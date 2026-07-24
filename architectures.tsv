@@ -1,0 +1,18 @@
+# name|zig target|zig cpu|qemu executable|description
+x86_64|x86_64-linux-musl|baseline|qemu-x86_64|64-bit x86 baseline
+i686|x86-linux-musl|pentium2|qemu-i386|32-bit x86, Pentium II or newer
+aarch64|aarch64-linux-musl|baseline|qemu-aarch64|64-bit ARM baseline
+armv5-softfloat|arm-linux-musleabi|arm926ej_s|qemu-arm|ARMv5TE EABI, soft float
+armv6-hardfloat|arm-linux-musleabihf|arm1176jzf_s|qemu-arm|ARMv6 EABI, hard float
+armv7-hardfloat|arm-linux-musleabihf|cortex_a7|qemu-arm|ARMv7-A EABI, hard float
+armv7-softfloat|arm-linux-musleabi|cortex_a7|qemu-arm|ARMv7-A EABI, soft float
+mips|mips-linux-musleabi|mips32|qemu-mips|32-bit MIPS, big endian, soft float
+mipsel|mipsel-linux-musleabi|mips32|qemu-mipsel|32-bit MIPS, little endian, soft float
+mips64|mips64-linux-muslabi64|mips64|qemu-mips64|64-bit MIPS, big endian
+mips64el|mips64el-linux-muslabi64|mips64|qemu-mips64el|64-bit MIPS, little endian
+powerpc|powerpc-linux-musleabihf|baseline|qemu-ppc|32-bit PowerPC, big endian, hard float
+powerpc64|powerpc64-linux-musl|baseline|qemu-ppc64|64-bit PowerPC, big endian
+powerpc64le|powerpc64le-linux-musl|baseline|qemu-ppc64le|64-bit PowerPC, little endian
+riscv64|riscv64-linux-musl|baseline|qemu-riscv64|64-bit RISC-V baseline
+loongarch64|loongarch64-linux-musl|baseline|qemu-loongarch64|64-bit LoongArch baseline
+s390x|s390x-linux-musl|baseline|qemu-s390x|64-bit IBM Z
