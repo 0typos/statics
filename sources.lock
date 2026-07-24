@@ -1,0 +1,23 @@
+# name|version|sha256|url
+# Keep this file machine-readable: no spaces around separators.
+zig-x86_64|0.16.0|70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00|https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz
+zig-aarch64|0.16.0|ea4b09bfb22ec6f6c6ceac57ab63efb6b46e17ab08d21f69f3a48b38e1534f17|https://ziglang.org/download/0.16.0/zig-aarch64-linux-0.16.0.tar.xz
+busybox|1.38.0|34f9ea6ff8636f2c9241153b9114eefa9e65674a45318ae1ef95bb5f31c53bb2|https://busybox.net/downloads/busybox-1.38.0.tar.bz2
+socat|1.8.1.3|06602ffd591e98c75b3dc1d66f0f19136cc666b0b2d95caad987d6ab2cb28097|http://www.dest-unreach.org/socat/download/socat-1.8.1.3.tar.gz
+dropbear|2026.94|e098034a843699200c8c977a991fff73159735bf795d5f72ef672c41a6b1ae81|https://matt.ucc.asn.au/dropbear/releases/dropbear-2026.94.tar.bz2
+iproute2|7.1.0|fd9fa1b95809417157ca83dd72957e3261bdbce896353cb936f80af0b33a4b5c|https://mirrors.edge.kernel.org/pub/linux/utils/net/iproute2/iproute2-7.1.0.tar.xz
+wireguard-tools|1.0.20260223|859f8af03702db5e5c43f8ece77f5ebef40a2f4627c3e03997a031d4940ea9bc|https://github.com/WireGuard/wireguard-tools/archive/refs/tags/v1.0.20260223.tar.gz
+openssl|3.5.7|a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8|https://github.com/openssl/openssl/releases/download/openssl-3.5.7/openssl-3.5.7.tar.gz
+libpcap|1.10.6|ec97d1206bdd19cb6bdd043eaa9f0037aa732262ec68e070fd7c7b5f834d5dfc|https://www.tcpdump.org/release/libpcap-1.10.6.tar.xz
+libmnl|1.0.5|274b9b919ef3152bfb3da3a13c950dd60d6e2bcd54230ffeca298d03b40d0525|https://www.netfilter.org/projects/libmnl/files/libmnl-1.0.5.tar.bz2
+tcpdump|4.99.6|40a8cefd45f0d2a06827e6658efb830d484868c449ad80f7efb33516af44f3da|https://www.tcpdump.org/release/tcpdump-4.99.6.tar.xz
+curl|8.21.0|aa1b66a70eace83dc624508745646c08ae561de512ab403adffb93ac87fc72e6|https://curl.se/download/curl-8.21.0.tar.xz
+iperf3|3.21|656e4405ebd620121de7ceca3eaf43a88f79ea1b857d041a6a0b1314801acdd8|https://downloads.es.net/pub/iperf/iperf-3.21.tar.gz
+ethtool|7.1|4d78c26edc0255bc92f4b995b5fd66108d75ff966ed4694f6025a6d370bc2496|https://mirrors.edge.kernel.org/pub/software/network/ethtool/ethtool-7.1.tar.xz
+strace|7.1|81743ecf2a5b44186b2f5038afdc8beda7e5c70aed15b4fbfbcc6e9ece24490f|https://strace.io/files/7.1/strace-7.1.tar.xz
+jq|1.8.2|71b8d6e8f5fe81f6c6d0d110e3892251f6ce76ed095abd315e26e6e1193af3af|https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-1.8.2.tar.gz
+ldns|1.9.2|b524fa21994b6e834200ceb8c27f1b84bda5982fe35706f058196c079db94d5d|https://nlnetlabs.nl/downloads/ldns/ldns-1.9.2.tar.gz
+mtr|0.96|73e6aef3fb6c8b482acb5b5e2b8fa7794045c4f2420276f035ce76c5beae632d|https://github.com/traviscross/mtr/archive/refs/tags/v0.96.tar.gz
+can-utils|2025.01|88b30feace372c4a61e6adb2534791c0cfba6123ebcca7f59bbb76580d4a6915|https://github.com/linux-can/can-utils/archive/refs/tags/v2025.01.tar.gz
+i2c-tools|4.4|8b15f0a880ab87280c40cfd7235cfff28134bf14d5646c07518b1ff6642a2473|https://mirrors.edge.kernel.org/pub/software/utils/i2c-tools/i2c-tools-4.4.tar.xz
+spi-tools|a19dffe44fee|4dfa41dc4f18c7bf4deb0faea6d349f6eac9f7d39a7c1d6ce6a23884fd9c8699|https://github.com/cpb-/spi-tools/archive/a19dffe44fee857124a993598caae0c85894f914.tar.gz

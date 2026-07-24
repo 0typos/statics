@@ -1,0 +1,35 @@
+name: Check upstream releases
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 6 * * 5"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Discover releases and refresh checksums
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./scripts/update_sources.py --write | tee update-summary.txt
+      - name: Open an update pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: automation/update-sources
+          delete-branch: true
+          commit-message: "chore: update pinned upstream sources"
+          title: "chore: update pinned upstream sources"
+          body: |
+            Automated upstream release check.
+
+            Source archives were downloaded and SHA-256 pins were regenerated.
+            CI must cross-build and QEMU-smoke-test every architecture before merge.
+            Maintainers should review upstream release notes and signatures.
+          labels: dependencies
+          add-paths: sources.lock

@@ -1,0 +1,102 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 4 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Validate manifests and scripts
+        run: ./scripts/validate.sh
+      - name: ShellCheck
+        run: shellcheck scripts/*.sh scripts/builders/*.sh scripts/lib/*.sh scripts/toolchain/*
+
+  build:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        arch:
+          - x86_64
+          - i686
+          - aarch64
+          - armv5-softfloat
+          - armv6-hardfloat
+          - armv7-hardfloat
+          - armv7-softfloat
+          - mips
+          - mipsel
+          - mips64
+          - mips64el
+          - powerpc
+          - powerpc64
+          - powerpc64le
+          - riscv64
+          - loongarch64
+          - s390x
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - name: Build ${{ matrix.arch }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: artifact
+          build-args: ARCH=${{ matrix.arch }}
+          outputs: type=local,dest=dist
+          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+      - name: Install QEMU
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes qemu-user-static
+      - name: Verify and package
+        run: |
+          ./scripts/verify.sh "dist/${{ matrix.arch }}" "${{ matrix.arch }}"
+          ./scripts/package.sh "${{ matrix.arch }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: statics-${{ matrix.arch }}
+          path: |
+            dist/statics-${{ matrix.arch }}.tar.xz
+            dist/statics-${{ matrix.arch }}.tar.xz.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+  source-bundle:
+    if: github.event_name != 'pull_request'
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - name: Export verified upstream source archives
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: source-artifact
+          outputs: type=local,dest=dist/sources
+          cache-from: type=gha,scope=sources
+          cache-to: type=gha,mode=max,scope=sources
+      - uses: actions/upload-artifact@v4
+        with:
+          name: corresponding-sources
+          path: dist/sources/
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,88 @@
+/*
+ * Zig 0.16's musl sysroot predates a few Linux 7.1 UAPI constants consumed
+ * by strace 7.1. Keep these values aligned with strace's pinned bundled UAPI.
+ */
+#ifndef CLONE_AUTOREAP
+# define CLONE_AUTOREAP (1ULL << 34)
+#endif
+#ifndef CLONE_NNP
+# define CLONE_NNP (1ULL << 35)
+#endif
+#ifndef CLONE_PIDFD_AUTOKILL
+# define CLONE_PIDFD_AUTOKILL (1ULL << 36)
+#endif
+#ifndef CLONE_EMPTY_MNTNS
+# define CLONE_EMPTY_MNTNS (1ULL << 37)
+#endif
+#ifndef BTRFS_FEATURE_INCOMPAT_REMAP_TREE
+# define BTRFS_FEATURE_INCOMPAT_REMAP_TREE (1ULL << 17)
+#endif
+#ifndef BTRFS_BLOCK_GROUP_REMAPPED
+# define BTRFS_BLOCK_GROUP_REMAPPED (1ULL << 11)
+#endif
+#ifndef BTRFS_BLOCK_GROUP_METADATA_REMAP
+# define BTRFS_BLOCK_GROUP_METADATA_REMAP (1ULL << 12)
+#endif
+#ifndef BTRFS_REMAP_TREE_OBJECTID
+# define BTRFS_REMAP_TREE_OBJECTID 13ULL
+#endif
+#ifndef KEY_ACTION_ON_SELECTION
+# define KEY_ACTION_ON_SELECTION 0x254
+#endif
+#ifndef KEY_CONTEXTUAL_INSERT
+# define KEY_CONTEXTUAL_INSERT 0x255
+#endif
+#ifndef KEY_CONTEXTUAL_QUERY
+# define KEY_CONTEXTUAL_QUERY 0x256
+#endif
+#ifndef FS_XFLAG_VERITY
+# define FS_XFLAG_VERITY 0x00020000
+#endif
+#ifndef FS_SHUTDOWN_FLAGS_DEFAULT
+# define FS_SHUTDOWN_FLAGS_DEFAULT 0x0
+#endif
+#ifndef FS_SHUTDOWN_FLAGS_LOGFLUSH
+# define FS_SHUTDOWN_FLAGS_LOGFLUSH 0x1
+#endif
+#ifndef FS_SHUTDOWN_FLAGS_NOLOGFLUSH
+# define FS_SHUTDOWN_FLAGS_NOLOGFLUSH 0x2
+#endif
+#ifndef FS_IOC_SHUTDOWN
+# define FS_IOC_SHUTDOWN 0x8004587dUL
+#endif
+#ifndef FSMOUNT_NAMESPACE
+# define FSMOUNT_NAMESPACE 0x00000002
+#endif
+#ifndef LANDLOCK_ACCESS_FS_RESOLVE_UNIX
+# define LANDLOCK_ACCESS_FS_RESOLVE_UNIX (1ULL << 16)
+#endif
+#ifndef OPEN_TREE_NAMESPACE
+# define OPEN_TREE_NAMESPACE (1U << 1)
+#endif
+
+#ifndef AT_EXECVE_CHECK
+# define AT_EXECVE_CHECK 0x10000
+#endif
+
+#ifndef PR_RSEQ_SLICE_EXTENSION
+# define PR_RSEQ_SLICE_EXTENSION 79
+#endif
+#ifndef PR_GET_CFI
+# define PR_GET_CFI 80
+#endif
+#ifndef PR_SET_CFI
+# define PR_SET_CFI 81
+#endif
+
+#ifndef IFLA_BR_STP_MODE
+# define IFLA_BR_STP_MODE 50
+#endif
+#ifndef BR_STP_MODE_AUTO
+# define BR_STP_MODE_AUTO 0
+# define BR_STP_MODE_USER 1
+# define BR_STP_MODE_KERNEL 2
+#endif
+
+#ifndef STATMOUNT_BY_FD
+# define STATMOUNT_BY_FD 0x00000001U
+#endif

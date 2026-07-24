@@ -1,0 +1,6 @@
+# Applied on top of the pinned BusyBox defconfig.
+CONFIG_STATIC=y
+CONFIG_NETCAT=y
+# Linux 7 removed CBQ UAPI definitions used by the BusyBox tc applet.
+# The dedicated iproute2 family is the intended future source for tc.
+# CONFIG_TC is not set
