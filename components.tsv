@@ -7,6 +7,7 @@ wireguard-tools|GPL-2.0-only|wg
 openssl|Apache-2.0|openssl; statically linked into curl, iperf3, drill, nmap, and ncat
 libpcap|BSD-3-Clause|statically linked into tcpdump, nmap, and ncat
 libmnl|LGPL-2.1-or-later|statically linked into iproute2 and ethtool
+libcap-ng|LGPL-2.1-or-later|statically linked into util-linux setpriv
 tcpdump|BSD-3-Clause|tcpdump
 curl|curl|curl
 iperf3|BSD-3-Clause|iperf3
@@ -21,3 +22,4 @@ spi-tools|GPL-2.0-only|spi-config and spi-pipe
 nmap|LicenseRef-NPSL-0.95 AND BSD-3-Clause AND MIT AND Zlib|nmap, ncat, core data files, and selected bundled libraries
 rsync|GPL-3.0-or-later AND MIT AND Zlib|rsync with bundled popt and zlib
 lsof|lsof|lsof
+util-linux|GPL-2.0-only AND GPL-2.0-or-later AND LGPL-2.1-or-later|nsenter, unshare, lsns, setpriv, findmnt, and their static util-linux libraries

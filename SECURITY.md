@@ -66,8 +66,9 @@ behavior under its security policy.
 ## Operational safety
 
 These utilities can listen on sockets, change network configuration, capture
-or generate traffic, start an SSH server, and execute subprocesses. Use them
-only on systems and networks where you are authorized to do so. Treat downloaded
+or generate traffic, enter or create namespaces, alter a child process's
+privilege state, start an SSH server, and execute subprocesses. Use them only
+on systems and networks where you are authorized to do so. Treat downloaded
 workflow artifacts as release candidates until their provenance and digests
 have been reviewed for the intended environment.
 

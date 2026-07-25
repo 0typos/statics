@@ -18,6 +18,7 @@ the [contribution checklist](../CONTRIBUTING.md).
 | Application protocols and data | `curl`, `openssl`, `drill`, `jq` |
 | Discovery and transfer | `nmap`, `ncat`, `rsync` |
 | Process diagnosis | `strace`, `lsof` |
+| Namespaces and privilege | `nsenter`, `unshare`, `lsns`, `setpriv`, `findmnt` |
 | Embedded buses | selected `can-utils`, `i2c-tools`, and `spi-tools` programs |
 
 ## Candidates for the next expansion

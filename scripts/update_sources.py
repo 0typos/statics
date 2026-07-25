@@ -206,6 +206,17 @@ def latest_libmnl() -> tuple[str, str]:
     )
 
 
+def latest_libcap_ng() -> tuple[str, str]:
+    return latest_from_github_tags(
+        "stevegrubb/libcap-ng",
+        r"v(\d+\.\d+(?:\.\d+)?)",
+        (
+            "https://github.com/stevegrubb/libcap-ng/archive/refs/tags/"
+            "v{version}.tar.gz"
+        ),
+    )
+
+
 def latest_curl() -> tuple[str, str]:
     return latest_from_index(
         "https://curl.se/download.html",
@@ -336,6 +347,19 @@ def latest_lsof() -> tuple[str, str]:
     )
 
 
+def latest_util_linux() -> tuple[str, str]:
+    root = "https://www.kernel.org/pub/linux/utils/util-linux/"
+    branches = set(re.findall(r'href="v(\d+\.\d+)/"', text(root)))
+    if not branches:
+        raise RuntimeError(f"no util-linux release branches found at {root}")
+    branch = max(branches, key=numeric_version)
+    return latest_from_index(
+        f"{root}v{branch}/",
+        rf"util-linux-({re.escape(branch)}(?:\.\d+)?)\.tar\.xz",
+        f"{root}v{branch}/util-linux-{{version}}.tar.xz",
+    )
+
+
 def latest_zig(host: str) -> tuple[str, str]:
     index = json.loads(text("https://ziglang.org/download/index.json"))
     stable = [key for key in index if re.fullmatch(r"\d+\.\d+\.\d+", key)]
@@ -352,6 +376,7 @@ DISCOVERERS: dict[str, Callable[[], tuple[str, str]]] = {
     "openssl": latest_openssl,
     "libpcap": latest_libpcap,
     "libmnl": latest_libmnl,
+    "libcap-ng": latest_libcap_ng,
     "tcpdump": latest_tcpdump,
     "curl": latest_curl,
     "iperf3": latest_iperf3,
@@ -366,6 +391,7 @@ DISCOVERERS: dict[str, Callable[[], tuple[str, str]]] = {
     "nmap": latest_nmap,
     "rsync": latest_rsync,
     "lsof": latest_lsof,
+    "util-linux": latest_util_linux,
     "zig-x86_64": lambda: latest_zig("x86_64-linux"),
     "zig-aarch64": lambda: latest_zig("aarch64-linux"),
 }

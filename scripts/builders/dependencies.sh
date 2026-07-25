@@ -68,8 +68,30 @@ build_libmnl() {
     )
 }
 
+build_libcap_ng() {
+    echo "==> building libcap-ng"
+    (
+        cd "$WORK_DIR/libcap-ng" || exit
+        ./autogen.sh >/dev/null
+        CC="$CC" AR="$AR" RANLIB="$RANLIB" PKG_CONFIG=false ./configure \
+            --build="$(cc -dumpmachine)" \
+            --host="$AUTOCONF_HOST" \
+            --prefix="$DEPS_PREFIX" \
+            --disable-shared \
+            --enable-static \
+            --disable-cap-audit \
+            --disable-deprecated \
+            --without-python3 \
+            CFLAGS="$STATIC_CFLAGS" \
+            LDFLAGS="$STATIC_LDFLAGS"
+        make -s -j"$JOBS"
+        make -s install
+    )
+}
+
 build_dependencies() {
     build_openssl
     build_libpcap
     build_libmnl
+    build_libcap_ng
 }
