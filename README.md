@@ -88,9 +88,9 @@ The matrix covers:
 - x86-64 and 32-bit x86
 - AArch64
 - ARMv6 hard-float and ARMv7 soft/hard-float
-- 32/64-bit MIPS in both endian modes
+- 32-bit MIPS in both endian modes
 - 32/64-bit PowerPC in big-endian and little-endian modes
-- RISC-V 64, LoongArch 64, and s390x
+- RISC-V 64 and s390x
 
 See [docs/ARCHITECTURES.md](docs/ARCHITECTURES.md) for ABI details and device
 selection guidance. A successful static build does not replace kernel support

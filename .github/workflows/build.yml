@@ -47,13 +47,10 @@ jobs:
           - armv7-softfloat
           - mips
           - mipsel
-          - mips64
-          - mips64el
           - powerpc
           - powerpc64
           - powerpc64le
           - riscv64
-          - loongarch64
           - s390x
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
