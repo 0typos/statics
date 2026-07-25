@@ -53,9 +53,9 @@ if grep -REn \
     exit 1
 fi
 
-grep -Eq '^ARG BASE_IMAGE=[^[:space:]]+@sha256:[0-9a-f]{64}$' \
+grep -Eq '^FROM [^[:space:]]+@sha256:[0-9a-f]{64} AS toolchain$' \
     "$repo_root/docker/Dockerfile" || {
-    echo "BASE_IMAGE must be pinned by SHA-256 digest" >&2
+    echo "the toolchain base image must be pinned by SHA-256 digest" >&2
     exit 1
 }
 
