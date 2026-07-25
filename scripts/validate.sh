@@ -45,6 +45,7 @@ bash -n \
     "$repo_root"/scripts/toolchain/*
 python3 -m py_compile "$repo_root/scripts/update_sources.py"
 python3 -m py_compile "$repo_root/scripts/generate-sbom.py"
+python3 "$repo_root/scripts/check-docs.py"
 
 if grep -REn \
     '^[[:space:]]*uses:[[:space:]]+[^[:space:]#]+@(v?[0-9]+|main|master)([[:space:]#]|$)' \
