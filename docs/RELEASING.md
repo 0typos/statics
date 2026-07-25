@@ -8,7 +8,8 @@ signature was unavailable. A GitHub Release is published only after:
 2. every architecture builds and passes static/QEMU verification;
 3. two independent, uncached x86-64 builds have identical contents;
 4. the corresponding-source archive is packaged;
-5. every downloaded release asset passes its portable SHA-256 file.
+5. public releases receive GitHub/Sigstore attestations in isolated jobs;
+6. every downloaded release asset passes its portable SHA-256 file.
 
 The release contains, for every architecture:
 
@@ -100,9 +101,14 @@ gate.
 
 ## Repository settings
 
-The default branch must require the `validate`, `reproducibility`, and all
-architecture `build` checks before accepting changes. Keep force pushes and
-branch deletion disabled.
+The default branch must require `Validate repository`, `Reproducibility`, and
+every `Build <architecture>` check before accepting changes. Keep force pushes
+and branch deletion disabled.
+
+Before the first public push, create the repository without initializing it,
+set `main` as the default branch, and push only the reviewed `main` history.
+Confirm that the repository owner and URL in local Git configuration are the
+intended public destination before setting `origin`.
 
 Under **Settings → Actions → General → Workflow permissions**, select read
 permissions by default and enable **Allow GitHub Actions to create and approve
@@ -112,5 +118,7 @@ with the workflow token do not start another workflow automatically.
 
 Release maintainers should also enable GitHub private vulnerability reporting
 when available and keep Actions artifact attestations permitted for public
-tag builds. See the [security policy](../SECURITY.md) for the reporting and
-trust model.
+tag builds. Enable Dependabot alerts and security updates, and protect the
+`v*` tag namespace so only release maintainers can create or update release
+tags. See the [security policy](../SECURITY.md) for the reporting and trust
+model.

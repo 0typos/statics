@@ -1,0 +1,83 @@
+name: Bug report
+description: Report a reproducible build, verification, packaging, or runtime problem
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include secrets, private packet captures, customer data, or device identifiers. Report suspected vulnerabilities privately using the process in `SECURITY.md`.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Build
+        - Verification or QEMU
+        - Packaging or SBOM
+        - Runtime utility behavior
+        - Automation
+        - Documentation
+    validations:
+      required: true
+  - type: input
+    id: revision
+    attributes:
+      label: Revision
+      description: Commit SHA or release tag where the problem occurs
+      placeholder: 0123456789abcdef or vYYYY.MM.DD
+    validations:
+      required: true
+  - type: dropdown
+    id: architecture
+    attributes:
+      label: Target architecture
+      options:
+        - Not architecture-specific
+        - x86_64
+        - i686
+        - aarch64
+        - armv6-hardfloat
+        - armv7-hardfloat
+        - armv7-softfloat
+        - mips
+        - mipsel
+        - powerpc
+        - powerpc64
+        - powerpc64le
+        - riscv64
+        - s390x
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Include the smallest command sequence that reproduces the problem
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Host and target environment
+      description: Include host OS, Docker and Buildx versions, target kernel, and relevant device details after redaction
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Redact tokens, private addresses, device identifiers, and unrelated data
+      render: text
