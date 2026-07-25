@@ -11,7 +11,7 @@ build_dropbear() {
         ac_cv_func_getpass=yes \
         ac_cv_func_getspnam=yes \
         CC="$CC" ./configure \
-            --host="$ZIG_TARGET" \
+            --host="$AUTOCONF_HOST" \
             --disable-zlib \
             CFLAGS='-O0 -ffunction-sections -fdata-sections -Wno-undef' \
             LDFLAGS='-static -Wl,--gc-sections -Wl,-s'

@@ -7,7 +7,7 @@ build_strace() {
         CC="$CC" \
         CPPFLAGS="-I$REPO_ROOT/configs/strace-uapi -I$WORK_DIR/strace/bundled/linux/include/uapi" \
         ./configure \
-            --host="$ZIG_TARGET" \
+            --host="$AUTOCONF_HOST" \
             --enable-bundled=yes \
             --enable-mpers=no \
             --enable-stacktrace=no \

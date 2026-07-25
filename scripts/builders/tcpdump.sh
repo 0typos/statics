@@ -8,7 +8,7 @@ build_tcpdump() {
         PKG_CONFIG_LIBDIR="$DEPS_PREFIX/lib/pkgconfig" \
         CPPFLAGS="-I$DEPS_PREFIX/include" \
         ./configure \
-            --host="$ZIG_TARGET" \
+            --host="$AUTOCONF_HOST" \
             --disable-local-libpcap \
             --without-cap-ng \
             --without-crypto \

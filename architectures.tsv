@@ -2,7 +2,6 @@
 x86_64|x86_64-linux-musl|baseline|qemu-x86_64|64-bit x86 baseline
 i686|x86-linux-musl|pentium2|qemu-i386|32-bit x86, Pentium II or newer
 aarch64|aarch64-linux-musl|baseline|qemu-aarch64|64-bit ARM baseline
-armv5-softfloat|arm-linux-musleabi|arm926ej_s|qemu-arm|ARMv5TE EABI, soft float
 armv6-hardfloat|arm-linux-musleabihf|arm1176jzf_s|qemu-arm|ARMv6 EABI, hard float
 armv7-hardfloat|arm-linux-musleabihf|cortex_a7|qemu-arm|ARMv7-A EABI, hard float
 armv7-softfloat|arm-linux-musleabi|cortex_a7|qemu-arm|ARMv7-A EABI, soft float

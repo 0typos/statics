@@ -6,7 +6,7 @@ build_mtr() {
         cd "$WORK_DIR/mtr" || exit
         ./bootstrap.sh
         CC="$CC" PKG_CONFIG=false ./configure \
-            --host="$ZIG_TARGET" \
+            --host="$AUTOCONF_HOST" \
             --without-gtk \
             --without-ipinfo \
             --without-jansson \

@@ -8,7 +8,7 @@ build_ldns() {
         CPPFLAGS="-I$DEPS_PREFIX/include" \
         LDFLAGS="$STATIC_LDFLAGS -L$DEPS_PREFIX/lib" \
         ./configure \
-            --host="$ZIG_TARGET" \
+            --host="$AUTOCONF_HOST" \
             --disable-shared \
             --enable-static \
             --disable-dane \

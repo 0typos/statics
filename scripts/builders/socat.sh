@@ -5,7 +5,7 @@ build_socat() {
     (
         cd "$WORK_DIR/socat" || exit
         CC="$CC" ./configure \
-            --host="$ZIG_TARGET" \
+            --host="$AUTOCONF_HOST" \
             --disable-openssl \
             --disable-readline \
             CFLAGS='-Os -Wno-date-time' \

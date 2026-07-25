@@ -42,7 +42,6 @@ jobs:
           - x86_64
           - i686
           - aarch64
-          - armv5-softfloat
           - armv6-hardfloat
           - armv7-hardfloat
           - armv7-softfloat
