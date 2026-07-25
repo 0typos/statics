@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         bison \
         jq \
         libtool \
+        patch \
         perl \
         pkg-config \
         python3 \

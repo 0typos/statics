@@ -27,6 +27,7 @@ required_binaries=(
     isotpdump isotprecv isotpsend slcand canbusload
     i2cdetect i2cdump i2cget i2cset i2ctransfer
     spi-config spi-pipe
+    nmap ncat rsync lsof
 )
 
 for metadata in BUILDINFO COMPONENTS.tsv SBOM.spdx.json SHA256SUMS \
@@ -40,6 +41,21 @@ done
 for binary in "${required_binaries[@]}"; do
     [[ -x $output_dir/$binary ]] || {
         echo "missing executable: $output_dir/$binary" >&2
+        exit 1
+    }
+done
+
+for nmap_data in \
+    nmap-mac-prefixes \
+    nmap-os-db \
+    nmap-protocols \
+    nmap-rpc \
+    nmap-service-probes \
+    nmap-services \
+    nmap.dtd \
+    nmap.xsl; do
+    [[ -s $output_dir/share/nmap/$nmap_data ]] || {
+        echo "missing Nmap runtime data: $nmap_data" >&2
         exit 1
     }
 done
@@ -83,7 +99,7 @@ bundle = next(
     if package.get("name") == f"statics-{arch}"
 )
 if bundle.get("filesAnalyzed") is not True:
-    raise SystemExit("SPDX bundle does not analyze its executable files")
+    raise SystemExit("SPDX bundle does not analyze its payload files")
 
 sha1_values = []
 for file_record in document["files"]:
@@ -181,6 +197,10 @@ if [[ ${SKIP_QEMU:-0} != 1 ]]; then
     check_output drill "$output_dir/drill" -v
     check_output mtr "$output_dir/mtr" --version
     check_output i2cdetect "$output_dir/i2cdetect" -V
+    check_output Nmap "$output_dir/nmap" --version
+    check_output Ncat "$output_dir/ncat" --version
+    check_output rsync "$output_dir/rsync" --version
+    check_output version "$output_dir/lsof" -v
 fi
 
 echo "verified $arch"

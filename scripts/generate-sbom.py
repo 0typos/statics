@@ -152,6 +152,17 @@ def main() -> int:
         "files": files,
         "relationships": relationships,
     }
+    if any("LicenseRef-NPSL-0.95" in fields[1] for fields in components):
+        document["hasExtractedLicensingInfos"] = [
+            {
+                "licenseId": "LicenseRef-NPSL-0.95",
+                "name": "Nmap Public Source License Version 0.95",
+                "extractedText": (
+                    output_dir / "licenses" / "nmap" / "LICENSE"
+                ).read_text(encoding="utf-8"),
+                "seeAlsos": ["https://nmap.org/npsl/"],
+            }
+        ]
     destination = output_dir / "SBOM.spdx.json"
     destination.write_text(
         json.dumps(document, indent=2, sort_keys=True) + "\n",

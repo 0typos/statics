@@ -1,0 +1,19 @@
+#!/bin/sh
+set -eu
+
+: "${ZIG_TARGET:?ZIG_TARGET is required}"
+zig_bin=${ZIG:-zig}
+
+if [ "${ZIG_CPU:-baseline}" = "baseline" ]; then
+    exec "$zig_bin" c++ -target "$ZIG_TARGET" \
+        -fno-sanitize=all \
+        -Wno-ignored-optimization-argument \
+        -Wno-unused-command-line-argument \
+        "$@"
+fi
+
+exec "$zig_bin" c++ -target "$ZIG_TARGET" -mcpu="$ZIG_CPU" \
+    -fno-sanitize=all \
+    -Wno-ignored-optimization-argument \
+    -Wno-unused-command-line-argument \
+    "$@"

@@ -4,8 +4,8 @@ socat|GPL-2.0-only|socat
 dropbear|MIT AND Unlicense|dropbearmulti and applet links; bundled libtomcrypt and libtommath
 iproute2|GPL-2.0-only|ip, ss, bridge, and tc
 wireguard-tools|GPL-2.0-only|wg
-openssl|Apache-2.0|openssl; statically linked into curl, iperf3, and drill
-libpcap|BSD-3-Clause|statically linked into tcpdump
+openssl|Apache-2.0|openssl; statically linked into curl, iperf3, drill, nmap, and ncat
+libpcap|BSD-3-Clause|statically linked into tcpdump, nmap, and ncat
 libmnl|LGPL-2.1-or-later|statically linked into iproute2 and ethtool
 tcpdump|BSD-3-Clause|tcpdump
 curl|curl|curl
@@ -18,3 +18,6 @@ mtr|GPL-2.0-only|mtr and mtr-packet
 can-utils|GPL-2.0-only OR BSD-3-Clause|selected SocketCAN and ISO-TP tools
 i2c-tools|GPL-2.0-or-later AND LGPL-2.1-or-later|selected I2C tools and statically linked libi2c code
 spi-tools|GPL-2.0-only|spi-config and spi-pipe
+nmap|LicenseRef-NPSL-0.95 AND BSD-3-Clause AND MIT AND Zlib|nmap, ncat, core data files, and selected bundled libraries
+rsync|GPL-3.0-or-later AND MIT AND Zlib|rsync with bundled popt and zlib
+lsof|lsof|lsof

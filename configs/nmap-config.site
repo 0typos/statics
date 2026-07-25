@@ -1,0 +1,3 @@
+# Nmap's bundled libdnet memcmp runtime probe cannot execute while
+# cross-building. Musl provides a conforming memcmp on every supported target.
+ac_cv_func_memcmp_working=yes
