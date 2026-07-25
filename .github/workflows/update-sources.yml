@@ -6,6 +6,7 @@ on:
     - cron: "41 6 * * 5"
 
 permissions:
+  actions: write
   contents: write
   pull-requests: write
 
@@ -13,14 +14,16 @@ jobs:
   update:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Discover releases and refresh checksums
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: ./scripts/update_sources.py --write | tee update-summary.txt
       - name: Open an update pull request
-        uses: peter-evans/create-pull-request@v7
+        id: update-pr
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
+          token: ${{ github.token }}
           branch: automation/update-sources
           delete-branch: true
           commit-message: "chore: update pinned upstream sources"
@@ -33,3 +36,12 @@ jobs:
             Maintainers should review upstream release notes and signatures.
           labels: dependencies
           add-paths: sources.lock
+      - name: Run full CI for the update commit
+        if: >-
+          steps.update-pr.outputs.pull-request-operation == 'created' ||
+          steps.update-pr.outputs.pull-request-operation == 'updated'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          UPDATE_BRANCH: ${{ steps.update-pr.outputs.pull-request-branch }}
+        run: gh workflow run build.yml --ref "$UPDATE_BRANCH"
