@@ -20,7 +20,7 @@ help:
 	@echo "  make verify ARCH=x86_64      Verify an existing local build"
 	@echo "  make package ARCH=x86_64     Create a deterministic tar.xz"
 	@echo "  make sources                 Export verified upstream archives"
-	@echo "  make source-package         Package corresponding source archives"
+	@echo "  make source-package          Package corresponding source archives"
 	@echo "  make clean                   Remove generated output"
 
 list:
