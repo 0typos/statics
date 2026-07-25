@@ -197,6 +197,27 @@ process namespaces, user ownership, ptrace restrictions, and security modules
 can hide file descriptors or processes. Run Lsof in the same namespaces as
 the target process when possible.
 
+## Namespace commands fail or show incomplete state
+
+`nsenter` uses `setns(2)` and commonly needs `CAP_SYS_ADMIN` in the user
+namespace that owns the namespace being joined. Also check:
+
+- the target PID still exists and `/proc/<pid>/ns/` is visible;
+- procfs `hidepid`, PID namespaces, and container mounts do not hide it;
+- seccomp and the active Linux security modules permit `setns` or `unshare`;
+- the requested namespace type is enabled by the target kernel;
+- unprivileged user namespaces are enabled when using
+  `unshare --map-root-user`;
+- the command path remains visible after entering a mount namespace.
+
+Entering a PID namespace affects child processes created afterward. It does
+not move the calling process itself into the target PID view. Use `nsenter`
+with a command, as shown in the [toolkit guide](TOOLKIT.md), so it creates the
+process in the intended context.
+
+`lsns` and `findmnt` read procfs namespace and mount information. Restricted
+or container-specific procfs mounts can legitimately produce partial output.
+
 ## Rsync does not preserve metadata
 
 The compact profile intentionally omits ACL and extended-attribute support.

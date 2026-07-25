@@ -63,6 +63,7 @@ sources=(
     openssl
     libpcap
     libmnl
+    libcap-ng
     tcpdump
     curl
     iperf3
@@ -77,6 +78,7 @@ sources=(
     nmap
     rsync
     lsof
+    util-linux
 )
 
 for path in "$WORK_DIR" "$OUTPUT_DIR"; do
@@ -124,6 +126,7 @@ source "$repo_root/scripts/builders/spi-tools.sh"
 source "$repo_root/scripts/builders/nmap.sh"
 source "$repo_root/scripts/builders/rsync.sh"
 source "$repo_root/scripts/builders/lsof.sh"
+source "$repo_root/scripts/builders/util-linux.sh"
 
 build_dependencies
 build_strace
@@ -140,6 +143,7 @@ build_spi_tools
 build_nmap
 build_rsync
 build_lsof
+build_util_linux
 build_busybox
 build_socat
 build_dropbear

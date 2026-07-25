@@ -40,6 +40,8 @@ copy_license wireguard-tools COPYING
 copy_license openssl LICENSE.txt
 copy_license libpcap LICENSE
 copy_license libmnl COPYING
+copy_license libcap-ng COPYING
+copy_license libcap-ng COPYING.LIB
 copy_license tcpdump LICENSE
 copy_license curl COPYING
 copy_license iperf3 LICENSE
@@ -64,6 +66,11 @@ copy_license rsync COPYING
 copy_license rsync popt/COPYING
 copy_license rsync zlib/zlib.h
 copy_license lsof COPYING
+copy_license util-linux COPYING
+copy_license util-linux README.licensing
+copy_license util-linux Documentation/licenses/COPYING.GPL-2.0-only
+copy_license util-linux Documentation/licenses/COPYING.GPL-2.0-or-later
+copy_license util-linux Documentation/licenses/COPYING.LGPL-2.1-or-later
 
 cp "$repo_root/components.tsv" "$output_dir/COMPONENTS.tsv"
 

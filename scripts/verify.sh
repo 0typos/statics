@@ -28,6 +28,7 @@ required_binaries=(
     i2cdetect i2cdump i2cget i2cset i2ctransfer
     spi-config spi-pipe
     nmap ncat rsync lsof
+    nsenter unshare lsns setpriv findmnt
 )
 
 for metadata in BUILDINFO BUILD_RECIPES_LICENSE COMPONENTS.tsv SBOM.spdx.json \
@@ -201,6 +202,11 @@ if [[ ${SKIP_QEMU:-0} != 1 ]]; then
     check_output Ncat "$output_dir/ncat" --version
     check_output rsync "$output_dir/rsync" --version
     check_output version "$output_dir/lsof" -v
+    check_output util-linux "$output_dir/nsenter" --version
+    check_output util-linux "$output_dir/unshare" --version
+    check_output util-linux "$output_dir/lsns" --version
+    check_output util-linux "$output_dir/setpriv" --version
+    check_output util-linux "$output_dir/findmnt" --version
 fi
 
 echo "verified $arch"

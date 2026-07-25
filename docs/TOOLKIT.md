@@ -1,6 +1,6 @@
 # Toolkit guide
 
-The default bundle is a compact Linux troubleshooting kit: 39 physical
+The default bundle is a compact Linux troubleshooting kit: 44 physical
 executables, BusyBox applet links, Dropbear multi-call links, Nmap runtime
 data, license texts, checksums, and build metadata. Static linking removes the
 dependency on a target's installed libc; it does not replace kernel features,
@@ -31,6 +31,7 @@ Nmap data, notices, and licenses remain available.
 | Discovery and packet diagnosis | `nmap`, `tcpdump`, `mtr`, `mtr-packet`, `iperf3` | Host/service discovery, capture, path analysis, and throughput |
 | Protocol and data checks | `curl`, `openssl`, `drill`, `jq`, `rsync` | HTTP, TLS, DNS, structured output, and efficient file transfer |
 | Process diagnosis | `strace`, `lsof` | System-call tracing and process/file/socket correlation |
+| Namespaces and privilege | `nsenter`, `unshare`, `lsns`, `setpriv`, `findmnt` | Enter, create, enumerate, constrain, and inspect namespace state |
 | CAN and ISO-TP | `candump`, `cansend`, `cangen`, `canplayer`, `cansniffer`, `isotpdump`, `isotprecv`, `isotpsend`, `slcand`, `canbusload` | SocketCAN and ISO-TP field diagnosis |
 | Hardware buses | `i2cdetect`, `i2cdump`, `i2cget`, `i2cset`, `i2ctransfer`, `spi-config`, `spi-pipe` | Linux I²C and spidev diagnosis |
 
@@ -45,6 +46,65 @@ Every bundled project retains its own license, indexed in `COMPONENTS.tsv`
 and reproduced under `licenses/<source>/`. Read `THIRD_PARTY_NOTICES.md`
 before redistributing a bundle; Nmap and Ncat have particularly distinct NPSL
 terms.
+
+## Linux namespaces
+
+`setns(2)` is the kernel system call for joining an existing namespace. Linux
+does not provide a separate canonical `setns` command; util-linux `nsenter`
+is the standard maintained CLI around that syscall.
+
+Enumerate namespaces and inspect the current mount view:
+
+```console
+lsns
+findmnt --kernel
+findmnt --target /tmp
+```
+
+Enter only a process's network namespace and inspect it with the bundled
+iproute2 tools:
+
+```console
+TARGET_PID=1234
+nsenter --target "$TARGET_PID" --net ip -brief address
+nsenter --target "$TARGET_PID" --net ss -listening -numeric -tcp -udp
+```
+
+Enter the common namespaces of a process and start its system shell:
+
+```console
+nsenter --target "$TARGET_PID" --mount --uts --ipc --net --pid -- /bin/sh
+```
+
+Joining the mount namespace changes path resolution. A toolkit stored only in
+the caller's mount namespace may disappear after `--mount`; copy it somewhere
+visible in both views or use commands available in the target root.
+
+Create an isolated user, mount, and PID namespace when the kernel permits
+unprivileged user namespaces:
+
+```console
+unshare --user --map-root-user --mount --pid --fork --mount-proc /bin/sh
+```
+
+Inspect the current privilege state or constrain a child command:
+
+```console
+setpriv --dump
+setpriv --no-new-privs --bounding-set=-all \
+    --inh-caps=-all --ambient-caps=-all /bin/sh
+```
+
+The second command changes only the child execution context, but capability
+bounding-set removal is irreversible for that process tree. Test privilege
+profiles against the intended workload before operational use.
+
+Namespace entry normally requires `CAP_SYS_ADMIN` in the user namespace that
+owns the target namespace. User-namespace creation can be disabled by the
+kernel or policy. PID namespace entry affects subsequently created children,
+not the already-running `nsenter` process. `lsns` and `findmnt` depend on
+procfs visibility and can show partial information across containers or
+restricted procfs mounts.
 
 ## Common network checks
 
@@ -190,6 +250,14 @@ and SPI commands require the target kernel drivers and relevant network
 interfaces or device nodes. Write-oriented bus commands can alter hardware
 state—inspect the device documentation first.
 
+### Util-linux namespace profile
+
+The util-linux build contains only `nsenter`, `unshare`, `lsns`, `setpriv`,
+and `findmnt`, with static libblkid, libmount, libsmartcols, and libcap-ng as
+needed. NLS, udev, SELinux, systemd, libmagic, cryptsetup, ncurses, readline,
+and Python integrations are disabled. BusyBox already supplies complementary
+applets such as `chroot`, `mount`, `umount`, and `pivot_root`.
+
 ## Privilege guide
 
 Exact rules vary by kernel and security policy, but these are common:
@@ -200,6 +268,8 @@ Exact rules vary by kernel and security policy, but these are common:
 | ICMP/raw probes, some Nmap scan modes, packet capture | root or capabilities such as `CAP_NET_RAW` |
 | Address, route, link, WireGuard, bridge, or traffic-control changes | root or `CAP_NET_ADMIN` |
 | Trace or inspect another user's process | root, ptrace permission, and compatible LSM policy |
+| Enter another process's namespaces | commonly root or `CAP_SYS_ADMIN` in the owning user namespace |
+| Create user/network/mount/PID namespaces | kernel namespace support plus the applicable sysctl, LSM, seccomp, and capability policy |
 | Read I²C/SPI devices or CAN interfaces | suitable device/interface permissions and drivers |
 | Start a listener on a privileged port | root or `CAP_NET_BIND_SERVICE` |
 

@@ -54,7 +54,7 @@ make source-package           # create dist/statics-sources.tar.xz
 
 ## Toolkit
 
-The bundle contains 39 physical executables plus BusyBox and Dropbear
+The bundle contains 44 physical executables plus BusyBox and Dropbear
 multi-call links, Nmap runtime data, checksums, an SPDX SBOM, and upstream
 license texts.
 
@@ -66,6 +66,7 @@ license texts.
 | Discovery, packet, and path diagnosis | `nmap`, `tcpdump`, `iperf3`, `mtr`, `mtr-packet` | Nmap and tcpdump use static libpcap; mtr is built without curses |
 | HTTP, TLS, DNS, and data | `curl`, `openssl`, `drill`, `jq` | TLS-capable tools share the pinned OpenSSL build |
 | Process diagnosis | `strace`, `lsof` | Syscall tracing plus process/file/socket correlation through Linux procfs |
+| Namespaces and privilege | `nsenter`, `unshare`, `lsns`, `setpriv`, `findmnt` | Enter, create, enumerate, constrain, and inspect Linux namespace state |
 | CAN and ISO-TP | `candump`, `cansend`, `cangen`, `canplayer`, `cansniffer`, `isotpdump`, `isotprecv`, `isotpsend`, `slcand`, `canbusload` | SocketCAN tools for field and vehicle networks |
 | Hardware buses | `i2cdetect`, `i2cdump`, `i2cget`, `i2cset`, `i2ctransfer`, `spi-config`, `spi-pipe` | Direct Linux I²C and spidev diagnosis |
 
@@ -85,6 +86,11 @@ Packet capture, raw probes, network changes, process tracing, and hardware-bus
 access still require the corresponding Linux capabilities, drivers, device
 nodes, and security policy. The [toolkit guide](docs/TOOLKIT.md) documents
 each profile and gives safe starting commands.
+
+`setns(2)` is a Linux system call rather than a separate standard utility.
+The bundled util-linux `nsenter` is its maintained command-line interface.
+`unshare`, `lsns`, `setpriv`, and `findmnt` cover the adjacent creation,
+enumeration, privilege, and mount-view workflows.
 
 ## Supported Linux targets
 

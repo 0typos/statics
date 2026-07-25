@@ -105,12 +105,13 @@ features/privileges required by the selected utility.
 Each row names a QEMU user-mode runner in `architectures.tsv`. Verification
 executes unprivileged smoke or version checks for BusyBox/netcat, socat,
 Dropbear, the iproute2 tools, WireGuard, OpenSSL, tcpdump, curl, iperf3,
-ethtool, strace, jq, drill, mtr, i2c-tools, Nmap/Ncat, rsync, and lsof. Every
-physical executable, including the CAN, ISO-TP, and SPI utilities, is checked
-for static linkage and the absence of a dynamic program interpreter. Nmap's
-runtime data files are checksum-verified separately. QEMU is an instruction/
-ABI smoke test, not proof that privileged networking or procfs inspection
-works on a real kernel and device.
+ethtool, strace, jq, drill, mtr, i2c-tools, Nmap/Ncat, rsync, lsof, and the
+util-linux namespace tools. Every physical executable, including the CAN,
+ISO-TP, and SPI utilities, is checked for static linkage and the absence of a
+dynamic program interpreter. Nmap's runtime data files are checksum-verified
+separately. QEMU is an instruction/ABI smoke test, not proof that privileged
+networking, namespace entry, or procfs inspection works on a real kernel and
+device.
 
 CI builds every listed target. Locally, `make smoke ARCH=<name>` supplies QEMU
 inside the container. `make verify ARCH=<name>` uses an existing exported

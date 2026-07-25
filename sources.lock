@@ -10,6 +10,7 @@ wireguard-tools|1.0.20260223|859f8af03702db5e5c43f8ece77f5ebef40a2f4627c3e03997a
 openssl|3.5.7|a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8|https://github.com/openssl/openssl/releases/download/openssl-3.5.7/openssl-3.5.7.tar.gz
 libpcap|1.10.6|ec97d1206bdd19cb6bdd043eaa9f0037aa732262ec68e070fd7c7b5f834d5dfc|https://www.tcpdump.org/release/libpcap-1.10.6.tar.xz
 libmnl|1.0.5|274b9b919ef3152bfb3da3a13c950dd60d6e2bcd54230ffeca298d03b40d0525|https://www.netfilter.org/projects/libmnl/files/libmnl-1.0.5.tar.bz2
+libcap-ng|0.9.3|fe11ebbb55904763b3532f19069f13ec319042634620180a03bd4653d301563e|https://github.com/stevegrubb/libcap-ng/archive/refs/tags/v0.9.3.tar.gz
 tcpdump|4.99.6|40a8cefd45f0d2a06827e6658efb830d484868c449ad80f7efb33516af44f3da|https://www.tcpdump.org/release/tcpdump-4.99.6.tar.xz
 curl|8.21.0|aa1b66a70eace83dc624508745646c08ae561de512ab403adffb93ac87fc72e6|https://curl.se/download/curl-8.21.0.tar.xz
 iperf3|3.21|656e4405ebd620121de7ceca3eaf43a88f79ea1b857d041a6a0b1314801acdd8|https://downloads.es.net/pub/iperf/iperf-3.21.tar.gz
@@ -24,3 +25,4 @@ spi-tools|a19dffe44fee|4dfa41dc4f18c7bf4deb0faea6d349f6eac9f7d39a7c1d6ce6a23884f
 nmap|7.99|df512492ffd108e53a27a06f26d8635bbe89e0e569455dc8ffef058c035d51b2|https://nmap.org/dist/nmap-7.99.tar.bz2
 rsync|3.4.4|bd88cf82fa653da32314fb229136407c5c90f80d1758d8f4b091767877d8fa96|https://download.samba.org/pub/rsync/src/rsync-3.4.4.tar.gz
 lsof|4.99.7|4a10391aab0b8ce1f539e82a1966693b2a6cf225972a6504ebb7ec4fa71675de|https://github.com/lsof-org/lsof/releases/download/4.99.7/lsof-4.99.7.tar.gz
+util-linux|2.42.2|03a05d3adf9602ef128f2da05b84b3205ce60c351e5737c0370f74000679ce8a|https://www.kernel.org/pub/linux/utils/util-linux/v2.42/util-linux-2.42.2.tar.xz
