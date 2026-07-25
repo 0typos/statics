@@ -134,6 +134,7 @@ aarch64/
 ├── share/nmap/
 ├── licenses/<upstream>/
 ├── BUILDINFO
+├── BUILD_RECIPES_LICENSE
 ├── COMPONENTS.tsv
 ├── SBOM.spdx.json
 ├── SHA256SUMS
@@ -145,6 +146,10 @@ aarch64/
 `SBOM.spdx.json` records the same payload plus its upstream package
 relationships. License texts and build metadata remain alongside the payload
 but are not entries in `SHA256SUMS`.
+
+`BUILD_RECIPES_LICENSE` is the MIT license for this repository's original
+build machinery. It does not apply to the bundled utilities. Their individual
+terms are indexed by `COMPONENTS.tsv` and packaged under `licenses/`.
 
 Archives are normalized for stable ordering, ownership, and timestamps.
 Reproducibility still depends on identical repository inputs, source

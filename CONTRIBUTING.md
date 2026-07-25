@@ -8,6 +8,19 @@ Start with the [building guide](docs/BUILDING.md), the
 [architecture matrix](docs/ARCHITECTURES.md), and the
 [security policy](SECURITY.md).
 
+## Contribution license
+
+Unless a contribution explicitly states otherwise and is accepted on that
+basis, contributions to this repository's original build recipes, scripts,
+configuration, and documentation are made under the repository's
+[MIT License](LICENSE). Contributions derived from an upstream project,
+including patches to upstream code, must also comply with that project's
+license.
+
+This does not change the license of any upstream project. Do not copy upstream
+code, generated files, or patches into the repository without preserving and
+documenting their applicable terms.
+
 ## Development workflow
 
 Create a focused branch, make the smallest coherent change, and run:
@@ -153,6 +166,7 @@ clone.
 - The change has one clear purpose.
 - Generated binaries and source archives are not committed.
 - Inputs are pinned and checksum-verified.
+- New repository-authored material is compatible with the MIT license.
 - License notices and SBOM relationships remain complete.
 - `./scripts/validate.sh` and ShellCheck pass.
 - Relevant targets build and smoke-test.

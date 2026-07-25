@@ -30,8 +30,8 @@ required_binaries=(
     nmap ncat rsync lsof
 )
 
-for metadata in BUILDINFO COMPONENTS.tsv SBOM.spdx.json SHA256SUMS \
-    THIRD_PARTY_NOTICES.md sources.lock; do
+for metadata in BUILDINFO BUILD_RECIPES_LICENSE COMPONENTS.tsv SBOM.spdx.json \
+    SHA256SUMS THIRD_PARTY_NOTICES.md sources.lock; do
     [[ -s $output_dir/$metadata ]] || {
         echo "missing build metadata: $output_dir/$metadata" >&2
         exit 1
