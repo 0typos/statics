@@ -33,6 +33,7 @@ if [[ $arch == i686 ]]; then
     AUTOCONF_HOST=i686-linux-musl
 fi
 export CC="$repo_root/scripts/toolchain/cc"
+export CXX="$repo_root/scripts/toolchain/cxx"
 export AR="$repo_root/scripts/toolchain/ar"
 export RANLIB="$repo_root/scripts/toolchain/ranlib"
 export JOBS=${JOBS:-$(getconf _NPROCESSORS_ONLN)}
@@ -73,6 +74,9 @@ sources=(
     can-utils
     i2c-tools
     spi-tools
+    nmap
+    rsync
+    lsof
 )
 
 for path in "$WORK_DIR" "$OUTPUT_DIR"; do
@@ -117,6 +121,9 @@ source "$repo_root/scripts/builders/mtr.sh"
 source "$repo_root/scripts/builders/can-utils.sh"
 source "$repo_root/scripts/builders/i2c-tools.sh"
 source "$repo_root/scripts/builders/spi-tools.sh"
+source "$repo_root/scripts/builders/nmap.sh"
+source "$repo_root/scripts/builders/rsync.sh"
+source "$repo_root/scripts/builders/lsof.sh"
 
 build_dependencies
 build_strace
@@ -130,6 +137,9 @@ build_mtr
 build_can_utils
 build_i2c_tools
 build_spi_tools
+build_nmap
+build_rsync
+build_lsof
 build_busybox
 build_socat
 build_dropbear
@@ -150,7 +160,9 @@ build_wireguard_tools
 
 (
     cd "$OUTPUT_DIR"
-    find . -maxdepth 1 -type f -perm /111 -printf '%P\n' |
+    find . -type f \
+        \( -perm /111 -o -path './share/nmap/*' \) \
+        -printf '%P\n' |
         LC_ALL=C sort |
         xargs -r sha256sum > SHA256SUMS
 )

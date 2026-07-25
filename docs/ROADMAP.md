@@ -12,16 +12,14 @@ buses.
 | Network control | `ip`, `ss`, `bridge`, `tc`, `wg`, `ethtool` |
 | Packet, path, and throughput | `tcpdump`, `mtr`, `iperf3` |
 | Application protocols and data | `curl`, `openssl`, `drill`, `jq` |
-| Process diagnosis | `strace` |
+| Discovery and transfer | `nmap`, `ncat`, `rsync` |
+| Process diagnosis | `strace`, `lsof` |
 | Embedded buses | selected `can-utils`, `i2c-tools`, and `spi-tools` programs |
 
 ## Candidates for the next expansion
 
 | Priority | Tool | Diagnostic value | Build considerations |
 | --- | --- | --- | --- |
-| 1 | `nmap`/`ncat` | Discovery, service probing, and richer netcat behavior | Large feature/data-file surface; define a minimal profile |
-| 1 | `rsync` | Recovery transfer and remote comparison | Compression and crypto dependency choices |
-| 1 | `lsof` | Process/file/socket correlation | Portability and procfs assumptions |
 | 2 | `smartctl`, `nvme-cli` | Storage health and device diagnosis | Hardware/ioctl and database considerations |
 | 2 | `usbutils` | USB topology, descriptors, and device identification | Decide whether and how to package the USB ID database |
 | 2 | `fio` | Storage and I/O characterization | Larger binary and workload safety considerations |
@@ -30,8 +28,9 @@ buses.
 | 3 | `conntrack` | Stateful firewall and NAT diagnosis | Netfilter-specific libraries and kernel support |
 
 Possible profiles can add TLS-enabled socat, compressed Dropbear sessions,
-interactive/curses mtr, and broader protocol support in curl without forcing
-those dependencies into the compact default bundle.
+interactive/curses mtr, broader protocol support in curl, Nmap NSE/Lua, and
+rsync's optional compression/checksum libraries without forcing those
+dependencies into the compact default bundle.
 
 BusyBox already provides useful versions of `ping`, `traceroute`, `arping`,
 `nslookup`, `wget`, `telnet`, `ifconfig`, `route`, `netstat`, `dmesg`, `hexdump`,

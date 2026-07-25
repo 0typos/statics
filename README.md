@@ -41,17 +41,17 @@ make source-package           # create dist/statics-sources.tar.xz
 
 ## Toolkit
 
-The bundle contains 35 physical executables, plus BusyBox and Dropbear
+The bundle contains 39 physical executables, plus BusyBox and Dropbear
 multi-call links.
 
 | Area | Outputs | Notes |
 | --- | --- | --- |
 | Rescue userspace | `busybox`, `nc`, `netcat` | Full BusyBox defconfig and convenient network applet links |
-| Remote access and relays | `socat`, `dropbear`, `dbclient`, `scp` | Dropbear also supplies key and conversion tools; zlib is disabled |
+| Remote access, relays, and transfer | `socat`, `ncat`, `rsync`, `dropbear`, `dbclient`, `scp` | Dropbear also supplies key and conversion tools; zlib is disabled |
 | Network state and control | `ip`, `ss`, `bridge`, `tc`, `wg`, `ethtool` | iproute2 and ethtool include static libmnl netlink support |
-| Packet and path diagnosis | `tcpdump`, `iperf3`, `mtr`, `mtr-packet` | Static libpcap; mtr is built for report/raw operation without curses |
+| Discovery, packet, and path diagnosis | `nmap`, `tcpdump`, `iperf3`, `mtr`, `mtr-packet` | Nmap and tcpdump use static libpcap; mtr is built without curses |
 | HTTP, TLS, DNS, and data | `curl`, `openssl`, `drill`, `jq` | curl, iperf3, and drill use the pinned OpenSSL build |
-| Process diagnosis | `strace` | Built against strace's pinned, bundled Linux UAPI |
+| Process diagnosis | `strace`, `lsof` | Syscall tracing plus process/file/socket correlation through Linux procfs |
 | CAN and ISO-TP | `candump`, `cansend`, `cangen`, `canplayer`, `cansniffer`, `isotpdump`, `isotprecv`, `isotpsend`, `slcand`, `canbusload` | SocketCAN tools for field and vehicle networks |
 | Hardware buses | `i2cdetect`, `i2cdump`, `i2cget`, `i2cset`, `i2ctransfer`, `spi-config`, `spi-pipe` | Direct Linux I²C and spidev diagnosis |
 
@@ -69,6 +69,20 @@ code path. Curl uses the synchronous libc resolver. OpenSSL's thread support
 is disabled on 32-bit targets to avoid relying on non-lock-free 64-bit atomic
 operations in constrained ABIs; the shipped command-line tools use it from a
 single thread.
+
+Nmap is built as a compact first profile with Ncat, TLS, service detection,
+OS detection, and the core databases, but without NSE/Lua, libssh2, Nping,
+Zenmap, or Ndiff. Its data files are packaged under `share/nmap`; either copy
+that directory to `/usr/share/nmap` on the target or invoke
+`nmap --datadir /path/to/share/nmap`. Nmap and Ncat are governed by the
+Nmap Public Source License rather than a standard OSI license, so review its
+deployment and redistribution terms for your use case.
+
+Rsync uses its bundled popt and zlib implementations and includes IPv4/IPv6
+and local socket-pair support. Optional ACL, xattr, iconv, OpenSSL, xxHash,
+zstd, and LZ4 integrations are disabled in this first portable profile. Lsof
+reads the target Linux procfs and therefore reflects the target kernel's
+procfs visibility and security restrictions.
 
 Packet capture, raw probes, network changes, tracing another process, and
 hardware-bus access still require the corresponding Linux capabilities,
@@ -105,7 +119,7 @@ Builds set a fixed `SOURCE_DATE_EPOCH`, remove debug/symbol tables with Zig's
 cross-linker flags, and emit:
 
 - `BUILDINFO` with the target and component versions
-- `SHA256SUMS` for every physical executable
+- `SHA256SUMS` for every physical payload file, including Nmap data
 - the exact `sources.lock` used by the build
 - `COMPONENTS.tsv` and a deterministic SPDX 2.3 SBOM
 - complete upstream notices under `licenses/`

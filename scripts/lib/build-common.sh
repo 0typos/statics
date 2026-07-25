@@ -9,6 +9,12 @@ install_binary() {
     install -m 0755 "$source" "$OUTPUT_DIR/$destination"
 }
 
+install_output_file() {
+    local source=$1
+    local destination=$2
+    install -D -m 0644 "$source" "$OUTPUT_DIR/$destination"
+}
+
 install_dependency_file() {
     local source=$1
     local destination=$2

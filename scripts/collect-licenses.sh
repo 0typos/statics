@@ -57,6 +57,13 @@ copy_license can-utils LICENSES/Linux-syscall-note.txt
 copy_license i2c-tools COPYING
 copy_license i2c-tools COPYING.LGPL
 copy_license spi-tools LICENSE
+copy_license nmap LICENSE
+copy_license nmap ncat/LICENSE
+copy_license nmap docs/3rd-party-licenses.txt
+copy_license rsync COPYING
+copy_license rsync popt/COPYING
+copy_license rsync zlib/zlib.h
+copy_license lsof COPYING
 
 cp "$repo_root/components.tsv" "$output_dir/COMPONENTS.tsv"
 

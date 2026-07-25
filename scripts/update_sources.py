@@ -94,6 +94,30 @@ def latest_from_github_tags(
     return version, url_template.format(version=version)
 
 
+def latest_from_github_release(
+    repository: str,
+    pattern: str,
+    url_template: str,
+) -> tuple[str, str]:
+    release = json.loads(
+        text(f"https://api.github.com/repos/{repository}/releases/latest")
+    )
+    match = re.fullmatch(pattern, release["tag_name"])
+    if match is None:
+        raise RuntimeError(
+            f"latest release tag does not match for {repository}: "
+            f"{release['tag_name']}"
+        )
+    version = match.group(1)
+    url = url_template.format(version=version)
+    asset_urls = {
+        asset["browser_download_url"] for asset in release.get("assets", [])
+    }
+    if url not in asset_urls:
+        raise RuntimeError(f"release asset not found for {repository}: {url}")
+    return version, url
+
+
 def latest_busybox() -> tuple[str, str]:
     return latest_from_index(
         "https://busybox.net/downloads/",
@@ -282,6 +306,36 @@ def latest_spi_tools() -> tuple[str, str]:
     )
 
 
+def latest_nmap() -> tuple[str, str]:
+    return latest_from_index(
+        "https://nmap.org/dist/",
+        r"nmap-(\d+\.\d+)\.tar\.bz2",
+        "https://nmap.org/dist/nmap-{version}.tar.bz2",
+    )
+
+
+def latest_rsync() -> tuple[str, str]:
+    return latest_from_index(
+        "https://download.samba.org/pub/rsync/src/",
+        r"rsync-(\d+\.\d+\.\d+)\.tar\.gz",
+        (
+            "https://download.samba.org/pub/rsync/src/"
+            "rsync-{version}.tar.gz"
+        ),
+    )
+
+
+def latest_lsof() -> tuple[str, str]:
+    return latest_from_github_release(
+        "lsof-org/lsof",
+        r"(\d+\.\d+\.\d+)",
+        (
+            "https://github.com/lsof-org/lsof/releases/download/"
+            "{version}/lsof-{version}.tar.gz"
+        ),
+    )
+
+
 def latest_zig(host: str) -> tuple[str, str]:
     index = json.loads(text("https://ziglang.org/download/index.json"))
     stable = [key for key in index if re.fullmatch(r"\d+\.\d+\.\d+", key)]
@@ -309,6 +363,9 @@ DISCOVERERS: dict[str, Callable[[], tuple[str, str]]] = {
     "can-utils": latest_can_utils,
     "i2c-tools": latest_i2c_tools,
     "spi-tools": latest_spi_tools,
+    "nmap": latest_nmap,
+    "rsync": latest_rsync,
+    "lsof": latest_lsof,
     "zig-x86_64": lambda: latest_zig("x86_64-linux"),
     "zig-aarch64": lambda: latest_zig("aarch64-linux"),
 }

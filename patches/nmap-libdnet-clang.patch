@@ -1,0 +1,29 @@
+diff --git a/libdnet-stripped/configure b/libdnet-stripped/configure
+--- a/libdnet-stripped/configure
++++ b/libdnet-stripped/configure
+@@ -15220,6 +15220,6 @@ int
+ main (void)
+ {
+-int foo() { return ETH_P_ALL; }
++int foo = ETH_P_ALL;
+   ;
+   return 0;
+ }
+diff --git a/libdnet-stripped/m4/acinclude.m4 b/libdnet-stripped/m4/acinclude.m4
+--- a/libdnet-stripped/m4/acinclude.m4
++++ b/libdnet-stripped/m4/acinclude.m4
+@@ -149,7 +149,7 @@ AC_DEFUN([AC_DNET_LINUX_PF_PACKET],
+     [AC_MSG_CHECKING(for Linux PF_PACKET sockets)
+     AC_TRY_COMPILE([#include <netpacket/packet.h>
+                     #include <linux/if_ether.h>],
+-                   [int foo() { return ETH_P_ALL; }],
++                   [int foo = ETH_P_ALL;],
+     ac_cv_dnet_linux_pf_packet=yes,
+     ac_cv_dnet_linux_pf_packet=no)
+     AC_MSG_RESULT($ac_cv_dnet_linux_pf_packet)
+diff --git a/Makefile.in b/Makefile.in
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -148 +148 @@ build-zlib: $(ZLIBDIR)/Makefile
+-	@echo Compiling zlib; cd $(ZLIBDIR) && $(MAKE);
++	@echo Compiling zlib; cd $(ZLIBDIR) && $(MAKE) libz.a;
