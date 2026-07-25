@@ -11,6 +11,7 @@ fi
 arch=$1
 input="$repo_root/dist/$arch"
 archive="$repo_root/dist/statics-$arch.tar.xz"
+sbom="$repo_root/dist/statics-$arch.spdx.json"
 
 [[ -d $input ]] || {
     echo "build output not found: $input" >&2
@@ -22,5 +23,10 @@ tar --sort=name \
     --owner=0 --group=0 --numeric-owner \
     --create --xz --file "$archive" \
     --directory "$repo_root/dist" "$arch"
-sha256sum "$archive" > "$archive.sha256"
+cp "$input/SBOM.spdx.json" "$sbom"
+(
+    cd "$repo_root/dist"
+    sha256sum "$(basename "$archive")" > "$(basename "$archive").sha256"
+    sha256sum "$(basename "$sbom")" > "$(basename "$sbom").sha256"
+)
 echo "$archive"
