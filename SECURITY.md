@@ -3,9 +3,10 @@
 ## Build inputs
 
 All upstream archives and both supported host toolchains are pinned by
-SHA-256 in `sources.lock`. A build stops before extraction when a digest does
-not match. Docker and GitHub Actions dependencies are maintained separately by
-Dependabot.
+SHA-256 in `sources.lock`. The Docker base/frontend images and every external
+GitHub Action are also pinned to immutable digests or full commit SHAs.
+A build stops before extraction when a source digest does not match.
+Dependabot maintains Docker and GitHub Actions pins.
 
 The scheduled source updater discovers stable releases and computes new
 digests, but only opens a pull request. It does not merge, publish, or replace
@@ -26,8 +27,15 @@ Each build:
 - links against musl with no ELF program interpreter;
 - strips binaries with the same cross-aware toolchain;
 - records versions and executable SHA-256 digests;
+- records a deterministic SPDX SBOM and complete upstream notices;
 - executes representative commands through QEMU;
 - exports the exact source archives as a companion artifact.
+
+CI also performs two independent uncached x86-64 builds and compares their
+complete output trees. Tagged public releases receive GitHub/Sigstore
+attestations linking each binary archive and SBOM to its workflow, repository,
+and commit. Attestations establish provenance; they are not a claim that the
+contents are vulnerability-free.
 
 QEMU tests instruction set and ABI compatibility. It does not validate
 privileged operations, device ioctls, a target's kernel configuration, or

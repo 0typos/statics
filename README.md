@@ -33,6 +33,7 @@ make build ARCH=mipsel        # build one target
 make package ARCH=mipsel      # build and create dist/statics-mipsel.tar.xz
 make all                      # build every target
 make sources                  # export all checksum-verified source archives
+make source-package           # create dist/statics-sources.tar.xz
 ```
 
 `make help` is the command reference. Generated files live under `dist/` and
@@ -106,17 +107,20 @@ cross-linker flags, and emit:
 - `BUILDINFO` with the target and component versions
 - `SHA256SUMS` for every physical executable
 - the exact `sources.lock` used by the build
+- `COMPONENTS.tsv` and a deterministic SPDX 2.3 SBOM
+- complete upstream notices under `licenses/`
 
 Most upstreams are fetched over HTTPS. Socat is the documented exception:
 its canonical hostname does not have a matching TLS certificate, so its
 release archive is fetched over HTTP and protected by the reviewed lock-file
 digest. See [SECURITY.md](SECURITY.md) for the trust model and update policy.
 
-The output may contain GPL and other copyleft software. When redistributing
-artifacts, retain the build recipes and make corresponding source available.
-`make sources` produces the exact upstream archive bundle used by a build.
-Upstream projects retain their own licenses; this repository does not
-relicense their code or binaries.
+The output contains GPL and other copyleft software. Binary bundles carry the
+relevant upstream license texts and a generated `THIRD_PARTY_NOTICES.md`.
+When redistributing artifacts, retain the build recipes and make corresponding
+source available. `make source-package` produces the exact upstream archive
+bundle used by a build. Upstream projects retain their own licenses; this
+repository does not relicense their code or binaries.
 
 ## Automation
 
@@ -127,6 +131,11 @@ GitHub Actions:
 - verifies static linking and runs each core utility under QEMU;
 - uploads deterministic per-architecture archives as workflow artifacts;
 - exports a matching source-archive artifact;
+- independently rebuilds x86-64 twice and compares the complete outputs;
+- publishes checksummed binaries, SPDX SBOMs, notices, and corresponding
+  sources on `v*` tags;
+- attaches GitHub/Sigstore provenance and SBOM attestations for public
+  releases;
 - rebuilds the pins weekly to catch toolchain or infrastructure regressions;
 - checks upstream releases weekly and opens a checksum-refresh PR.
 
@@ -134,7 +143,11 @@ Dependabot maintains Docker and GitHub Actions references. Source updates are
 kept separate because generic tarball releases are not a Dependabot ecosystem;
 [`scripts/update_sources.py`](scripts/update_sources.py) is the lock-file
 equivalent. Update PRs are intentionally not auto-merged: CI and review of
-release notes/signatures remain required.
+release notes/signatures remain required. The updater explicitly dispatches
+the full build for its bot-created PR branch.
+
+See [docs/RELEASING.md](docs/RELEASING.md) for release gates, assets, and
+attestation verification.
 
 ## Adding a tool or architecture
 
