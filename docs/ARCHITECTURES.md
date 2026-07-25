@@ -9,7 +9,6 @@ otherwise valid ELF executable starts.
 | `x86_64` | `x86_64-linux-musl` | x86-64 baseline | 64-bit little-endian |
 | `i686` | `x86-linux-musl` | Pentium II | 32-bit little-endian |
 | `aarch64` | `aarch64-linux-musl` | AArch64 baseline | 64-bit little-endian |
-| `armv5-softfloat` | `arm-linux-musleabi` | ARM926EJ-S / ARMv5TE | EABI soft-float; common in older routers/NAS devices |
 | `armv6-hardfloat` | `arm-linux-musleabihf` | ARM1176JZF-S | EABI hard-float; Raspberry Pi 1 class |
 | `armv7-hardfloat` | `arm-linux-musleabihf` | Cortex-A7 | EABI hard-float; common ARMv7 Linux |
 | `armv7-softfloat` | `arm-linux-musleabi` | Cortex-A7 | EABI soft-float for firmware without hard-float userspace |

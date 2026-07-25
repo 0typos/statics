@@ -31,7 +31,7 @@ build_libpcap() {
     (
         cd "$WORK_DIR/libpcap" || exit
         CC="$CC" AR="$AR" RANLIB="$RANLIB" ./configure \
-            --host="$ZIG_TARGET" \
+            --host="$AUTOCONF_HOST" \
             --prefix="$DEPS_PREFIX" \
             --disable-shared \
             --disable-bluetooth \
@@ -57,7 +57,7 @@ build_libmnl() {
     (
         cd "$WORK_DIR/libmnl" || exit
         CC="$CC" AR="$AR" RANLIB="$RANLIB" ./configure \
-            --host="$ZIG_TARGET" \
+            --host="$AUTOCONF_HOST" \
             --prefix="$DEPS_PREFIX" \
             --disable-shared \
             --enable-static \

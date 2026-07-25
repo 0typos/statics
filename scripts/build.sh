@@ -28,6 +28,10 @@ export DEPS_PREFIX="$WORK_DIR/prefix"
 export ZIG=${ZIG:-zig}
 export ZIG_TARGET=$zig_target
 export ZIG_CPU=$zig_cpu
+export AUTOCONF_HOST=$zig_target
+if [[ $arch == i686 ]]; then
+    AUTOCONF_HOST=i686-linux-musl
+fi
 export CC="$repo_root/scripts/toolchain/cc"
 export AR="$repo_root/scripts/toolchain/ar"
 export RANLIB="$repo_root/scripts/toolchain/ranlib"
@@ -38,7 +42,7 @@ export TZ=UTC
 export LC_ALL=C
 
 case "$arch" in
-    i686|armv5-softfloat|armv6-hardfloat|armv7-hardfloat|armv7-softfloat|\
+    i686|armv6-hardfloat|armv7-hardfloat|armv7-softfloat|\
         mips|mipsel|powerpc)
         export TARGET_BITS=32
         export OPENSSL_THREAD_OPTION=no-threads
@@ -136,6 +140,7 @@ build_wireguard_tools
     echo "architecture=$arch"
     echo "zig_target=$ZIG_TARGET"
     echo "zig_cpu=$ZIG_CPU"
+    echo "autoconf_host=$AUTOCONF_HOST"
     echo "zig_version=$("$ZIG" version)"
     echo "libc=musl"
     echo "source_date_epoch=$SOURCE_DATE_EPOCH"

@@ -9,7 +9,7 @@ build_ethtool() {
         MNL_CFLAGS="-I$DEPS_PREFIX/include" \
         MNL_LIBS="$DEPS_PREFIX/lib/libmnl.a" \
         ./configure \
-            --host="$ZIG_TARGET" \
+            --host="$AUTOCONF_HOST" \
             --enable-netlink \
             CFLAGS="$STATIC_CFLAGS" \
             LDFLAGS="$STATIC_LDFLAGS"

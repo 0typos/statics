@@ -5,7 +5,7 @@ build_jq() {
     (
         cd "$WORK_DIR/jq" || exit
         CC="$CC" AR="$AR" RANLIB="$RANLIB" ./configure \
-            --host="$ZIG_TARGET" \
+            --host="$AUTOCONF_HOST" \
             --disable-shared \
             --enable-static \
             --enable-all-static \

@@ -54,6 +54,12 @@ A candidate should be:
 
 Linux remains phase one.
 
+ARMv5 soft-float is deferred from the first release. Zig 0.16's compiler
+runtime currently requires atomic operations that ARMv5 cannot provide
+directly. Revisit the target when Zig supplies a supported fallback or when a
+separately maintained musl toolchain can be justified and tested on real
+ARMv5 Linux hardware.
+
 Darwin should use Mach-O targets and native/macOS CI validation. Fully static
 system binaries are generally not the same compatibility proposition as
 musl/Linux, so “portable, minimally dependent” may be the more honest goal.
