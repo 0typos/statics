@@ -27,6 +27,14 @@ def records(path: Path) -> list[list[str]]:
     return result
 
 
+def checksum(path: Path, algorithm: str) -> str:
+    digest = hashlib.new(algorithm)
+    with path.open("rb") as handle:
+        while chunk := handle.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def main() -> int:
     if len(sys.argv) != 3:
         print(f"usage: {sys.argv[0]} OUTPUT_DIR ARCH", file=sys.stderr)
@@ -43,19 +51,18 @@ def main() -> int:
     ).hexdigest()
 
     bundle_id = spdx_id("Package", f"statics-{arch}")
-    packages: list[dict[str, object]] = [
-        {
-            "SPDXID": bundle_id,
-            "name": f"statics-{arch}",
-            "versionInfo": lock_digest[:16],
-            "downloadLocation": "NOASSERTION",
-            "filesAnalyzed": False,
-            "licenseConcluded": "NOASSERTION",
-            "licenseDeclared": "NOASSERTION",
-            "copyrightText": "NOASSERTION",
-            "primaryPackagePurpose": "APPLICATION",
-        }
-    ]
+    bundle_package: dict[str, object] = {
+        "SPDXID": bundle_id,
+        "name": f"statics-{arch}",
+        "versionInfo": lock_digest[:16],
+        "downloadLocation": "NOASSERTION",
+        "filesAnalyzed": True,
+        "licenseConcluded": "NOASSERTION",
+        "licenseDeclared": "NOASSERTION",
+        "copyrightText": "NOASSERTION",
+        "primaryPackagePurpose": "APPLICATION",
+    }
+    packages: list[dict[str, object]] = [bundle_package]
     relationships: list[dict[str, str]] = [
         {
             "spdxElementId": "SPDXRef-DOCUMENT",
@@ -92,17 +99,21 @@ def main() -> int:
         )
 
     files: list[dict[str, object]] = []
+    file_sha1_checksums: list[str] = []
     sums_path = output_dir / "SHA256SUMS"
     for line in sums_path.read_text(encoding="utf-8").splitlines():
-        checksum, filename = line.split(maxsplit=1)
+        sha256, filename = line.split(maxsplit=1)
         filename = filename.lstrip("*")
+        sha1 = checksum(output_dir / filename, "sha1")
+        file_sha1_checksums.append(sha1)
         file_id = spdx_id("File", filename)
         files.append(
             {
                 "SPDXID": file_id,
                 "fileName": f"./{filename}",
                 "checksums": [
-                    {"algorithm": "SHA256", "checksumValue": checksum}
+                    {"algorithm": "SHA1", "checksumValue": sha1},
+                    {"algorithm": "SHA256", "checksumValue": sha256},
                 ],
                 "licenseConcluded": "NOASSERTION",
                 "copyrightText": "NOASSERTION",
@@ -116,6 +127,13 @@ def main() -> int:
             }
         )
 
+    verification_input = "".join(sorted(file_sha1_checksums)).encode("ascii")
+    bundle_package["packageVerificationCode"] = {
+        "packageVerificationCodeValue": hashlib.sha1(
+            verification_input
+        ).hexdigest()
+    }
+
     document = {
         "spdxVersion": "SPDX-2.3",
         "dataLicense": "CC0-1.0",
@@ -128,7 +146,7 @@ def main() -> int:
         "creationInfo": {
             "created": "1970-01-01T00:00:00Z",
             "creators": ["Tool: statics-generate-sbom"],
-            "licenseListVersion": "3.27.0",
+            "licenseListVersion": "3.27",
         },
         "packages": packages,
         "files": files,
