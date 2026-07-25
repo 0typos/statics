@@ -1,0 +1,20 @@
+# source|SPDX license expression|role and outputs
+busybox|GPL-2.0-only|busybox and applet links
+socat|GPL-2.0-only|socat
+dropbear|MIT AND Unlicense|dropbearmulti and applet links; bundled libtomcrypt and libtommath
+iproute2|GPL-2.0-only|ip, ss, bridge, and tc
+wireguard-tools|GPL-2.0-only|wg
+openssl|Apache-2.0|openssl; statically linked into curl, iperf3, and drill
+libpcap|BSD-3-Clause|statically linked into tcpdump
+libmnl|LGPL-2.1-or-later|statically linked into iproute2 and ethtool
+tcpdump|BSD-3-Clause|tcpdump
+curl|curl|curl
+iperf3|BSD-3-Clause|iperf3
+ethtool|GPL-2.0-only|ethtool
+strace|LGPL-2.1-or-later AND (GPL-2.0-only WITH Linux-syscall-note)|strace and bundled Linux UAPI
+jq|MIT AND BSD-2-Clause|jq and bundled oniguruma
+ldns|BSD-3-Clause|drill
+mtr|GPL-2.0-only|mtr and mtr-packet
+can-utils|GPL-2.0-only OR BSD-3-Clause|selected SocketCAN and ISO-TP tools
+i2c-tools|GPL-2.0-or-later AND LGPL-2.1-or-later|selected I2C tools and statically linked libi2c code
+spi-tools|GPL-2.0-only|spi-config and spi-pipe

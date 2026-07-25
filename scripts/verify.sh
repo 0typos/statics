@@ -29,12 +29,48 @@ required_binaries=(
     spi-config spi-pipe
 )
 
+for metadata in BUILDINFO COMPONENTS.tsv SBOM.spdx.json SHA256SUMS \
+    THIRD_PARTY_NOTICES.md sources.lock; do
+    [[ -s $output_dir/$metadata ]] || {
+        echo "missing build metadata: $output_dir/$metadata" >&2
+        exit 1
+    }
+done
+
 for binary in "${required_binaries[@]}"; do
     [[ -x $output_dir/$binary ]] || {
         echo "missing executable: $output_dir/$binary" >&2
         exit 1
     }
 done
+
+while IFS='|' read -r source_name _; do
+    [[ $source_name == \#* || -z $source_name ]] && continue
+    [[ -d $output_dir/licenses/$source_name ]] || {
+        echo "missing license directory: $output_dir/licenses/$source_name" >&2
+        exit 1
+    }
+    find "$output_dir/licenses/$source_name" -type f -size +0c -print -quit |
+        grep -q . || {
+        echo "empty license directory: $output_dir/licenses/$source_name" >&2
+        exit 1
+    }
+done < "$repo_root/components.tsv"
+
+python3 - "$output_dir/SBOM.spdx.json" "$arch" <<'PY'
+import json
+import sys
+
+path, arch = sys.argv[1:]
+with open(path, encoding="utf-8") as handle:
+    document = json.load(handle)
+if document.get("spdxVersion") != "SPDX-2.3":
+    raise SystemExit("unexpected SPDX version")
+if document.get("name") != f"statics-{arch}":
+    raise SystemExit("unexpected SPDX document name")
+if not document.get("packages") or not document.get("files"):
+    raise SystemExit("SPDX document has no packages or files")
+PY
 
 while IFS= read -r binary; do
     file "$output_dir/$binary"

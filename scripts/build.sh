@@ -151,4 +151,6 @@ build_wireguard_tools
 )
 
 cp "$repo_root/sources.lock" "$OUTPUT_DIR/sources.lock"
+"$repo_root/scripts/collect-licenses.sh" "$WORK_DIR" "$OUTPUT_DIR"
+python3 "$repo_root/scripts/generate-sbom.py" "$OUTPUT_DIR" "$arch"
 echo "==> built $arch in $OUTPUT_DIR"

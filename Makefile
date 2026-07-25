@@ -7,7 +7,7 @@ ARCHES := $(shell awk -F '|' '$$0 !~ /^#/ { print $$1 }' architectures.tsv)
 
 .DEFAULT_GOAL := help
 
-.PHONY: help list build all smoke smoke-all verify package sources clean
+.PHONY: help list build all smoke smoke-all verify package sources source-package clean
 
 help:
 	@echo "Static Linux troubleshooting binaries"
@@ -20,6 +20,7 @@ help:
 	@echo "  make verify ARCH=x86_64      Verify an existing local build"
 	@echo "  make package ARCH=x86_64     Create a deterministic tar.xz"
 	@echo "  make sources                 Export verified upstream archives"
+	@echo "  make source-package         Package corresponding source archives"
 	@echo "  make clean                   Remove generated output"
 
 list:
@@ -60,6 +61,9 @@ sources:
 		--target source-artifact \
 		--output type=local,dest=dist/sources \
 		.
+
+source-package: sources
+	./scripts/package-sources.sh
 
 clean:
 	rm -rf .build dist
