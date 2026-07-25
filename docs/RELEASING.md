@@ -17,8 +17,9 @@ The release contains, for every architecture:
 
 It also contains `statics-sources.tar.xz` and its SHA-256 file. Binary
 archives include `BUILDINFO`, `COMPONENTS.tsv`, `sources.lock`,
-`THIRD_PARTY_NOTICES.md`, the SPDX SBOM, and all relevant upstream license
-texts.
+`THIRD_PARTY_NOTICES.md`, `BUILD_RECIPES_LICENSE`, the SPDX SBOM, and all
+relevant upstream license texts. The build-recipe license is MIT; every
+upstream component remains under its separately recorded terms.
 
 ## Preflight
 
@@ -89,8 +90,9 @@ tar -tJf statics-x86_64.tar.xz
 ```
 
 Verify the architecture actually being deployed, not only x86-64. Inspect
-`BUILDINFO`, `sources.lock`, `THIRD_PARTY_NOTICES.md`, and
-`SBOM.spdx.json` inside the extracted target directory.
+`BUILDINFO`, `sources.lock`, `BUILD_RECIPES_LICENSE`,
+`THIRD_PARTY_NOTICES.md`, and `SBOM.spdx.json` inside the extracted target
+directory.
 
 Re-running the tag workflow verifies the build again and replaces assets on
 the existing GitHub Release. It does not bypass any build or reproducibility

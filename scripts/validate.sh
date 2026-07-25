@@ -3,6 +3,15 @@ set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 
+[[ -s $repo_root/LICENSE ]] || {
+    echo "missing repository license" >&2
+    exit 1
+}
+head -n 1 "$repo_root/LICENSE" | grep -qx 'MIT License' || {
+    echo "repository license is not MIT" >&2
+    exit 1
+}
+
 awk -F '|' '
     /^#/ || NF == 0 { next }
     NF != 4 { print FNR ": malformed source lock record"; bad=1; next }

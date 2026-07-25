@@ -114,6 +114,7 @@ cross-linker flags, and emit:
 - the exact `sources.lock` used by the build
 - `COMPONENTS.tsv` and a deterministic SPDX 2.3 SBOM
 - complete upstream notices under `licenses/`
+- the build-recipe MIT license as `BUILD_RECIPES_LICENSE`
 
 Most upstreams are fetched over HTTPS. Socat is the documented exception:
 its canonical hostname does not have a matching TLS certificate, so its
@@ -124,8 +125,26 @@ The output contains GPL and other copyleft software. Binary bundles carry the
 relevant upstream license texts and a generated `THIRD_PARTY_NOTICES.md`.
 When redistributing artifacts, retain the build recipes and make corresponding
 source available. `make source-package` produces the exact upstream archive
-bundle used by a build. Upstream projects retain their own licenses; this
-repository does not relicense their code or binaries.
+bundle used by a build.
+
+## Licensing
+
+Repository-authored build recipes, scripts, configuration, and documentation
+are licensed under the [MIT License](LICENSE), unless a file says otherwise.
+Patches or other material derived from an upstream project remain subject to
+that project's terms.
+
+That MIT license does not replace or override the licenses of the utilities,
+libraries, or source archives built by this project. Each upstream project
+retains its own copyright and license terms. [`components.tsv`](components.tsv)
+indexes those terms, and every binary bundle includes
+`THIRD_PARTY_NOTICES.md` plus the relevant texts under
+`licenses/<source>/`. The repository's MIT license is included separately in
+artifacts as `BUILD_RECIPES_LICENSE`.
+
+Redistributors are responsible for complying with every applicable upstream
+license, including corresponding-source obligations and Nmap's NPSL terms.
+This repository does not relicense upstream code or generated binaries.
 
 ## Automation
 

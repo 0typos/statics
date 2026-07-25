@@ -93,6 +93,4 @@ cp "$repo_root/components.tsv" "$output_dir/COMPONENTS.tsv"
     echo "The exact source archives and checksums are recorded in \`sources.lock\`."
 } > "$output_dir/THIRD_PARTY_NOTICES.md"
 
-if [[ -f $repo_root/LICENSE ]]; then
-    cp "$repo_root/LICENSE" "$output_dir/BUILD_RECIPES_LICENSE"
-fi
+cp "$repo_root/LICENSE" "$output_dir/BUILD_RECIPES_LICENSE"

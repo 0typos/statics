@@ -37,6 +37,15 @@ Nmap data, notices, and licenses remain available.
 The BusyBox and Dropbear entries after the semicolon are symbolic links to
 their multi-call binary; they do not add separate binary payloads.
 
+## License boundary
+
+`BUILD_RECIPES_LICENSE` contains the MIT license for this repository's
+original build machinery. It is not a blanket license for the toolkit.
+Every bundled project retains its own license, indexed in `COMPONENTS.tsv`
+and reproduced under `licenses/<source>/`. Read `THIRD_PARTY_NOTICES.md`
+before redistributing a bundle; Nmap and Ncat have particularly distinct NPSL
+terms.
+
 ## Common network checks
 
 Inspect interfaces, routes, neighbors, and listening sockets:
