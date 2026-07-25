@@ -16,7 +16,7 @@ Requirements: Git, GNU Make, Docker with Buildx, roughly 8 GB of free disk
 space for the first build, and an `amd64` or `arm64` Docker host.
 
 ```console
-git clone REPOSITORY_URL statics
+# Clone this repository using the URL shown by your Git host, then:
 cd statics
 make smoke ARCH=x86_64
 make build ARCH=x86_64

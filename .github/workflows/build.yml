@@ -18,22 +18,22 @@ concurrency:
 
 jobs:
   validate:
+    name: Validate repository
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Validate manifests and scripts
         run: ./scripts/validate.sh
       - name: ShellCheck
         run: shellcheck scripts/*.sh scripts/builders/*.sh scripts/lib/*.sh scripts/toolchain/*
 
   build:
+    name: Build ${{ matrix.arch }}
     needs: validate
     runs-on: ubuntu-24.04
     timeout-minutes: 60
-    permissions:
-      attestations: write
-      contents: read
-      id-token: write
     strategy:
       fail-fast: false
       max-parallel: 4
@@ -54,6 +54,8 @@ jobs:
           - s390x
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
       - name: Build ${{ matrix.arch }}
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
@@ -70,17 +72,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes qemu-user-static
       - name: Verify and package
+        env:
+          TARGET_ARCH: ${{ matrix.arch }}
         run: |
-          ./scripts/verify.sh "dist/${{ matrix.arch }}" "${{ matrix.arch }}"
-          ./scripts/package.sh "${{ matrix.arch }}"
-      - name: Attest release archive and SBOM
-        if: >-
-          startsWith(github.ref, 'refs/tags/v') &&
-          github.event.repository.visibility == 'public'
-        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
-        with:
-          subject-path: dist/statics-${{ matrix.arch }}.tar.xz
-          sbom-path: dist/statics-${{ matrix.arch }}.spdx.json
+          ./scripts/verify.sh "dist/$TARGET_ARCH" "$TARGET_ARCH"
+          ./scripts/package.sh "$TARGET_ARCH"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: statics-${{ matrix.arch }}
@@ -93,11 +89,14 @@ jobs:
           retention-days: 14
 
   reproducibility:
+    name: Reproducibility
     needs: validate
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
       - name: Build x86-64 twice without layer reuse
         run: |
@@ -121,15 +120,14 @@ jobs:
           .build/repro-a .build/repro-b
 
   source-bundle:
+    name: Build corresponding sources
     if: github.event_name != 'pull_request'
     needs: validate
     runs-on: ubuntu-24.04
-    permissions:
-      attestations: write
-      contents: read
-      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
       - name: Export verified upstream source archives
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
@@ -142,13 +140,6 @@ jobs:
           cache-to: type=gha,mode=max,scope=sources
       - name: Package corresponding sources
         run: ./scripts/package-sources.sh
-      - name: Attest corresponding-source archive
-        if: >-
-          startsWith(github.ref, 'refs/tags/v') &&
-          github.event.repository.visibility == 'public'
-        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
-        with:
-          subject-path: dist/statics-sources.tar.xz
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: statics-sources
@@ -158,15 +149,89 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  attest_builds:
+    name: Attest ${{ matrix.arch }}
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') &&
+      github.event.repository.visibility == 'public'
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      attestations: write # Record the artifact attestation.
+      contents: read
+      id-token: write # Sign the attestation through GitHub OIDC.
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - x86_64
+          - i686
+          - aarch64
+          - armv6-hardfloat
+          - armv7-hardfloat
+          - armv7-softfloat
+          - mips
+          - mipsel
+          - powerpc
+          - powerpc64
+          - powerpc64le
+          - riscv64
+          - s390x
+    steps:
+      - name: Download ${{ matrix.arch }} release assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: statics-${{ matrix.arch }}
+          path: attest
+      - name: Attest release archive and SBOM
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        with:
+          subject-path: attest/statics-${{ matrix.arch }}.tar.xz
+          sbom-path: attest/statics-${{ matrix.arch }}.spdx.json
+
+  attest_source:
+    name: Attest corresponding sources
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') &&
+      github.event.repository.visibility == 'public'
+    needs: source-bundle
+    runs-on: ubuntu-24.04
+    permissions:
+      attestations: write # Record the artifact attestation.
+      contents: read
+      id-token: write # Sign the attestation through GitHub OIDC.
+    steps:
+      - name: Download corresponding-source assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: statics-sources
+          path: attest
+      - name: Attest corresponding-source archive
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        with:
+          subject-path: attest/statics-sources.tar.xz
+
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    name: Publish release
+    if: >-
+      always() &&
+      startsWith(github.ref, 'refs/tags/v') &&
+      needs.build.result == 'success' &&
+      needs.reproducibility.result == 'success' &&
+      needs.source-bundle.result == 'success' &&
+      (needs.attest_builds.result == 'success' ||
+      needs.attest_builds.result == 'skipped') &&
+      (needs.attest_source.result == 'success' ||
+      needs.attest_source.result == 'skipped')
     needs:
       - build
       - reproducibility
       - source-bundle
+      - attest_builds
+      - attest_source
     runs-on: ubuntu-24.04
     permissions:
-      contents: write
+      contents: write # Create or update the GitHub Release and its assets.
     steps:
       - name: Download release assets
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1

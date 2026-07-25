@@ -1,0 +1,48 @@
+name: Tool request
+description: Propose another troubleshooting or connectivity utility
+title: "tool: "
+labels:
+  - enhancement
+body:
+  - type: input
+    id: project
+    attributes:
+      label: Project and upstream URL
+      placeholder: utility-name — https://example.org/project
+    validations:
+      required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Troubleshooting use case
+      description: Explain what field, recovery, namespace, hardware, or network problem this utility solves
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Existing toolkit alternatives
+      description: Note whether a bundled utility already covers some or all of this use case
+    validations:
+      required: true
+  - type: textarea
+    id: build
+    attributes:
+      label: Static cross-build considerations
+      description: Known build system, libc, C/C++/Rust/Go dependencies, runtime data, kernel requirements, or architecture limitations
+  - type: textarea
+    id: license
+    attributes:
+      label: License and redistribution notes
+      description: Identify the upstream license and any known redistribution constraints
+    validations:
+      required: true
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope confirmation
+      options:
+        - label: This utility is useful for Linux troubleshooting, recovery, or network connectivity.
+          required: true
+        - label: I understand that acceptance depends on static-build feasibility, licensing, size, and maintenance cost.
+          required: true

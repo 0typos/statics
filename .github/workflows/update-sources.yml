@@ -6,15 +6,24 @@ on:
     - cron: "41 6 * * 5"
 
 permissions:
-  actions: write
-  contents: write
-  pull-requests: write
+  contents: read
+
+concurrency:
+  group: update-sources
+  cancel-in-progress: false
 
 jobs:
   update:
+    name: Refresh pinned upstream sources
     runs-on: ubuntu-24.04
+    permissions:
+      actions: write # Dispatch the full build for the update branch.
+      contents: write # Create and update the automation branch.
+      pull-requests: write # Open or refresh the dependency pull request.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Discover releases and refresh checksums
         env:
           GITHUB_TOKEN: ${{ github.token }}
