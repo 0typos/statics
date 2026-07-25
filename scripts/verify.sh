@@ -59,7 +59,10 @@ done < "$repo_root/components.tsv"
 
 python3 - "$output_dir/SBOM.spdx.json" "$arch" <<'PY'
 import json
+import hashlib
+import re
 import sys
+from pathlib import Path
 
 path, arch = sys.argv[1:]
 with open(path, encoding="utf-8") as handle:
@@ -70,6 +73,39 @@ if document.get("name") != f"statics-{arch}":
     raise SystemExit("unexpected SPDX document name")
 if not document.get("packages") or not document.get("files"):
     raise SystemExit("SPDX document has no packages or files")
+license_list = document.get("creationInfo", {}).get("licenseListVersion", "")
+if not re.fullmatch(r"\d+\.\d+", license_list):
+    raise SystemExit("invalid SPDX license-list version")
+
+bundle = next(
+    package
+    for package in document["packages"]
+    if package.get("name") == f"statics-{arch}"
+)
+if bundle.get("filesAnalyzed") is not True:
+    raise SystemExit("SPDX bundle does not analyze its executable files")
+
+sha1_values = []
+for file_record in document["files"]:
+    filename = file_record["fileName"].removeprefix("./")
+    binary = Path(path).parent / filename
+    checksums = {
+        checksum["algorithm"]: checksum["checksumValue"]
+        for checksum in file_record.get("checksums", [])
+    }
+    for algorithm in ("SHA1", "SHA256"):
+        digest = hashlib.new(algorithm.lower(), binary.read_bytes()).hexdigest()
+        if checksums.get(algorithm) != digest:
+            raise SystemExit(f"bad {algorithm} in SPDX record for {filename}")
+    sha1_values.append(checksums["SHA1"])
+
+verification_input = "".join(sorted(sha1_values)).encode("ascii")
+verification_code = hashlib.sha1(verification_input).hexdigest()
+recorded_code = bundle.get("packageVerificationCode", {}).get(
+    "packageVerificationCodeValue"
+)
+if recorded_code != verification_code:
+    raise SystemExit("bad SPDX package verification code")
 PY
 
 while IFS= read -r binary; do
