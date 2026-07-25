@@ -14,13 +14,10 @@ otherwise valid ELF executable starts.
 | `armv7-softfloat` | `arm-linux-musleabi` | Cortex-A7 | EABI soft-float for firmware without hard-float userspace |
 | `mips` | `mips-linux-musleabi` | MIPS32 | 32-bit big-endian, soft-float o32 ABI |
 | `mipsel` | `mipsel-linux-musleabi` | MIPS32 | 32-bit little-endian, soft-float o32 ABI |
-| `mips64` | `mips64-linux-muslabi64` | MIPS64 | 64-bit big-endian, n64 ABI |
-| `mips64el` | `mips64el-linux-muslabi64` | MIPS64 | 64-bit little-endian, n64 ABI |
 | `powerpc` | `powerpc-linux-musleabihf` | baseline PowerPC | 32-bit big-endian, hard-float ABI |
 | `powerpc64` | `powerpc64-linux-musl` | baseline PowerPC64 | 64-bit big-endian |
 | `powerpc64le` | `powerpc64le-linux-musl` | baseline PowerPC64LE | 64-bit little-endian |
 | `riscv64` | `riscv64-linux-musl` | RV64 baseline | 64-bit little-endian |
-| `loongarch64` | `loongarch64-linux-musl` | LoongArch64 baseline | 64-bit little-endian |
 | `s390x` | `s390x-linux-musl` | IBM Z baseline | 64-bit big-endian |
 
 ## Identifying a device

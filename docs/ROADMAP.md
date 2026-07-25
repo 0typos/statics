@@ -60,6 +60,15 @@ directly. Revisit the target when Zig supplies a supported fallback or when a
 separately maintained musl toolchain can be justified and tested on real
 ARMv5 Linux hardware.
 
+MIPS64 big- and little-endian ABIs are also deferred. Zig 0.16's LLD currently
+discards OpenSSL CLI sections incorrectly with this repository's static,
+section-garbage-collected link profile. The first release retains both
+big- and little-endian MIPS32 targets.
+
+LoongArch64 is deferred until the older Autotools projects in the dependency
+chain can be updated without carrying generated `config.sub` replacements in
+the first release.
+
 Darwin should use Mach-O targets and native/macOS CI validation. Fully static
 system binaries are generally not the same compatibility proposition as
 musl/Linux, so “portable, minimally dependent” may be the more honest goal.
