@@ -167,7 +167,10 @@ GitHub Actions:
 - attaches GitHub/Sigstore provenance and SBOM attestations for public
   releases;
 - rebuilds the pins weekly to catch toolchain or infrastructure regressions;
-- checks upstream releases weekly and opens a checksum-refresh PR.
+- checks upstream releases weekly and opens a checksum-refresh PR;
+- repins, builds, and releases every architecture monthly, publishing only
+  when every gate passes and skipping the build entirely when nothing has
+  changed since the last release.
 
 Dependabot maintains Docker and GitHub Actions references. Source updates are
 kept separate because generic tarball releases are not a Dependabot ecosystem;
@@ -175,6 +178,12 @@ kept separate because generic tarball releases are not a Dependabot ecosystem;
 equivalent. Update PRs are intentionally not auto-merged: CI and review of
 release notes/signatures remain required. The updater explicitly dispatches
 the full build for its bot-created PR branch.
+
+The monthly release publishes repinned upstream versions without that review,
+which is the point of an unattended release and also its main caveat. It never
+writes to `main`. See the [release guide](docs/RELEASING.md) to turn the
+refresh off, disable the schedule, or read what the automation is allowed to
+do.
 
 See the [release guide](docs/RELEASING.md) for release gates, assets, and
 attestation verification.

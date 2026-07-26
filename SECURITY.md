@@ -25,10 +25,22 @@ GitHub Action are also pinned to immutable digests or full commit SHAs.
 A build stops before extraction when a source digest does not match.
 Dependabot maintains Docker and GitHub Actions pins.
 
-The scheduled source updater discovers stable releases and computes new
-digests, but only opens a pull request. It does not merge, publish, or replace
-an existing release. Reviewers should inspect upstream release notes, compare
-published checksums, and verify upstream signatures where available.
+The weekly source updater discovers stable releases and computes new digests,
+but only opens a pull request. It does not merge into the default branch.
+Reviewers should inspect upstream release notes, compare published checksums,
+and verify upstream signatures where available.
+
+The monthly release workflow is different and deserves explicit attention: it
+repins to the latest upstream releases, builds them, and publishes the result
+without a maintainer reading upstream release notes or verifying upstream
+signatures first. Every mechanical gate still applies — digest pinning, static
+linking, QEMU verification, uncached reproducibility, SBOM, and attestations —
+so an automated release is as reproducible and as attributable as a manual
+one. What it lacks is human judgement about the upstream code it pins. Those
+releases are built from a commit on `automation/monthly-release`, never from
+unreviewed changes to the default branch. Operators who need review before
+publication should set `REFRESH_SOURCES` to `false` or disable the schedule;
+see the [release guide](docs/RELEASING.md).
 
 Socat is an explicit transport exception. Its canonical download host does not
 present a certificate valid for the hostname, so the release archive is

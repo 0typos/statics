@@ -1,0 +1,190 @@
+name: Monthly release
+
+on:
+  workflow_dispatch:
+    inputs:
+      refresh_sources:
+        description: Repin every upstream component to its latest release
+        type: boolean
+        default: true
+      force:
+        description: Release even when nothing changed since the last release
+        type: boolean
+        default: false
+  schedule:
+    # 03:19 UTC on the first day of every month.
+    - cron: "19 3 1 * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: monthly-release
+  cancel-in-progress: false
+
+env:
+  # Scheduled runs always repin. Set this to false to release whatever the
+  # reviewed default branch already pins instead.
+  REFRESH_SOURCES: >-
+    ${{ github.event_name != 'workflow_dispatch' || inputs.refresh_sources }}
+  FORCE_RELEASE: >-
+    ${{ github.event_name == 'workflow_dispatch' && inputs.force }}
+  RELEASE_BRANCH: automation/monthly-release
+
+jobs:
+  candidate:
+    name: Prepare release candidate
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # Publish the candidate commit the release is built from.
+    outputs:
+      release: ${{ steps.select.outputs.release }}
+      ref: ${{ steps.select.outputs.ref }}
+      tag: ${{ steps.select.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Repin upstream sources
+        if: env.REFRESH_SOURCES == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        # update_sources.py rewrites sources.lock only after every discovery
+        # and digest succeeds, so a failed run leaves the pins untouched. The
+        # log stays outside the work tree to keep the candidate tree clean.
+        run: |
+          ./scripts/update_sources.py --write |
+            tee "$RUNNER_TEMP/sources-update.txt"
+
+      - name: Validate the candidate manifests
+        run: ./scripts/validate.sh
+
+      - name: Select the release candidate
+        id: select
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          base_sha=$(git rev-parse HEAD)
+          if git diff --quiet -- sources.lock; then
+            repinned=false
+          else
+            repinned=true
+          fi
+
+          # Compare the full candidate tree against the tree that produced the
+          # last release: identical contents rebuild to identical artifacts.
+          # Only tracked modifications are staged, so runner scratch files can
+          # never make an unchanged candidate look new.
+          git add --update
+          candidate_tree=$(git write-tree)
+
+          previous_tag=$(gh api "repos/$GH_REPO/releases/latest" \
+            --jq '.tag_name' 2>/dev/null || true)
+          released_tree=""
+          if [[ -n $previous_tag ]]; then
+            ref_json=$(gh api "repos/$GH_REPO/git/ref/tags/$previous_tag" \
+              2>/dev/null || true)
+            if [[ -n $ref_json ]]; then
+              object_sha=$(jq -r '.object.sha' <<<"$ref_json")
+              if [[ $(jq -r '.object.type' <<<"$ref_json") == tag ]]; then
+                object_sha=$(gh api "repos/$GH_REPO/git/tags/$object_sha" \
+                  --jq '.object.sha')
+              fi
+              released_tree=$(gh api "repos/$GH_REPO/git/commits/$object_sha" \
+                --jq '.tree.sha')
+            fi
+          fi
+
+          release=true
+          if [[ -z $previous_tag ]]; then
+            reason="no previous release exists"
+          elif [[ $candidate_tree != "$released_tree" ]]; then
+            reason="build inputs changed since $previous_tag"
+          elif [[ $FORCE_RELEASE == true ]]; then
+            reason="identical to $previous_tag; released on request"
+          else
+            release=false
+            reason="identical to $previous_tag; nothing to release"
+          fi
+
+          tag=""
+          candidate_sha="$base_sha"
+          if [[ $release == true ]]; then
+            base_tag="v$(date --utc +%Y.%m.%d)"
+            tag="$base_tag"
+            attempt=1
+            while gh api "repos/$GH_REPO/git/ref/tags/$tag" >/dev/null 2>&1; do
+              tag="$base_tag.$attempt"
+              attempt=$((attempt + 1))
+            done
+
+            if [[ $repinned == true ]]; then
+              # The candidate needs a real commit so the release tag, the
+              # attestations, and the packaged sources.lock all agree.
+              if gh api "repos/$GH_REPO/git/ref/heads/$RELEASE_BRANCH" \
+                >/dev/null 2>&1; then
+                gh api "repos/$GH_REPO/git/refs/heads/$RELEASE_BRANCH" \
+                  --method PATCH \
+                  --raw-field sha="$base_sha" \
+                  --field force=true >/dev/null
+              else
+                gh api "repos/$GH_REPO/git/refs" \
+                  --method POST \
+                  --raw-field ref="refs/heads/$RELEASE_BRANCH" \
+                  --raw-field sha="$base_sha" >/dev/null
+              fi
+              message="chore: pin latest upstream sources for $tag"
+              candidate_sha=$(gh api \
+                "repos/$GH_REPO/contents/sources.lock" \
+                --method PUT \
+                --raw-field branch="$RELEASE_BRANCH" \
+                --raw-field sha="$(git rev-parse "$base_sha:sources.lock")" \
+                --raw-field content="$(base64 --wrap=0 sources.lock)" \
+                --raw-field message="$message" \
+                --jq '.commit.sha')
+            fi
+          fi
+
+          {
+            echo "release=$release"
+            echo "ref=$candidate_sha"
+            echo "tag=$tag"
+          } >>"$GITHUB_OUTPUT"
+
+          if [[ $release == true ]]; then
+            decision="building and releasing as $tag"
+          else
+            decision="skipped"
+          fi
+
+          {
+            echo "## Monthly release candidate"
+            echo
+            echo "- decision: **$decision**"
+            echo "- reason: $reason"
+            echo "- upstream pins refreshed: $repinned"
+            echo "- candidate commit: \`$candidate_sha\`"
+            echo
+            if [[ -s $RUNNER_TEMP/sources-update.txt ]]; then
+              echo '```'
+              cat "$RUNNER_TEMP/sources-update.txt"
+              echo '```'
+            fi
+          } >>"$GITHUB_STEP_SUMMARY"
+
+  release:
+    name: Build and release
+    needs: candidate
+    if: needs.candidate.outputs.release == 'true'
+    permissions:
+      attestations: write # Record artifact attestations for public releases.
+      contents: write # Create the release tag and publish the release.
+      id-token: write # Sign attestations through GitHub OIDC.
+    uses: ./.github/workflows/build.yml
+    with:
+      ref: ${{ needs.candidate.outputs.ref }}
+      release_tag: ${{ needs.candidate.outputs.tag }}
