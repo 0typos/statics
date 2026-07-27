@@ -1,0 +1,252 @@
+name: Monthly release
+
+on:
+  workflow_dispatch:
+    inputs:
+      refresh_sources:
+        description: Repin every upstream component to its latest release
+        type: boolean
+        default: true
+      force:
+        description: Release even when nothing changed since the last release
+        type: boolean
+        default: false
+  schedule:
+    # 03:19 UTC on the first day of every month.
+    - cron: "19 3 1 * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: monthly-release
+  cancel-in-progress: false
+
+env:
+  # Scheduled runs always repin. Set this to false to release whatever the
+  # reviewed default branch already pins instead.
+  REFRESH_SOURCES: >-
+    ${{ github.event_name != 'workflow_dispatch' || inputs.refresh_sources }}
+  FORCE_RELEASE: >-
+    ${{ github.event_name == 'workflow_dispatch' && inputs.force }}
+  RELEASE_BRANCH: automation/monthly-release
+  # Published binaries kept on the Releases page, one release per month.
+  # Older releases are removed; their tags are never deleted.
+  RELEASE_KEEP: 24
+
+jobs:
+  candidate:
+    name: Prepare release candidate
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # Publish the candidate commit the release is built from.
+    outputs:
+      release: ${{ steps.select.outputs.release }}
+      ref: ${{ steps.select.outputs.ref }}
+      tag: ${{ steps.select.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Repin upstream sources
+        if: env.REFRESH_SOURCES == 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        # update_sources.py rewrites sources.lock only after every discovery
+        # and digest succeeds, so a failed run leaves the pins untouched. The
+        # log stays outside the work tree to keep the candidate tree clean.
+        run: |
+          ./scripts/update_sources.py --write |
+            tee "$RUNNER_TEMP/sources-update.txt"
+
+      - name: Validate the candidate manifests
+        run: ./scripts/validate.sh
+
+      - name: Select the release candidate
+        id: select
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          base_sha=$(git rev-parse HEAD)
+          if git diff --quiet -- sources.lock; then
+            repinned=false
+          else
+            repinned=true
+          fi
+
+          # Only tracked modifications are staged, so runner scratch files can
+          # never make an unchanged candidate look new.
+          git add --update
+          candidate_tree=$(git write-tree)
+
+          # Digest every path that can change an artifact. Prose-only files are
+          # excluded because nothing copies them into a build; everything else,
+          # including LICENSE and the workflows that decide what gets built, is
+          # an input. New paths count as inputs unless listed here.
+          input_digest() {
+            git ls-tree -r --full-tree --format='%(objectname) %(path)' "$1" |
+              awk '$2 !~ /^(README\.md|CONTRIBUTING\.md|SECURITY\.md|docs\/)/' |
+              sha256sum |
+              cut -d ' ' -f 1
+          }
+
+          candidate_digest=$(input_digest "$candidate_tree")
+
+          previous_tag=$(gh api "repos/$GH_REPO/releases/latest" \
+            --jq '.tag_name' 2>/dev/null || true)
+          released_digest=""
+          if [[ -n $previous_tag ]] && git \
+            -c http.extraheader="Authorization: Bearer $GH_TOKEN" \
+            fetch --quiet --depth 1 --no-tags origin \
+            "+refs/tags/$previous_tag:refs/tags/$previous_tag" 2>/dev/null
+          then
+            released_digest=$(input_digest "refs/tags/$previous_tag^{tree}")
+          fi
+
+          release=true
+          if [[ -z $previous_tag ]]; then
+            reason="no previous release exists"
+          elif [[ -z $released_digest ]]; then
+            reason="$previous_tag is unreadable; building rather than assuming"
+          elif [[ $candidate_digest != "$released_digest" ]]; then
+            reason="build inputs changed since $previous_tag"
+          elif [[ $FORCE_RELEASE == true ]]; then
+            reason="build inputs match $previous_tag; released on request"
+          else
+            release=false
+            reason="build inputs match $previous_tag; nothing to release"
+          fi
+
+          tag=""
+          candidate_sha="$base_sha"
+          if [[ $release == true ]]; then
+            base_tag="v$(date --utc +%Y.%m.%d)"
+            tag="$base_tag"
+            attempt=1
+            while gh api "repos/$GH_REPO/git/ref/tags/$tag" >/dev/null 2>&1; do
+              tag="$base_tag.$attempt"
+              attempt=$((attempt + 1))
+            done
+
+            if [[ $repinned == true ]]; then
+              # The candidate needs a real commit so the release tag, the
+              # attestations, and the packaged sources.lock all agree.
+              if gh api "repos/$GH_REPO/git/ref/heads/$RELEASE_BRANCH" \
+                >/dev/null 2>&1; then
+                gh api "repos/$GH_REPO/git/refs/heads/$RELEASE_BRANCH" \
+                  --method PATCH \
+                  --raw-field sha="$base_sha" \
+                  --field force=true >/dev/null
+              else
+                gh api "repos/$GH_REPO/git/refs" \
+                  --method POST \
+                  --raw-field ref="refs/heads/$RELEASE_BRANCH" \
+                  --raw-field sha="$base_sha" >/dev/null
+              fi
+              message="chore: pin latest upstream sources for $tag"
+              candidate_sha=$(gh api \
+                "repos/$GH_REPO/contents/sources.lock" \
+                --method PUT \
+                --raw-field branch="$RELEASE_BRANCH" \
+                --raw-field sha="$(git rev-parse "$base_sha:sources.lock")" \
+                --raw-field content="$(base64 --wrap=0 sources.lock)" \
+                --raw-field message="$message" \
+                --jq '.commit.sha')
+            fi
+          fi
+
+          {
+            echo "release=$release"
+            echo "ref=$candidate_sha"
+            echo "tag=$tag"
+          } >>"$GITHUB_OUTPUT"
+
+          if [[ $release == true ]]; then
+            decision="building and releasing as $tag"
+          else
+            decision="skipped"
+          fi
+
+          {
+            echo "## Monthly release candidate"
+            echo
+            echo "- decision: **$decision**"
+            echo "- reason: $reason"
+            echo "- upstream pins refreshed: $repinned"
+            echo "- candidate commit: \`$candidate_sha\`"
+            echo
+            if [[ -s $RUNNER_TEMP/sources-update.txt ]]; then
+              echo '```'
+              cat "$RUNNER_TEMP/sources-update.txt"
+              echo '```'
+            fi
+          } >>"$GITHUB_STEP_SUMMARY"
+
+  release:
+    name: Build and release
+    needs: candidate
+    if: needs.candidate.outputs.release == 'true'
+    permissions:
+      attestations: write # Record artifact attestations for public releases.
+      contents: write # Create the release tag and publish the release.
+      id-token: write # Sign attestations through GitHub OIDC.
+    uses: ./.github/workflows/build.yml
+    with:
+      ref: ${{ needs.candidate.outputs.ref }}
+      release_tag: ${{ needs.candidate.outputs.tag }}
+
+  prune:
+    name: Prune superseded releases
+    needs: release
+    if: needs.release.result == 'success'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # Delete the assets of superseded releases.
+    steps:
+      - name: Keep the most recent releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # Drafts are somebody's work in progress and are never touched.
+          mapfile -t releases < <(
+            gh api --paginate "repos/$GH_REPO/releases" \
+              --jq '.[] | select(.draft | not)
+                    | [.published_at, .tag_name] | @tsv' |
+              sed '/^$/d' |
+              sort --reverse
+          )
+
+          total=${#releases[@]}
+          if ((total <= RELEASE_KEEP)); then
+            echo "$total published, keeping $RELEASE_KEEP: nothing to prune"
+            exit 0
+          fi
+
+          # Refuse to act on a result that would discard the whole page, which
+          # is what an API or filter regression would look like.
+          if ((RELEASE_KEEP < 1)); then
+            echo "RELEASE_KEEP must be at least 1" >&2
+            exit 1
+          fi
+
+          superseded=("${releases[@]:RELEASE_KEEP}")
+          echo "## Pruned releases" >>"$GITHUB_STEP_SUMMARY"
+          echo >>"$GITHUB_STEP_SUMMARY"
+
+          for entry in "${superseded[@]}"; do
+            tag=${entry#*$'\t'}
+            # No --cleanup-tag: the tag stays, so the release remains
+            # reproducible from source after its binaries are removed.
+            gh release delete "$tag" --yes
+            echo "- \`$tag\` (assets removed, tag kept)" \
+              >>"$GITHUB_STEP_SUMMARY"
+          done
+
+          echo "pruned ${#superseded[@]}, kept $RELEASE_KEEP"

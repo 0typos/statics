@@ -1,8 +1,11 @@
 # Release process
 
-Pushing any `v*` tag starts the `Build` workflow's release path. Project policy
-requires a signed tag when available, or an annotated tag with the reason a
-signature was unavailable. A GitHub Release is published only after:
+Releases are published two ways: a maintainer pushes a `v*` tag, or the
+`Monthly release` workflow builds and tags on its own schedule. Both run the
+identical `Build` gates, and neither can publish unless every one passes.
+Project policy requires a signed tag when available, or an annotated tag with
+the reason a signature was unavailable. A GitHub Release is published only
+after:
 
 1. repository validation and ShellCheck pass;
 2. every architecture builds and passes static/QEMU verification;
@@ -47,7 +50,9 @@ Review:
 - documented feature/architecture limitations;
 - the workflow pins and base-image digest.
 
-Never release directly from an unreviewed automated source-update branch.
+Never tag an unreviewed automated source-update branch by hand. Publishing
+unreviewed pins is only acceptable through the monthly workflow below, whose
+gates and trade-offs are documented and whose output is labelled as automated.
 
 ## Creating a release
 
@@ -76,6 +81,60 @@ gh attestation verify statics-x86_64.tar.xz --repo OWNER/REPOSITORY
 
 The standalone SPDX file is checksum-linked to the release assets. The SBOM
 attestation's subject is the binary archive.
+
+## Automated monthly release
+
+`Monthly release` runs at 03:19 UTC on the first day of each month and can be
+started by hand from the Actions tab. It:
+
+1. repins every component in `sources.lock` to its latest upstream release;
+2. digests every path that can change an artifact, compares it against the
+   same digest for the last release, and stops without building when they
+   match. `README.md`, `CONTRIBUTING.md`, `SECURITY.md`, and `docs/` are
+   excluded because no build copies them; `LICENSE`, the manifests, the
+   scripts, the Docker context, and the workflows all count, and any path
+   added later counts unless it is added to that exclusion list. A tag that
+   cannot be read is treated as changed, so the run builds rather than
+   assumes;
+3. commits the refreshed pins to `automation/monthly-release` when they
+   changed, so the tag, the attestations, and the packaged `sources.lock` all
+   describe one real commit;
+4. calls the same `Build` workflow with that commit, so validation, the full
+   architecture matrix, QEMU verification, the uncached reproducibility
+   comparison, the source bundle, and the attestations all apply unchanged;
+5. creates annotated tag `vYYYY.MM.DD` on the built commit and publishes the
+   release only after every gate reports success;
+6. prunes published releases beyond the most recent `RELEASE_KEEP` (24, or
+   two years of monthly releases). Only the release and its assets are
+   removed. **Tags are never deleted**, so a pruned version stays buildable
+   from source and its commit stays reachable; `gh release delete` is called
+   without `--cleanup-tag`. Draft releases are ignored, and pruning runs only
+   after a release has actually been published.
+
+Nothing is tagged before the build succeeds. A failed month leaves the
+candidate on `automation/monthly-release`, publishes nothing, and notifies
+whoever watches Actions; the next run resets the branch and retries. When the
+date is already taken the tag becomes `vYYYY.MM.DD.1`, `.2`, and so on.
+
+This path trades maintainer review of upstream releases for unattended
+delivery. It repins and publishes without a human reading upstream release
+notes or checking upstream signatures, which the reviewed
+[`update-sources`](../.github/workflows/update-sources.yml) pull request into
+`main` still exists to do. Two supported ways to keep review in the loop:
+
+- release only what `main` already pins, by setting `REFRESH_SOURCES` to
+  `false` in [the workflow](../.github/workflows/monthly-release.yml). The
+  monthly run then rebuilds and publishes reviewed pins, and merged update
+  PRs are what make a release contain anything new;
+- disable the schedule and dispatch `Monthly release` manually, which keeps
+  the one-click build-and-publish path without the calendar.
+
+Manual dispatch takes two inputs: `refresh_sources` (repin, default true) and
+`force` (release even when nothing changed, default false).
+
+Scheduled workflows are disabled automatically after 60 days without
+repository activity. Confirm the schedule is still enabled after a quiet
+period.
 
 ## Verify published assets
 
@@ -122,3 +181,21 @@ tag builds. Enable Dependabot alerts and security updates, and protect the
 `v*` tag namespace so only release maintainers can create or update release
 tags. See the [security policy](../SECURITY.md) for the reporting and trust
 model.
+
+The monthly release needs no credential of its own. It authenticates with the
+automatic `GITHUB_TOKEN` and grants itself `contents: write` per job, so the
+repository default stays read-only and there is no secret to create or rotate.
+Two ruleset conditions still have to hold, and both are satisfied by the
+recommended settings above:
+
+- the `v*` tag rules must not restrict tag *creation*. Rules that block
+  deletion and non-fast-forward updates are fine, because the workflow only
+  ever creates new tags and skips a tag that already exists. If you add
+  "Restrict creations", add the Actions token to the ruleset bypass list, or
+  the monthly run builds everything and then fails at the tag step;
+- `automation/monthly-release` must be creatable and force-updatable. Scope
+  branch protection to `main` rather than all branches.
+
+Nothing here lets the automation write to `main`. The candidate commit lives
+on its own branch, and the reviewed source-update PR remains the only way
+refreshed pins reach the default branch.

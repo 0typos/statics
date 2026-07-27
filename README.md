@@ -5,6 +5,13 @@ repository contains the build recipes, source pins, CI, verification, and
 release machinery—not generated binaries. Build outputs are local files,
 GitHub Actions artifacts, or release assets.
 
+Published binaries are rebuilt automatically every month. A scheduled workflow
+repins every component to its latest upstream release, rebuilds all thirteen
+architectures, and publishes a new GitHub Release once every verification gate
+passes. Months with no upstream or recipe change are skipped rather than
+republished, so the newest release is always the newest set of inputs that
+actually built and verified. See [Automation](#automation).
+
 Every target is compiled against musl with a pinned
 [Zig](https://ziglang.org/) toolchain. Docker provides the clean build
 environment, and QEMU user-mode emulation provides an execution smoke test for
@@ -167,7 +174,12 @@ GitHub Actions:
 - attaches GitHub/Sigstore provenance and SBOM attestations for public
   releases;
 - rebuilds the pins weekly to catch toolchain or infrastructure regressions;
-- checks upstream releases weekly and opens a checksum-refresh PR.
+- checks upstream releases weekly and opens a checksum-refresh PR;
+- repins, builds, and releases every architecture monthly, publishing only
+  when every gate passes and skipping the build entirely when nothing has
+  changed since the last release;
+- keeps the most recent 24 monthly releases and removes the assets of older
+  ones, without ever deleting a tag.
 
 Dependabot maintains Docker and GitHub Actions references. Source updates are
 kept separate because generic tarball releases are not a Dependabot ecosystem;
@@ -175,6 +187,12 @@ kept separate because generic tarball releases are not a Dependabot ecosystem;
 equivalent. Update PRs are intentionally not auto-merged: CI and review of
 release notes/signatures remain required. The updater explicitly dispatches
 the full build for its bot-created PR branch.
+
+The monthly release publishes repinned upstream versions without that review,
+which is the point of an unattended release and also its main caveat. It never
+writes to `main`. See the [release guide](docs/RELEASING.md) to turn the
+refresh off, disable the schedule, or read what the automation is allowed to
+do.
 
 See the [release guide](docs/RELEASING.md) for release gates, assets, and
 attestation verification.
