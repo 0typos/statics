@@ -177,7 +177,9 @@ GitHub Actions:
 - checks upstream releases weekly and opens a checksum-refresh PR;
 - repins, builds, and releases every architecture monthly, publishing only
   when every gate passes and skipping the build entirely when nothing has
-  changed since the last release.
+  changed since the last release;
+- keeps the most recent 24 monthly releases and removes the assets of older
+  ones, without ever deleting a tag.
 
 Dependabot maintains Docker and GitHub Actions references. Source updates are
 kept separate because generic tarball releases are not a Dependabot ecosystem;

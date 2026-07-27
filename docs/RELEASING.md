@@ -103,7 +103,13 @@ started by hand from the Actions tab. It:
    architecture matrix, QEMU verification, the uncached reproducibility
    comparison, the source bundle, and the attestations all apply unchanged;
 5. creates annotated tag `vYYYY.MM.DD` on the built commit and publishes the
-   release only after every gate reports success.
+   release only after every gate reports success;
+6. prunes published releases beyond the most recent `RELEASE_KEEP` (24, or
+   two years of monthly releases). Only the release and its assets are
+   removed. **Tags are never deleted**, so a pruned version stays buildable
+   from source and its commit stays reachable; `gh release delete` is called
+   without `--cleanup-tag`. Draft releases are ignored, and pruning runs only
+   after a release has actually been published.
 
 Nothing is tagged before the build succeeds. A failed month leaves the
 candidate on `automation/monthly-release`, publishes nothing, and notifies

@@ -30,6 +30,9 @@ env:
   FORCE_RELEASE: >-
     ${{ github.event_name == 'workflow_dispatch' && inputs.force }}
   RELEASE_BRANCH: automation/monthly-release
+  # Published binaries kept on the Releases page, one release per month.
+  # Older releases are removed; their tags are never deleted.
+  RELEASE_KEEP: 24
 
 jobs:
   candidate:
@@ -195,3 +198,55 @@ jobs:
     with:
       ref: ${{ needs.candidate.outputs.ref }}
       release_tag: ${{ needs.candidate.outputs.tag }}
+
+  prune:
+    name: Prune superseded releases
+    needs: release
+    if: needs.release.result == 'success'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # Delete the assets of superseded releases.
+    steps:
+      - name: Keep the most recent releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # Drafts are somebody's work in progress and are never touched.
+          mapfile -t releases < <(
+            gh api --paginate "repos/$GH_REPO/releases" \
+              --jq '.[] | select(.draft | not)
+                    | [.published_at, .tag_name] | @tsv' |
+              sed '/^$/d' |
+              sort --reverse
+          )
+
+          total=${#releases[@]}
+          if ((total <= RELEASE_KEEP)); then
+            echo "$total published, keeping $RELEASE_KEEP: nothing to prune"
+            exit 0
+          fi
+
+          # Refuse to act on a result that would discard the whole page, which
+          # is what an API or filter regression would look like.
+          if ((RELEASE_KEEP < 1)); then
+            echo "RELEASE_KEEP must be at least 1" >&2
+            exit 1
+          fi
+
+          superseded=("${releases[@]:RELEASE_KEEP}")
+          echo "## Pruned releases" >>"$GITHUB_STEP_SUMMARY"
+          echo >>"$GITHUB_STEP_SUMMARY"
+
+          for entry in "${superseded[@]}"; do
+            tag=${entry#*$'\t'}
+            # No --cleanup-tag: the tag stays, so the release remains
+            # reproducible from source after its binaries are removed.
+            gh release delete "$tag" --yes
+            echo "- \`$tag\` (assets removed, tag kept)" \
+              >>"$GITHUB_STEP_SUMMARY"
+          done
+
+          echo "pruned ${#superseded[@]}, kept $RELEASE_KEEP"

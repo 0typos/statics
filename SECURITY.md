@@ -15,7 +15,10 @@ repository may also need coordinated reporting to the upstream project.
 
 The maintained security surface is the current default branch and the latest
 published release. Older artifacts remain reproducible from their tags but do
-not receive backported fixes unless maintainers announce otherwise.
+not receive backported fixes unless maintainers announce otherwise. Prebuilt
+assets are kept for the most recent 24 monthly releases; beyond that the
+release and its downloads are removed while the tag is retained, so an expired
+version stays buildable but is no longer distributed.
 
 ## Build inputs
 
