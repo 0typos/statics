@@ -36,6 +36,64 @@ env:
   RETRY_WINDOW_SECONDS: 600
 
 jobs:
+  changes:
+    name: Detect build inputs
+    runs-on: ubuntu-24.04
+    outputs:
+      build: ${{ steps.detect.outputs.build }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.ref }}
+      - name: Decide whether anything build-relevant changed
+        id: detect
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          # Anything that is not a plain push or pull request - schedule,
+          # dispatch, a release build - always builds.
+          case "$EVENT" in
+          pull_request)
+            paths=$(gh api "repos/$GH_REPO/pulls/$PR_NUMBER/files" --paginate \
+              --jq '.[].filename')
+            ;;
+          push)
+            if [[ $BEFORE =~ ^0{40}$ ]]; then
+              paths=""
+            else
+              paths=$(gh api "repos/$GH_REPO/compare/$BEFORE...$AFTER" \
+                --jq '.files[]?.filename' || true)
+            fi
+            ;;
+          *)
+            paths=""
+            ;;
+          esac
+
+          # An empty list means "could not tell": build rather than guess.
+          if [[ -z $paths ]]; then
+            echo "build=true" >>"$GITHUB_OUTPUT"
+            echo "no usable file list; building"
+            exit 0
+          fi
+
+          if printf '%s\n' "$paths" | ./scripts/build-relevant.sh --any; then
+            echo "build=true" >>"$GITHUB_OUTPUT"
+            echo "build inputs changed; building"
+          else
+            echo "build=false" >>"$GITHUB_OUTPUT"
+            echo "documentation only; skipping the expensive work"
+          fi
+          printf '%s\n' "$paths" | sed 's/^/  /' >>"$GITHUB_STEP_SUMMARY"
+
   validate:
     name: Validate repository
     runs-on: ubuntu-24.04
@@ -51,7 +109,7 @@ jobs:
 
   build:
     name: Build ${{ matrix.arch }}
-    needs: validate
+    needs: [validate, changes]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
@@ -78,9 +136,12 @@ jobs:
           persist-credentials: false
           ref: ${{ inputs.ref }}
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        if: needs.changes.outputs.build == 'true'
       - name: Mark the build start
+        if: needs.changes.outputs.build == 'true'
         run: echo "build_started=$(date +%s)" >>"$GITHUB_ENV"
       - name: Build ${{ matrix.arch }}
+        if: needs.changes.outputs.build == 'true'
         id: build
         continue-on-error: true
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
@@ -113,16 +174,19 @@ jobs:
           steps.classify.outputs.retry != 'true'
         run: exit 1
       - name: Install QEMU
+        if: needs.changes.outputs.build == 'true'
         run: |
           sudo apt-get -o Acquire::Retries=3 update
           sudo apt-get -o Acquire::Retries=3 install --yes qemu-user-static
       - name: Verify and package
+        if: needs.changes.outputs.build == 'true'
         env:
           TARGET_ARCH: ${{ matrix.arch }}
         run: |
           ./scripts/verify.sh "dist/$TARGET_ARCH" "$TARGET_ARCH"
           ./scripts/package.sh "$TARGET_ARCH"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: needs.changes.outputs.build == 'true'
         with:
           name: statics-${{ matrix.arch }}
           path: |
@@ -135,7 +199,7 @@ jobs:
 
   reproducibility:
     name: Reproducibility
-    needs: validate
+    needs: [validate, changes]
     runs-on: ubuntu-24.04
     # Two uncached builds, plus headroom for one retry of a fast failure.
     timeout-minutes: 75
@@ -145,7 +209,9 @@ jobs:
           persist-credentials: false
           ref: ${{ inputs.ref }}
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        if: needs.changes.outputs.build == 'true'
       - name: Build x86-64 twice without layer reuse
+        if: needs.changes.outputs.build == 'true'
         run: |
           set -euo pipefail
 
@@ -182,6 +248,7 @@ jobs:
           build_with_one_retry .build/repro-a
           build_with_one_retry .build/repro-b
       - name: Compare complete build outputs
+        if: needs.changes.outputs.build == 'true'
         run: >-
           diff --recursive --no-dereference
           .build/repro-a .build/repro-b
@@ -189,7 +256,7 @@ jobs:
   source-bundle:
     name: Build corresponding sources
     if: github.event_name != 'pull_request'
-    needs: validate
+    needs: [validate, changes]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -197,9 +264,12 @@ jobs:
           persist-credentials: false
           ref: ${{ inputs.ref }}
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        if: needs.changes.outputs.build == 'true'
       - name: Mark the export start
+        if: needs.changes.outputs.build == 'true'
         run: echo "build_started=$(date +%s)" >>"$GITHUB_ENV"
       - name: Export verified upstream source archives
+        if: needs.changes.outputs.build == 'true'
         id: export
         continue-on-error: true
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
@@ -230,8 +300,10 @@ jobs:
           steps.classify.outputs.retry != 'true'
         run: exit 1
       - name: Package corresponding sources
+        if: needs.changes.outputs.build == 'true'
         run: ./scripts/package-sources.sh
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: needs.changes.outputs.build == 'true'
         with:
           name: statics-sources
           path: |

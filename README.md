@@ -1,5 +1,8 @@
 # statics
 
+[![Build](https://github.com/0typos/statics/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/0typos/statics/actions/workflows/build.yml)
+[![Monthly release](https://github.com/0typos/statics/actions/workflows/monthly-release.yml/badge.svg)](https://github.com/0typos/statics/actions/workflows/monthly-release.yml)
+
 Reproducible, cross-architecture Linux troubleshooting binaries. This
 repository contains the build recipes, source pins, CI, verification, and
 release machinery—not generated binaries. Build outputs are local files,
