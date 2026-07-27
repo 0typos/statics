@@ -83,13 +83,12 @@ jobs:
           git add --update
           candidate_tree=$(git write-tree)
 
-          # Digest every path that can change an artifact. Prose-only files are
-          # excluded because nothing copies them into a build; everything else,
-          # including LICENSE and the workflows that decide what gets built, is
-          # an input. New paths count as inputs unless listed here.
+          # Digest every path that can change an artifact. scripts/build-relevant.sh
+          # is the single definition of which paths those are, shared with the
+          # Build workflow so the two can never drift apart.
           input_digest() {
             git ls-tree -r --full-tree --format='%(objectname) %(path)' "$1" |
-              awk '$2 !~ /^(README\.md|CONTRIBUTING\.md|SECURITY\.md|docs\/)/' |
+              ./scripts/build-relevant.sh --filter |
               sha256sum |
               cut -d ' ' -f 1
           }
