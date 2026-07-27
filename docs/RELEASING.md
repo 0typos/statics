@@ -88,8 +88,14 @@ attestation's subject is the binary archive.
 started by hand from the Actions tab. It:
 
 1. repins every component in `sources.lock` to its latest upstream release;
-2. compares the resulting tree against the tree the last release was built
-   from, and stops without building when they are identical;
+2. digests every path that can change an artifact, compares it against the
+   same digest for the last release, and stops without building when they
+   match. `README.md`, `CONTRIBUTING.md`, `SECURITY.md`, and `docs/` are
+   excluded because no build copies them; `LICENSE`, the manifests, the
+   scripts, the Docker context, and the workflows all count, and any path
+   added later counts unless it is added to that exclusion list. A tag that
+   cannot be read is treated as changed, so the run builds rather than
+   assumes;
 3. commits the refreshed pins to `automation/monthly-release` when they
    changed, so the tag, the attestations, and the packaged `sources.lock` all
    describe one real commit;
@@ -170,14 +176,17 @@ tag builds. Enable Dependabot alerts and security updates, and protect the
 tags. See the [security policy](../SECURITY.md) for the reporting and trust
 model.
 
-The monthly release needs two settings beyond that default-read baseline. It
-grants its own `contents: write` per job, so no repository-wide change is
-required, but rulesets still apply to the workflow token:
+The monthly release needs no credential of its own. It authenticates with the
+automatic `GITHUB_TOKEN` and grants itself `contents: write` per job, so the
+repository default stays read-only and there is no secret to create or rotate.
+Two ruleset conditions still have to hold, and both are satisfied by the
+recommended settings above:
 
-- the `v*` tag ruleset must allow the GitHub Actions token to create tags, or
-  the monthly run builds everything and then fails at the tag step. Add
-  Actions to the ruleset bypass list, or accept tag-push releases only and
-  turn the monthly schedule off;
+- the `v*` tag rules must not restrict tag *creation*. Rules that block
+  deletion and non-fast-forward updates are fine, because the workflow only
+  ever creates new tags and skips a tag that already exists. If you add
+  "Restrict creations", add the Actions token to the ruleset bypass list, or
+  the monthly run builds everything and then fails at the tag step;
 - `automation/monthly-release` must be creatable and force-updatable. Scope
   branch protection to `main` rather than all branches.
 

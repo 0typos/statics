@@ -5,6 +5,13 @@ repository contains the build recipes, source pins, CI, verification, and
 release machinery—not generated binaries. Build outputs are local files,
 GitHub Actions artifacts, or release assets.
 
+Published binaries are rebuilt automatically every month. A scheduled workflow
+repins every component to its latest upstream release, rebuilds all thirteen
+architectures, and publishes a new GitHub Release once every verification gate
+passes. Months with no upstream or recipe change are skipped rather than
+republished, so the newest release is always the newest set of inputs that
+actually built and verified. See [Automation](#automation).
+
 Every target is compiled against musl with a pinned
 [Zig](https://ziglang.org/) toolchain. Docker provides the clean build
 environment, and QEMU user-mode emulation provides an execution smoke test for

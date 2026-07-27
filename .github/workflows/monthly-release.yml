@@ -75,40 +75,47 @@ jobs:
             repinned=true
           fi
 
-          # Compare the full candidate tree against the tree that produced the
-          # last release: identical contents rebuild to identical artifacts.
           # Only tracked modifications are staged, so runner scratch files can
           # never make an unchanged candidate look new.
           git add --update
           candidate_tree=$(git write-tree)
 
+          # Digest every path that can change an artifact. Prose-only files are
+          # excluded because nothing copies them into a build; everything else,
+          # including LICENSE and the workflows that decide what gets built, is
+          # an input. New paths count as inputs unless listed here.
+          input_digest() {
+            git ls-tree -r --full-tree --format='%(objectname) %(path)' "$1" |
+              awk '$2 !~ /^(README\.md|CONTRIBUTING\.md|SECURITY\.md|docs\/)/' |
+              sha256sum |
+              cut -d ' ' -f 1
+          }
+
+          candidate_digest=$(input_digest "$candidate_tree")
+
           previous_tag=$(gh api "repos/$GH_REPO/releases/latest" \
             --jq '.tag_name' 2>/dev/null || true)
-          released_tree=""
-          if [[ -n $previous_tag ]]; then
-            ref_json=$(gh api "repos/$GH_REPO/git/ref/tags/$previous_tag" \
-              2>/dev/null || true)
-            if [[ -n $ref_json ]]; then
-              object_sha=$(jq -r '.object.sha' <<<"$ref_json")
-              if [[ $(jq -r '.object.type' <<<"$ref_json") == tag ]]; then
-                object_sha=$(gh api "repos/$GH_REPO/git/tags/$object_sha" \
-                  --jq '.object.sha')
-              fi
-              released_tree=$(gh api "repos/$GH_REPO/git/commits/$object_sha" \
-                --jq '.tree.sha')
-            fi
+          released_digest=""
+          if [[ -n $previous_tag ]] && git \
+            -c http.extraheader="Authorization: Bearer $GH_TOKEN" \
+            fetch --quiet --depth 1 --no-tags origin \
+            "+refs/tags/$previous_tag:refs/tags/$previous_tag" 2>/dev/null
+          then
+            released_digest=$(input_digest "refs/tags/$previous_tag^{tree}")
           fi
 
           release=true
           if [[ -z $previous_tag ]]; then
             reason="no previous release exists"
-          elif [[ $candidate_tree != "$released_tree" ]]; then
+          elif [[ -z $released_digest ]]; then
+            reason="$previous_tag is unreadable; building rather than assuming"
+          elif [[ $candidate_digest != "$released_digest" ]]; then
             reason="build inputs changed since $previous_tag"
           elif [[ $FORCE_RELEASE == true ]]; then
-            reason="identical to $previous_tag; released on request"
+            reason="build inputs match $previous_tag; released on request"
           else
             release=false
-            reason="identical to $previous_tag; nothing to release"
+            reason="build inputs match $previous_tag; nothing to release"
           fi
 
           tag=""
