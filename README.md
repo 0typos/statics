@@ -179,7 +179,10 @@ GitHub Actions:
   when every gate passes and skipping the build entirely when nothing has
   changed since the last release;
 - keeps the most recent 24 monthly releases and removes the assets of older
-  ones, without ever deleting a tag.
+  ones, without ever deleting a tag;
+- retries a build once when it fails in its first ten minutes, which is where
+  registry, DNS, and mirror failures land. A failure past that point has
+  reached the compiler and is reported, never retried.
 
 Dependabot maintains Docker and GitHub Actions references. Source updates are
 kept separate because generic tarball releases are not a Dependabot ecosystem;

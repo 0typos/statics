@@ -42,7 +42,10 @@ temporary=$(mktemp "${output}.partial.XXXXXX")
 trap 'rm -f "$temporary"' EXIT
 
 echo "fetching $name $version"
-curl --fail --location --proto '=http,https' --retry 3 --show-error --silent \
+# Retrying a download is always safe: the result is rejected below unless it
+# matches the pinned digest, so a retry can only recover a transport failure.
+curl --fail --location --proto '=http,https' --show-error --silent \
+    --retry 5 --retry-connrefused --retry-max-time 600 --connect-timeout 30 \
     --user-agent 'statics-source-fetcher/1.0' "$url" --output "$temporary"
 printf '%s  %s\n' "$expected_sha" "$temporary" | sha256sum --check --status || {
     echo "checksum mismatch for $name $version" >&2

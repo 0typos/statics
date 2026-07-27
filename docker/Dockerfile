@@ -4,7 +4,10 @@ FROM docker.io/library/debian:bookworm-slim@sha256:7b140f374b289a7c2befc338f42eb
 
 ARG TARGETARCH
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Acquire::Retries rides out transient mirror failures. It changes how a
+# package is fetched, never which package, so the build stays reproducible.
+RUN apt-get -o Acquire::Retries=3 update \
+    && apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
         bash \
         autoconf \
         automake \
@@ -58,7 +61,9 @@ RUN chmod +x scripts/*.sh scripts/toolchain/* \
 
 FROM builder AS test
 ARG ARCH=x86_64
-RUN apt-get update && apt-get install -y --no-install-recommends qemu-user-static \
+RUN apt-get -o Acquire::Retries=3 update \
+    && apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
+        qemu-user-static \
     && rm -rf /var/lib/apt/lists/* \
     && scripts/verify.sh "/out/$ARCH" "$ARCH"
 
