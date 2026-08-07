@@ -22,7 +22,7 @@ mtr|0.96|73e6aef3fb6c8b482acb5b5e2b8fa7794045c4f2420276f035ce76c5beae632d|https:
 can-utils|2025.01|88b30feace372c4a61e6adb2534791c0cfba6123ebcca7f59bbb76580d4a6915|https://github.com/linux-can/can-utils/archive/refs/tags/v2025.01.tar.gz
 i2c-tools|4.4|8b15f0a880ab87280c40cfd7235cfff28134bf14d5646c07518b1ff6642a2473|https://mirrors.edge.kernel.org/pub/software/utils/i2c-tools/i2c-tools-4.4.tar.xz
 spi-tools|a19dffe44fee|4dfa41dc4f18c7bf4deb0faea6d349f6eac9f7d39a7c1d6ce6a23884fd9c8699|https://github.com/cpb-/spi-tools/archive/a19dffe44fee857124a993598caae0c85894f914.tar.gz
-nmap|7.99|df512492ffd108e53a27a06f26d8635bbe89e0e569455dc8ffef058c035d51b2|https://nmap.org/dist/nmap-7.99.tar.bz2
+nmap|7.991|a5d507f29437bef3bedd4771ff9aaa8fc1c2a109ddba1f5b1cf12027456929be|https://nmap.org/dist/nmap-7.991.tar.bz2
 rsync|3.4.4|bd88cf82fa653da32314fb229136407c5c90f80d1758d8f4b091767877d8fa96|https://download.samba.org/pub/rsync/src/rsync-3.4.4.tar.gz
 lsof|4.99.7|4a10391aab0b8ce1f539e82a1966693b2a6cf225972a6504ebb7ec4fa71675de|https://github.com/lsof-org/lsof/releases/download/4.99.7/lsof-4.99.7.tar.gz
 util-linux|2.42.2|03a05d3adf9602ef128f2da05b84b3205ce60c351e5737c0370f74000679ce8a|https://www.kernel.org/pub/linux/utils/util-linux/v2.42/util-linux-2.42.2.tar.xz
