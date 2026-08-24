@@ -44,8 +44,9 @@ trap 'rm -f "$temporary"' EXIT
 echo "fetching $name $version"
 # Retrying a download is always safe: the result is rejected below unless it
 # matches the pinned digest, so a retry can only recover a transport failure.
-curl --fail --location --proto '=http,https' --show-error --silent \
-    --retry 5 --retry-connrefused --retry-max-time 600 --connect-timeout 30 \
+curl --fail --location --proto '=http,https' --show-error --silent --http1.1 \
+    --retry 5 --retry-all-errors --retry-connrefused --retry-delay 3 \
+    --retry-max-time 600 --connect-timeout 30 \
     --user-agent 'statics-source-fetcher/1.0' "$url" --output "$temporary"
 printf '%s  %s\n' "$expected_sha" "$temporary" | sha256sum --check --status || {
     echo "checksum mismatch for $name $version" >&2
