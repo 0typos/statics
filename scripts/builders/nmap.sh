@@ -4,7 +4,7 @@ build_nmap() {
     echo "==> building Nmap and Ncat"
     (
         cd "$WORK_DIR/nmap" || exit
-        patch -s -p1 < "$REPO_ROOT/patches/nmap-libdnet-clang.patch"
+        patch -s -p1 < "$REPO_ROOT/patches/nmap-build-fixes.patch"
         CC="$CC" CXX="$CXX" AR="$AR" RANLIB="$RANLIB" \
             PKG_CONFIG=false \
             CONFIG_SITE="$REPO_ROOT/configs/nmap-config.site" \
