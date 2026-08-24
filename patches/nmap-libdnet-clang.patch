@@ -1,6 +1,0 @@
-diff --git a/Makefile.in b/Makefile.in
---- a/Makefile.in
-+++ b/Makefile.in
-@@ -148 +148 @@ build-zlib: $(ZLIBDIR)/Makefile
--	@echo Compiling zlib; cd $(ZLIBDIR) && $(MAKE);
-+	@echo Compiling zlib; cd $(ZLIBDIR) && $(MAKE) libz.a;

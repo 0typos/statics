@@ -1,0 +1,19 @@
+diff --git a/Makefile.in b/Makefile.in
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -148 +148 @@ build-zlib: $(ZLIBDIR)/Makefile
+-	@echo Compiling zlib; cd $(ZLIBDIR) && $(MAKE);
++	@echo Compiling zlib; cd $(ZLIBDIR) && $(MAKE) libz.a;
+diff --git a/nmap.cc b/nmap.cc
+--- a/nmap.cc
++++ b/nmap.cc
+@@ -1858,7 +1858,9 @@
+   AllProbes::service_scan_free();
+   traceroute_hop_cache_clear();
+   nsock_set_default_engine(NULL);
++#ifndef NOLUA
+   close_nse();
++#endif
+ }
+ 
+ int nmap_main(int argc, char *argv[]) {
