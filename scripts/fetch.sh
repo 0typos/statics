@@ -44,10 +44,33 @@ trap 'rm -f "$temporary"' EXIT
 echo "fetching $name $version"
 # Retrying a download is always safe: the result is rejected below unless it
 # matches the pinned digest, so a retry can only recover a transport failure.
-curl --fail --location --proto '=http,https' --show-error --silent --http1.1 \
-    --retry 5 --retry-all-errors --retry-connrefused --retry-delay 3 \
-    --retry-max-time 600 --connect-timeout 30 \
-    --user-agent 'statics-source-fetcher/1.0' "$url" --output "$temporary"
+download() {
+    curl --fail --location --proto '=http,https' --show-error --silent --http1.1 \
+        --retry 5 --retry-all-errors --retry-connrefused --retry-delay 3 \
+        --retry-max-time 600 --connect-timeout 30 \
+        --user-agent 'statics-source-fetcher/1.0' "$1" --output "$temporary"
+}
+
+if ! download "$url"; then
+    # Upstream hosts go dark for hours at a time (busybox.net most often).
+    # These mirrors carry most release tarballs under their original
+    # basename, and the digest check below vouches for whatever they serve,
+    # so a fallback can never substitute a tampered archive.
+    fetched=
+    for mirror in \
+        "https://downloads.yoctoproject.org/mirror/sources/${url##*/}" \
+        "https://sources.buildroot.net/$name/${url##*/}"; do
+        echo "primary source unreachable; trying $mirror" >&2
+        if download "$mirror"; then
+            fetched=1
+            break
+        fi
+    done
+    [[ $fetched ]] || {
+        echo "no reachable source for $name $version" >&2
+        exit 1
+    }
+fi
 printf '%s  %s\n' "$expected_sha" "$temporary" | sha256sum --check --status || {
     echo "checksum mismatch for $name $version" >&2
     exit 1
