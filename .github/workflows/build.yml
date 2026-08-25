@@ -123,7 +123,7 @@ jobs:
     timeout-minutes: 60
     strategy:
       fail-fast: false
-      max-parallel: 4
+      max-parallel: ${{ (inputs.runner == 'beefy' && 16) || 4 }}
       matrix:
         arch:
           - x86_64
