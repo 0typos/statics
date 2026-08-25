@@ -120,7 +120,7 @@ jobs:
     name: Build ${{ matrix.arch }}
     needs: [validate, changes]
     runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
-    timeout-minutes: 60
+    timeout-minutes: ${{ (inputs.runner == 'beefy' && 120) || 60 }}
     strategy:
       fail-fast: false
       max-parallel: ${{ (inputs.runner == 'beefy' && 16) || 4 }}
