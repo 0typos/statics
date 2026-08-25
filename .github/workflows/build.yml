@@ -6,6 +6,15 @@ on:
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      runner:
+        description: >-
+          Runner for all jobs. `beefy` targets the on-demand self-hosted
+          runner — start it with `ci-runner 0typos/statics -j N` or the
+          dispatched jobs will sit queued.
+        type: choice
+        options: [ubuntu-24.04, beefy]
+        default: ubuntu-24.04
   schedule:
     - cron: "23 4 * * 1"
   workflow_call:
@@ -38,7 +47,7 @@ env:
 jobs:
   changes:
     name: Detect build inputs
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
     outputs:
       build: ${{ steps.detect.outputs.build }}
     steps:
@@ -96,7 +105,7 @@ jobs:
 
   validate:
     name: Validate repository
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -110,7 +119,7 @@ jobs:
   build:
     name: Build ${{ matrix.arch }}
     needs: [validate, changes]
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -174,7 +183,9 @@ jobs:
           steps.classify.outputs.retry != 'true'
         run: exit 1
       - name: Install QEMU
-        if: needs.changes.outputs.build == 'true'
+        # Hosted runners only: the self-hosted `beefy` host provides
+        # qemu-user-static and binfmt itself (and has no apt).
+        if: needs.changes.outputs.build == 'true' && inputs.runner != 'beefy'
         run: |
           sudo apt-get -o Acquire::Retries=3 update
           sudo apt-get -o Acquire::Retries=3 install --yes qemu-user-static
@@ -200,7 +211,7 @@ jobs:
   reproducibility:
     name: Reproducibility
     needs: [validate, changes]
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
     # Two uncached builds, plus headroom for one retry of a fast failure.
     timeout-minutes: 75
     steps:
@@ -257,7 +268,7 @@ jobs:
     name: Build corresponding sources
     if: github.event_name != 'pull_request'
     needs: [validate, changes]
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -319,7 +330,7 @@ jobs:
       startsWith(github.ref, 'refs/tags/v')) &&
       github.event.repository.visibility == 'public'
     needs: build
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
     permissions:
       attestations: write # Record the artifact attestation.
       contents: read
@@ -360,7 +371,7 @@ jobs:
       startsWith(github.ref, 'refs/tags/v')) &&
       github.event.repository.visibility == 'public'
     needs: source-bundle
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
     permissions:
       attestations: write # Record the artifact attestation.
       contents: read
@@ -395,7 +406,7 @@ jobs:
       - source-bundle
       - attest_builds
       - attest_source
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
     permissions:
       contents: write # Create the release tag, GitHub Release, and assets.
     env:
