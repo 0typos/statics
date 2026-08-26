@@ -45,7 +45,9 @@ build_nftables() {
             --disable-man-doc \
             CFLAGS="$STATIC_CFLAGS" \
             LDFLAGS="$STATIC_LDFLAGS -L$DEPS_PREFIX/lib"
-        make -s -j"$JOBS"
+        # nftables bakes `date +%s` into nftbuildstamp[] (configure.ac
+        # MAKE_STAMP); pin it to SOURCE_DATE_EPOCH so two builds match.
+        make -s -j"$JOBS" MAKE_STAMP="$SOURCE_DATE_EPOCH"
         install_binary src/nft nft
     )
 }
