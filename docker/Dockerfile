@@ -55,9 +55,14 @@ RUN --mount=type=cache,id=statics-source-archives,target=/var/cache/statics \
 
 FROM sources AS builder
 ARG ARCH=x86_64
+# Per-component `make -j` budget. Empty ⇒ build.sh defaults to nproc (correct
+# for a plain local build or an isolated hosted runner). On the shared beefy
+# host the workflow passes a capped value so concurrent arch builds saturate
+# the cores instead of oversubscribing them into scheduler thrash.
+ARG JOBS
 COPY . .
 RUN chmod +x scripts/*.sh scripts/toolchain/* \
-    && scripts/build.sh "$ARCH" "/out/$ARCH"
+    && JOBS="$JOBS" scripts/build.sh "$ARCH" "/out/$ARCH"
 
 FROM builder AS test
 ARG ARCH=x86_64
