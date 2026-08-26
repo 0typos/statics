@@ -8,8 +8,8 @@ openssl|Apache-2.0|openssl; statically linked into curl, iperf3, drill, nmap, nc
 libpcap|BSD-3-Clause|statically linked into tcpdump, nmap, and ncat
 libmnl|LGPL-2.1-or-later|statically linked into iproute2, ethtool, libnftnl, and nft
 libcap-ng|LGPL-2.1-or-later|statically linked into util-linux setpriv
-libnftnl|LGPL-2.1-or-later|statically linked into nft
-nftables|GPL-2.0-only|nft
+libnftnl|GPL-2.0-or-later|statically linked into nft
+nftables|GPL-2.0-only AND GPL-2.0-or-later|nft
 tcpdump|BSD-3-Clause|tcpdump
 curl|curl|curl
 iperf3|BSD-3-Clause|iperf3
