@@ -188,7 +188,14 @@ if [[ ${SKIP_QEMU:-0} != 1 ]]; then
     check_output "bridge utility" "$output_dir/bridge" -V
     check_output iproute2 "$output_dir/tc" -V
     check_output wireguard-tools "$output_dir/wg" --version
-    check_output nftables "$output_dir/nft" --version
+    # nft opens a NETLINK_NETFILTER socket in nft_ctx_new() before it parses any
+    # argument, and qemu-user cannot emulate AF_NETLINK — so nft aborts at
+    # startup under emulation, even for --version (ip/ss/tc read --version
+    # first, which is why they smoke-test fine). Runtime-check nft only when
+    # running natively; every arch still gets the static-ELF checks above.
+    if [[ ${#runner[@]} -eq 0 ]]; then
+        check_output nftables "$output_dir/nft" --version
+    fi
     check_output OpenSSL "$output_dir/openssl" version
     check_output tcpdump "$output_dir/tcpdump" --version
     check_output curl "$output_dir/curl" --version
