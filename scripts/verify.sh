@@ -21,7 +21,7 @@ IFS='|' read -r _ _ _ qemu _ <<<"$record"
 
 required_binaries=(
     busybox socat dropbearmulti
-    ip ss bridge tc wg
+    ip ss bridge tc wg nft
     openssl tcpdump curl iperf3 ethtool strace jq drill mtr mtr-packet
     candump cansend cangen canplayer cansniffer
     isotpdump isotprecv isotpsend slcand canbusload
@@ -181,13 +181,14 @@ if [[ ${SKIP_QEMU:-0} != 1 ]]; then
 
     "${runner[@]}" "$output_dir/busybox" true
     "${runner[@]}" "$output_dir/busybox" netcat --help >/dev/null 2>&1
-    "${runner[@]}" "$output_dir/socat" -V >/dev/null
+    check_output WITH_OPENSSL "$output_dir/socat" -V
     check_output Dropbear "$output_dir/dropbearmulti" dropbear -V
     check_output iproute2 "$output_dir/ip" -Version
     check_output iproute2 "$output_dir/ss" -V
     check_output "bridge utility" "$output_dir/bridge" -V
     check_output iproute2 "$output_dir/tc" -V
     check_output wireguard-tools "$output_dir/wg" --version
+    check_output nftables "$output_dir/nft" --version
     check_output OpenSSL "$output_dir/openssl" version
     check_output tcpdump "$output_dir/tcpdump" --version
     check_output curl "$output_dir/curl" --version

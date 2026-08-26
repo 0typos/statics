@@ -4,10 +4,12 @@ socat|GPL-2.0-only|socat
 dropbear|MIT AND Unlicense|dropbearmulti and applet links; bundled libtomcrypt and libtommath
 iproute2|GPL-2.0-only|ip, ss, bridge, and tc
 wireguard-tools|GPL-2.0-only|wg
-openssl|Apache-2.0|openssl; statically linked into curl, iperf3, drill, nmap, and ncat
+openssl|Apache-2.0|openssl; statically linked into curl, iperf3, drill, nmap, ncat, and socat
 libpcap|BSD-3-Clause|statically linked into tcpdump, nmap, and ncat
-libmnl|LGPL-2.1-or-later|statically linked into iproute2 and ethtool
+libmnl|LGPL-2.1-or-later|statically linked into iproute2, ethtool, libnftnl, and nft
 libcap-ng|LGPL-2.1-or-later|statically linked into util-linux setpriv
+libnftnl|LGPL-2.1-or-later|statically linked into nft
+nftables|GPL-2.0-only|nft
 tcpdump|BSD-3-Clause|tcpdump
 curl|curl|curl
 iperf3|BSD-3-Clause|iperf3
