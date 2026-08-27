@@ -7,7 +7,7 @@ build_busybox() {
         make defconfig >/dev/null
         "$REPO_ROOT/scripts/merge-kconfig.sh" .config "$REPO_ROOT/configs/busybox.fragment"
         KCONFIG_NOTIMESTAMP=1 make oldconfig </dev/null >/dev/null
-        KCONFIG_NOTIMESTAMP=1 make -s -j"$JOBS" \
+        KCONFIG_NOTIMESTAMP=1 run_make \
             CC="$CC" HOSTCC=cc AR="$AR" RANLIB="$RANLIB" \
             KCFLAGS='-Wno-ignored-optimization-argument -Wno-unused-command-line-argument' \
             LDFLAGS='-Wl,-s' \

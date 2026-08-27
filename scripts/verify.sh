@@ -29,6 +29,7 @@ required_binaries=(
     spi-config spi-pipe
     nmap ncat rsync lsof
     nsenter unshare lsns setpriv findmnt
+    e2fsck dumpe2fs tune2fs mke2fs smartctl nvme
 )
 
 for metadata in BUILDINFO BUILD_RECIPES_LICENSE COMPONENTS.tsv SBOM.spdx.json \
@@ -140,7 +141,8 @@ done < <(
     find . -maxdepth 1 -type f -perm /111 -printf '%P\n' | LC_ALL=C sort
 )
 
-for link in nc netcat dropbear dbclient dropbearkey dropbearconvert scp; do
+for link in nc netcat dropbear dbclient dropbearkey dropbearconvert scp \
+    fsck.ext2 fsck.ext3 fsck.ext4 mkfs.ext4; do
     [[ -L $output_dir/$link ]] || {
         echo "missing applet link: $output_dir/$link" >&2
         exit 1
@@ -210,6 +212,11 @@ if [[ ${SKIP_QEMU:-0} != 1 ]]; then
     check_output Ncat "$output_dir/ncat" --version
     check_output rsync "$output_dir/rsync" --version
     check_output version "$output_dir/lsof" -v
+    check_output e2fsck "$output_dir/e2fsck" -V
+    check_output dumpe2fs "$output_dir/dumpe2fs" -V
+    check_output mke2fs "$output_dir/mke2fs" -V
+    check_output smartctl "$output_dir/smartctl" --version
+    check_output "nvme version" "$output_dir/nvme" version
     check_output util-linux "$output_dir/nsenter" --version
     check_output util-linux "$output_dir/unshare" --version
     check_output util-linux "$output_dir/lsns" --version

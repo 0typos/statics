@@ -20,7 +20,7 @@ build_openssl() {
             --openssldir=/etc/ssl \
             "$STATIC_CFLAGS" \
             "$STATIC_LDFLAGS"
-        make -s -j"$JOBS"
+        run_make
         make -s install_dev
         install_binary apps/openssl openssl
     )
@@ -47,7 +47,7 @@ build_libpcap() {
             --without-turbocap \
             CFLAGS="$STATIC_CFLAGS" \
             LDFLAGS="$STATIC_LDFLAGS"
-        make -s -j"$JOBS"
+        run_make
         make -s install
     )
 }
@@ -63,7 +63,7 @@ build_libmnl() {
             --enable-static \
             CFLAGS="$STATIC_CFLAGS" \
             LDFLAGS="$STATIC_LDFLAGS"
-        make -s -j"$JOBS"
+        run_make
         make -s install
     )
 }
@@ -84,7 +84,7 @@ build_libcap_ng() {
             --without-python3 \
             CFLAGS="$STATIC_CFLAGS" \
             LDFLAGS="$STATIC_LDFLAGS"
-        make -s -j"$JOBS"
+        run_make
         make -s install
     )
 }
