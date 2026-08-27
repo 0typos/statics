@@ -4,7 +4,7 @@ build_i2c_tools() {
     echo "==> building i2c-tools"
     (
         cd "$WORK_DIR/i2c-tools" || exit
-        make -s -j"$JOBS" \
+        run_make \
             CC="$CC" \
             AR="$AR" \
             BUILD_DYNAMIC_LIB=0 \

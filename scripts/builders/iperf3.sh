@@ -15,7 +15,7 @@ build_iperf3() {
             --without-sctp \
             --with-openssl="$DEPS_PREFIX" \
             CFLAGS="$STATIC_CFLAGS"
-        make -s -j"$JOBS"
+        run_make
         install_binary src/iperf3 iperf3
     )
 }

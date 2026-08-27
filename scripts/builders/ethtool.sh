@@ -13,7 +13,7 @@ build_ethtool() {
             --enable-netlink \
             CFLAGS="$STATIC_CFLAGS" \
             LDFLAGS="$STATIC_LDFLAGS"
-        make -s -j"$JOBS"
+        run_make
         install_binary ethtool ethtool
     )
 }

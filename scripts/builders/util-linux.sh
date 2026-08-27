@@ -38,7 +38,7 @@ build_util_linux() {
         # library, and pkg-config paths expose only the pinned static build.
         grep -q '^#define HAVE_LIBCAP_NG 1' config.h
 
-        make -s -j"$JOBS" nsenter unshare lsns setpriv findmnt
+        run_make nsenter unshare lsns setpriv findmnt
         install_binary nsenter nsenter
         install_binary unshare unshare
         install_binary lsns lsns

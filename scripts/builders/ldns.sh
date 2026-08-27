@@ -18,7 +18,7 @@ build_ldns() {
             --with-ssl="$DEPS_PREFIX" \
             --without-pyldns \
             CFLAGS="$STATIC_CFLAGS"
-        make -s -j"$JOBS"
+        run_make
         install_binary drill/drill drill
     )
 }

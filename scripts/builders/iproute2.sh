@@ -7,7 +7,7 @@ build_iproute2() {
         CC="$CC" AR="$AR" \
         PKG_CONFIG_LIBDIR="$DEPS_PREFIX/lib/pkgconfig" \
         ./configure
-        make -j"$JOBS" \
+        run_make \
             SUBDIRS='lib ip bridge misc tc' \
             SHARED_LIBS=n \
             CC="$CC" \
