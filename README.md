@@ -71,7 +71,7 @@ license texts.
 | Area | Outputs | Notes |
 | --- | --- | --- |
 | Rescue userspace | `busybox`, `nc`, `netcat` | Full BusyBox defconfig and convenient network applet links |
-| Remote access, relays, and transfer | `socat`, `ncat`, `rsync`, `dropbear`, `dbclient`, `scp` | Dropbear also supplies key and conversion tools; zlib is disabled |
+| Remote access, relays, and transfer | `socat`, `ncat`, `rsync`, `dropbear`, `dbclient`, `scp` | socat carries TLS via the shared OpenSSL; Dropbear also supplies key and conversion tools, zlib disabled |
 | Network state and control | `ip`, `ss`, `bridge`, `tc`, `wg`, `ethtool` | iproute2 and ethtool include static libmnl netlink support |
 | Discovery, packet, and path diagnosis | `nmap`, `tcpdump`, `iperf3`, `mtr`, `mtr-packet` | Nmap and tcpdump use static libpcap; mtr is built without curses |
 | HTTP, TLS, DNS, and data | `curl`, `openssl`, `drill`, `jq` | TLS-capable tools share the pinned OpenSSL build |
