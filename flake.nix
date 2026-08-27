@@ -56,6 +56,8 @@
               pkgs.automake
               pkgs.libtool
               pkgs.cmake
+              pkgs.meson
+              pkgs.ninja
               pkgs.pkg-config
               pkgs.gcc
               pkgs.binutils
