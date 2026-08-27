@@ -23,7 +23,7 @@ build_dropbear() {
                 -e '/^LDFLAGS/ s/ -pie//g' \
                 Makefile
         fi
-        make -s -j"$JOBS" \
+        run_make \
             PROGRAMS='dropbear dbclient dropbearkey dropbearconvert scp' \
             MULTI=1 STATIC=1
         install_binary dropbearmulti dropbearmulti

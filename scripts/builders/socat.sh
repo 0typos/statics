@@ -13,7 +13,7 @@ build_socat() {
             --enable-openssl-base="$DEPS_PREFIX" \
             --disable-readline \
             CFLAGS='-Os -Wno-date-time'
-        make -s -j"$JOBS"
+        run_make
         install_binary socat socat
     )
 }

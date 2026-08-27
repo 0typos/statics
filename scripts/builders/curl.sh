@@ -30,7 +30,7 @@ build_curl() {
             --disable-manual \
             --disable-threaded-resolver \
             CFLAGS="$STATIC_CFLAGS"
-        make -s -j"$JOBS"
+        run_make
         install_binary src/curl curl
     )
 }

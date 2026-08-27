@@ -25,7 +25,7 @@ build_strace() {
                 -include $WORK_DIR/strace/bundled/linux/include/uapi/linux/videodev2.h \
                 -include $REPO_ROOT/configs/strace-zig-uapi.h" \
             LDFLAGS="$STATIC_LDFLAGS"
-        make -s -j"$JOBS"
+        run_make
         install_binary src/strace strace
     )
 }

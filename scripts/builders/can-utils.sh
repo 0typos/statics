@@ -4,7 +4,7 @@ build_can_utils() {
     echo "==> building can-utils"
     (
         cd "$WORK_DIR/can-utils" || exit
-        make -s -j"$JOBS" \
+        run_make \
             CC="$CC" \
             CFLAGS="$STATIC_CFLAGS" \
             LDFLAGS="$STATIC_LDFLAGS" \
