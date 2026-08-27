@@ -1,0 +1,27 @@
+diff -ur a/lib/blkid/llseek.c b/lib/blkid/llseek.c
+--- a/lib/blkid/llseek.c	2026-03-06 12:17:36.000000000 -0500
++++ b/lib/blkid/llseek.c	2026-08-26 22:30:37.580897317 -0400
+@@ -39,6 +39,10 @@
+ 
+ #define my_llseek lseek64
+ 
++#elif SIZEOF_OFF_T >= 8
++
++#define my_llseek lseek
++
+ #elif defined(HAVE_LLSEEK)
+ #include <sys/syscall.h>
+ 
+diff -ur a/lib/ext2fs/llseek.c b/lib/ext2fs/llseek.c
+--- a/lib/ext2fs/llseek.c	2026-03-06 12:17:36.000000000 -0500
++++ b/lib/ext2fs/llseek.c	2026-08-26 22:30:37.580927672 -0400
+@@ -35,7 +35,9 @@
+ 
+ #ifdef __linux__
+ 
++#if SIZEOF_OFF_T < 8
+ #include <linux/unistd.h>
++#endif
+ 
+ static ext2_loff_t my_llseek (int fd, ext2_loff_t offset, int origin)
+ {
