@@ -12,5 +12,6 @@ if [[ $# -ne 2 ]]; then
 fi
 
 source "$repo_root/scripts/lib/build-common.sh"
+# shellcheck disable=SC1090  # builder file is chosen by the DAG at run time
 source "$repo_root/scripts/builders/$1.sh"
 "$2"
