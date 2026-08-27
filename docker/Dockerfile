@@ -20,15 +20,23 @@ RUN apt-get -o Acquire::Retries=3 update \
         bison \
         jq \
         libtool \
-        meson \
         ninja-build \
         patch \
         perl \
         pkg-config \
         python3 \
+        python3-pip \
         xz-utils \
         bzip2 \
     && rm -rf /var/lib/apt/lists/*
+
+# Bookworm's meson 1.0 cannot identify Zig's linker banner ("zig ld") and
+# aborts cross setup; meson 1.12 recognizes it natively (ld.zigcc). Installed
+# from PyPI pinned by wheel hash, dependency-free.
+RUN printf 'meson==1.12.0 --hash=sha256:71f133147fa0fcfe8f4df49fa1045771064947834538409e5d97b3613aac8b4e\n' > /tmp/meson.req \
+    && pip3 install --break-system-packages --no-deps --require-hashes -r /tmp/meson.req \
+    && rm /tmp/meson.req \
+    && meson --version
 
 WORKDIR /workspace
 COPY sources.lock ./
