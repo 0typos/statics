@@ -40,7 +40,7 @@ disruptive.
 | 3 | `iftop`, `nethogs` | Interactive per-flow or per-process traffic visibility | curses, procfs, capture privileges, and non-interactive testability |
 | 3 | `stress-ng` | CPU, memory, scheduler, and system stress | Large surface and intentionally disruptive workloads |
 
-Also consider focused variants instead of new binaries: TLS-enabled socat,
+Also consider focused variants instead of new binaries:
 compressed Dropbear sessions, interactive/curses mtr, broader curl protocols,
 Nmap NSE/Lua, and rsync ACL/xattr/compression/checksum integrations. Profiles
 need distinct names and verification so the compact default remains

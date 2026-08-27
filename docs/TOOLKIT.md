@@ -26,7 +26,7 @@ Nmap data, notices, and licenses remain available.
 | Area | Executables and links | Primary use |
 | --- | --- | --- |
 | Rescue userspace | `busybox`; `ping`, `ping6`, `traceroute`, `traceroute6`, `nslookup`, `wget`, `telnet`, `arp`, `arping`, `route`, `ifconfig`, `netstat`, `nc`, `netcat` | Shell recovery, basic reachability, and legacy network inspection |
-| Relays and remote access | `socat`, `ncat`, `dropbearmulti`; `dropbear`, `dbclient`, `dropbearkey`, `dropbearconvert`, `scp` | TCP/UDP relays, port checks, emergency SSH, and file copy |
+| Relays and remote access | `socat`, `ncat`, `dropbearmulti`; `dropbear`, `dbclient`, `dropbearkey`, `dropbearconvert`, `scp` | TCP/UDP/TLS relays, port checks, emergency SSH, and file copy |
 | Network control | `ip`, `ss`, `bridge`, `tc`, `wg`, `ethtool` | Addresses, routes, sockets, links, traffic control, WireGuard, and NIC state |
 | Discovery and packet diagnosis | `nmap`, `tcpdump`, `mtr`, `mtr-packet`, `iperf3` | Host/service discovery, capture, path analysis, and throughput |
 | Protocol and data checks | `curl`, `openssl`, `drill`, `jq`, `rsync` | HTTP, TLS, DNS, structured output, and efficient file transfer |
@@ -216,8 +216,17 @@ utilities are used single-threaded.
 
 ### Socat and Dropbear
 
-Socat is built without OpenSSL and readline. Use `ncat`, `curl`, or the
-standalone `openssl` command for TLS-oriented checks.
+Socat is built with OpenSSL and without readline. It shares the bundle's
+pinned static OpenSSL, so it can open, terminate, and relay TLS in addition to
+plaintext streams. To front a plaintext service with TLS:
+
+```sh
+socat OPENSSL-LISTEN:8443,reuseaddr,fork,cert=server.pem,verify=0 \
+    TCP:127.0.0.1:8080
+```
+
+`ncat --ssl`, `curl`, and the standalone `openssl` command remain available for
+client-side TLS checks.
 
 Dropbear disables zlib. Its links include server, client, key, conversion, and
 SCP commands. Starting an emergency SSH server expands the target's attack
