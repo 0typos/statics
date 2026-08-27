@@ -4,12 +4,15 @@ build_socat() {
     echo "==> building socat"
     (
         cd "$WORK_DIR/socat" || exit
-        CC="$CC" ./configure \
+        CC="$CC" \
+        CPPFLAGS="-I$DEPS_PREFIX/include" \
+        LDFLAGS="-static -Wl,--gc-sections -Wl,-s -L$DEPS_PREFIX/lib" \
+        ./configure \
             --host="$AUTOCONF_HOST" \
-            --disable-openssl \
+            --enable-openssl \
+            --enable-openssl-base="$DEPS_PREFIX" \
             --disable-readline \
-            CFLAGS='-Os -Wno-date-time' \
-            LDFLAGS='-static -Wl,--gc-sections -Wl,-s'
+            CFLAGS='-Os -Wno-date-time'
         make -s -j"$JOBS"
         install_binary socat socat
     )

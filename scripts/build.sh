@@ -64,6 +64,8 @@ sources=(
     libpcap
     libmnl
     libcap-ng
+    libnftnl
+    nftables
     tcpdump
     curl
     iperf3
@@ -107,6 +109,7 @@ done
 
 source "$repo_root/scripts/lib/build-common.sh"
 source "$repo_root/scripts/builders/dependencies.sh"
+source "$repo_root/scripts/builders/nftables.sh"
 source "$repo_root/scripts/builders/busybox.sh"
 source "$repo_root/scripts/builders/socat.sh"
 source "$repo_root/scripts/builders/dropbear.sh"
@@ -129,6 +132,8 @@ source "$repo_root/scripts/builders/lsof.sh"
 source "$repo_root/scripts/builders/util-linux.sh"
 
 build_dependencies
+build_libnftnl
+build_nftables
 build_strace
 build_tcpdump
 build_curl

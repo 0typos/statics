@@ -42,6 +42,8 @@ copy_license libpcap LICENSE
 copy_license libmnl COPYING
 copy_license libcap-ng COPYING
 copy_license libcap-ng COPYING.LIB
+copy_license libnftnl COPYING
+copy_license nftables COPYING
 copy_license tcpdump LICENSE
 copy_license curl COPYING
 copy_license iperf3 LICENSE
