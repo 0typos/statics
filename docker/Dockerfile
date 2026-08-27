@@ -20,6 +20,8 @@ RUN apt-get -o Acquire::Retries=3 update \
         bison \
         jq \
         libtool \
+        meson \
+        ninja-build \
         patch \
         perl \
         pkg-config \

@@ -25,3 +25,7 @@ nmap|LicenseRef-NPSL-0.95 AND BSD-3-Clause AND MIT AND Zlib|nmap, ncat, core dat
 rsync|GPL-3.0-or-later AND MIT AND Zlib|rsync with bundled popt and zlib
 lsof|lsof|lsof
 util-linux|GPL-2.0-only AND GPL-2.0-or-later AND LGPL-2.1-or-later|nsenter, unshare, lsns, setpriv, findmnt, and their static util-linux libraries
+e2fsprogs|GPL-2.0-only AND LGPL-2.0-only AND BSD-3-Clause AND MIT|e2fsck, dumpe2fs, tune2fs, mke2fs, and fsck/mkfs links; bundled libext2fs, libe2p, libuuid, libet, libss
+smartmontools|GPL-2.0-or-later|smartctl with the compiled-in drive database
+libnvme|LGPL-2.1-or-later|statically linked into nvme
+nvme-cli|GPL-2.0-only AND GPL-2.0-or-later|nvme
