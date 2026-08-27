@@ -73,6 +73,10 @@ copy_license util-linux README.licensing
 copy_license util-linux Documentation/licenses/COPYING.GPL-2.0-only
 copy_license util-linux Documentation/licenses/COPYING.GPL-2.0-or-later
 copy_license util-linux Documentation/licenses/COPYING.LGPL-2.1-or-later
+copy_license e2fsprogs NOTICE
+copy_license smartmontools COPYING
+copy_license libnvme COPYING
+copy_license nvme-cli LICENSE
 
 cp "$repo_root/components.tsv" "$output_dir/COMPONENTS.tsv"
 

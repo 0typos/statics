@@ -37,6 +37,7 @@ export CXX="$repo_root/scripts/toolchain/cxx"
 export AR="$repo_root/scripts/toolchain/ar"
 export RANLIB="$repo_root/scripts/toolchain/ranlib"
 export JOBS=${JOBS:-$(getconf _NPROCESSORS_ONLN)}
+export STATICS_ARCH=$arch
 export SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-0}
 export KCONFIG_NOTIMESTAMP=1
 export TZ=UTC
@@ -81,6 +82,10 @@ sources=(
     rsync
     lsof
     util-linux
+    e2fsprogs
+    smartmontools
+    libnvme
+    nvme-cli
 )
 
 for path in "$WORK_DIR" "$OUTPUT_DIR"; do
@@ -124,7 +129,8 @@ dag=$WORK_DIR/dag.mk
     printf 'all:'
     for c in deps libnftnl nftables strace tcpdump curl iperf3 ethtool jq \
         ldns mtr can-utils i2c-tools spi-tools nmap rsync lsof util-linux \
-        busybox socat dropbear iproute2 wireguard-tools; do
+        busybox socat dropbear iproute2 wireguard-tools \
+        e2fsprogs smartmontools libnvme nvme-cli; do
         printf ' $(S)/%s' "$c"
     done
     printf '\n\n'
@@ -161,6 +167,10 @@ dag=$WORK_DIR/dag.mk
     emit dropbear dropbear build_dropbear
     emit iproute2 iproute2 build_iproute2 deps
     emit wireguard-tools wireguard-tools build_wireguard_tools
+    emit e2fsprogs e2fsprogs build_e2fsprogs
+    emit smartmontools smartmontools build_smartmontools
+    emit libnvme nvme build_libnvme deps
+    emit nvme-cli nvme build_nvme_cli libnvme
 } > "$dag"
 
 make -f "$dag" -j"$JOBS" --output-sync=target all
