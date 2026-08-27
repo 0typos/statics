@@ -15,7 +15,7 @@ build_tcpdump() {
             --without-smi \
             CFLAGS="$STATIC_CFLAGS" \
             LDFLAGS="$STATIC_LDFLAGS -L$DEPS_PREFIX/lib"
-        make -s -j"$JOBS"
+        run_make
         install_binary tcpdump tcpdump
     )
 }

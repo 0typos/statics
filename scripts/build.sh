@@ -107,53 +107,63 @@ for source in "${sources[@]}"; do
     cp -a "$SOURCES_DIR/$source/." "$WORK_DIR/$source/"
 done
 
-source "$repo_root/scripts/lib/build-common.sh"
-source "$repo_root/scripts/builders/dependencies.sh"
-source "$repo_root/scripts/builders/nftables.sh"
-source "$repo_root/scripts/builders/busybox.sh"
-source "$repo_root/scripts/builders/socat.sh"
-source "$repo_root/scripts/builders/dropbear.sh"
-source "$repo_root/scripts/builders/iproute2.sh"
-source "$repo_root/scripts/builders/wireguard-tools.sh"
-source "$repo_root/scripts/builders/tcpdump.sh"
-source "$repo_root/scripts/builders/curl.sh"
-source "$repo_root/scripts/builders/iperf3.sh"
-source "$repo_root/scripts/builders/ethtool.sh"
-source "$repo_root/scripts/builders/strace.sh"
-source "$repo_root/scripts/builders/jq.sh"
-source "$repo_root/scripts/builders/ldns.sh"
-source "$repo_root/scripts/builders/mtr.sh"
-source "$repo_root/scripts/builders/can-utils.sh"
-source "$repo_root/scripts/builders/i2c-tools.sh"
-source "$repo_root/scripts/builders/spi-tools.sh"
-source "$repo_root/scripts/builders/nmap.sh"
-source "$repo_root/scripts/builders/rsync.sh"
-source "$repo_root/scripts/builders/lsof.sh"
-source "$repo_root/scripts/builders/util-linux.sh"
+# Components build as a GNU make DAG under one jobserver: `make -j$JOBS` is
+# the single global parallelism budget, shared between concurrently building
+# components and their inner makes (builders call run_make, which defers to
+# the jobserver instead of stacking its own -j). Library deps build serially
+# into the shared prefix first; everything else parallelizes against the DAG.
+stamps=$WORK_DIR/.stamps
+mkdir -p "$stamps"
 
-build_dependencies
-build_libnftnl
-build_nftables
-build_strace
-build_tcpdump
-build_curl
-build_iperf3
-build_ethtool
-build_jq
-build_ldns
-build_mtr
-build_can_utils
-build_i2c_tools
-build_spi_tools
-build_nmap
-build_rsync
-build_lsof
-build_util_linux
-build_busybox
-build_socat
-build_dropbear
-build_iproute2
-build_wireguard_tools
+dag=$WORK_DIR/dag.mk
+# shellcheck disable=SC2016  # $(S)/$(RB) are make variables, not shell
+{
+    printf 'RB := %s/scripts/run-builder.sh\n' "$repo_root"
+    printf 'S := %s\n\n' "$stamps"
+    printf '.PHONY: all\n'
+    printf 'all:'
+    for c in deps libnftnl nftables strace tcpdump curl iperf3 ethtool jq \
+        ldns mtr can-utils i2c-tools spi-tools nmap rsync lsof util-linux \
+        busybox socat dropbear iproute2 wireguard-tools; do
+        printf ' $(S)/%s' "$c"
+    done
+    printf '\n\n'
+
+    emit() { # target, builder file, function, prerequisites...
+        local target=$1 file=$2 fn=$3
+        shift 3
+        printf '$(S)/%s:' "$target"
+        local dep
+        for dep in "$@"; do printf ' $(S)/%s' "$dep"; done
+        printf '\n\t+@$(RB) %s %s && touch $@\n' "$file" "$fn"
+    }
+
+    emit deps dependencies build_dependencies
+    emit libnftnl nftables build_libnftnl deps
+    emit nftables nftables build_nftables libnftnl
+    emit strace strace build_strace
+    emit tcpdump tcpdump build_tcpdump deps
+    emit curl curl build_curl deps
+    emit iperf3 iperf3 build_iperf3 deps
+    emit ethtool ethtool build_ethtool deps
+    emit jq jq build_jq
+    emit ldns ldns build_ldns deps
+    emit mtr mtr build_mtr
+    emit can-utils can-utils build_can_utils
+    emit i2c-tools i2c-tools build_i2c_tools
+    emit spi-tools spi-tools build_spi_tools
+    emit nmap nmap build_nmap deps
+    emit rsync rsync build_rsync
+    emit lsof lsof build_lsof
+    emit util-linux util-linux build_util_linux deps
+    emit busybox busybox build_busybox
+    emit socat socat build_socat deps
+    emit dropbear dropbear build_dropbear
+    emit iproute2 iproute2 build_iproute2 deps
+    emit wireguard-tools wireguard-tools build_wireguard_tools
+} > "$dag"
+
+make -f "$dag" -j"$JOBS" --output-sync=target all
 
 {
     echo "architecture=$arch"

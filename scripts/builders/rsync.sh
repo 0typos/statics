@@ -23,7 +23,7 @@ build_rsync() {
             rsync_cv_HAVE_SOCKETPAIR=yes \
             CFLAGS="$STATIC_CFLAGS" \
             LDFLAGS="$STATIC_LDFLAGS"
-        make -s -j"$JOBS" rsync
+        run_make rsync
         install_binary rsync rsync
     )
 }

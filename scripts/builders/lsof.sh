@@ -14,7 +14,7 @@ build_lsof() {
             --without-selinux \
             CFLAGS="$STATIC_CFLAGS" \
             LDFLAGS="$STATIC_LDFLAGS"
-        make -s -j"$JOBS" lsof
+        run_make lsof
         install_binary lsof lsof
     )
 }

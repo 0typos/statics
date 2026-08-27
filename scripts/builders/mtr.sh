@@ -15,7 +15,7 @@ build_mtr() {
             --disable-bash-completion \
             CFLAGS="$STATIC_CFLAGS" \
             LDFLAGS="$STATIC_LDFLAGS"
-        make -s -j"$JOBS" mtr mtr-packet
+        run_make mtr mtr-packet
         install_binary mtr mtr
         install_binary mtr-packet mtr-packet
     )

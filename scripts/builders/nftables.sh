@@ -19,7 +19,7 @@ build_libnftnl() {
             --enable-static \
             CFLAGS="$STATIC_CFLAGS" \
             LDFLAGS="$STATIC_LDFLAGS"
-        make -s -j"$JOBS"
+        run_make
         make -s install
     )
 }
@@ -47,7 +47,7 @@ build_nftables() {
             LDFLAGS="$STATIC_LDFLAGS -L$DEPS_PREFIX/lib"
         # nftables bakes `date +%s` into nftbuildstamp[] (configure.ac
         # MAKE_STAMP); pin it to SOURCE_DATE_EPOCH so two builds match.
-        make -s -j"$JOBS" MAKE_STAMP="$SOURCE_DATE_EPOCH"
+        run_make MAKE_STAMP="$SOURCE_DATE_EPOCH"
         install_binary src/nft nft
     )
 }

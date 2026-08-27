@@ -38,7 +38,7 @@ build_nmap() {
             libnetutil/makefile.dep \
             ncat/makefile.dep \
             nsock/src/makefile.dep
-        make -s -j"$JOBS" nmap build-ncat
+        run_make nmap build-ncat
         install_binary nmap nmap
         install_binary ncat/ncat ncat
 
