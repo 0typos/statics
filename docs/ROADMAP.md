@@ -2,8 +2,8 @@
 
 The current bundle covers rescue userspace, relays and remote access, network
 configuration, socket and packet inspection, HTTP/TLS/DNS checks, throughput
-and path diagnosis, syscall tracing, JSON processing, and common IoT field
-buses.
+and path diagnosis, firewall policy, syscall tracing, filesystem and storage
+diagnosis, JSON processing, and common IoT field buses.
 
 This page records candidates, not commitments. The executable contract is in
 the [toolkit guide](TOOLKIT.md), and implementation proposals should follow
@@ -13,11 +13,12 @@ the [contribution checklist](../CONTRIBUTING.md).
 
 | Area | Tools |
 | --- | --- |
-| Network control | `ip`, `ss`, `bridge`, `tc`, `wg`, `ethtool` |
+| Network control | `ip`, `ss`, `bridge`, `tc`, `wg`, `ethtool`, `nft` |
 | Packet, path, and throughput | `tcpdump`, `mtr`, `iperf3` |
 | Application protocols and data | `curl`, `openssl`, `drill`, `jq` |
 | Discovery and transfer | `nmap`, `ncat`, `rsync` |
 | Process diagnosis | `strace`, `lsof` |
+| Filesystems and storage | `e2fsck`, `dumpe2fs`, `tune2fs`, `mke2fs`, `smartctl`, `nvme` |
 | Namespaces and privilege | `nsenter`, `unshare`, `lsns`, `setpriv`, `findmnt` |
 | Embedded buses | selected `can-utils`, `i2c-tools`, and `spi-tools` programs |
 
@@ -29,11 +30,9 @@ disruptive.
 
 | Priority | Tool | Diagnostic value | Build considerations |
 | --- | --- | --- | --- |
-| 1 | `smartctl`, `nvme-cli` | Storage health and device diagnosis | Hardware ioctls, database packaging, and device permissions |
 | 1 | `usbutils`, `pciutils` | Bus topology, descriptors, and device identification | Package and update hardware ID databases explicitly |
 | 1 | `mmc-utils` | eMMC/SD health, EXT_CSD, and device configuration | Write operations can be destructive; needs real-device tests |
 | 2 | `iw` | Wi-Fi link, station, scan, and regulatory diagnosis | libnl/static netlink dependencies and wireless privileges |
-| 2 | `nft` | Inspect and repair modern packet-filter rules | libnftables and JSON/parser dependency surface |
 | 2 | `conntrack` | Stateful firewall and NAT diagnosis | Netfilter-specific libraries and kernel support |
 | 2 | `bpftool` | Inspect BPF programs, maps, links, and features | Large kernel-header/libbpf surface and strong kernel coupling |
 | 2 | `fio` | Storage and I/O characterization | Larger binary, workload safety, and reproducibility considerations |

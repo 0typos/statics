@@ -180,10 +180,10 @@ binary kit.
 
 ## Automation
 
-Published binaries are rebuilt automatically every month. The scheduled workflow
-repins every component, rebuilds all thirteen architectures and publishes only after
-every verification gate passes. When no input changed, it skips the release rather than
-republishing the same bits.
+A scheduled release check runs every month. When build inputs changed, it repins every
+component, rebuilds all thirteen architectures and publishes only after every
+verification gate passes. When nothing changed, it skips the build and release rather
+than republishing the same bits.
 
 Each candidate is validated, cross-built, verified as statically linked and smoke-run
 under QEMU. CI also rebuilds x86-64 twice and compares the complete output, publishes
