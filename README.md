@@ -1,224 +1,232 @@
 # statics
 
-[![Build](https://github.com/0typos/statics/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/0typos/statics/actions/workflows/build.yml)
-[![Monthly release](https://github.com/0typos/statics/actions/workflows/monthly-release.yml/badge.svg)](https://github.com/0typos/statics/actions/workflows/monthly-release.yml)
+<p align="center">
+  <img src="assets/brand/statics-mark.png" width="168" alt="statics: a portable field case filled with Linux troubleshooting tools">
+</p>
 
-Reproducible, cross-architecture Linux troubleshooting binaries. This
-repository contains the build recipes, source pins, CI, verification, and
-release machinery—not generated binaries. Build outputs are local files,
-GitHub Actions artifacts, or release assets.
+<p align="center">
+  <strong>Bring the tools the target forgot.</strong><br>
+  Reproducible, cross-architecture static Linux binaries—packed for the field.
+</p>
 
-Published binaries are rebuilt automatically every month. A scheduled workflow
-repins every component to its latest upstream release, rebuilds all thirteen
-architectures, and publishes a new GitHub Release once every verification gate
-passes. Months with no upstream or recipe change are skipped rather than
-republished, so the newest release is always the newest set of inputs that
-actually built and verified. See [Automation](#automation).
+<p align="center">
+  <a href="https://github.com/0typos/statics/actions/workflows/build.yml"><img src="https://github.com/0typos/statics/actions/workflows/build.yml/badge.svg" alt="Build"></a>
+  <a href="https://github.com/0typos/statics/releases"><img src="https://img.shields.io/github/v/release/0typos/statics?include_prereleases&amp;sort=semver&amp;style=flat-square&amp;color=00CFE8" alt="Latest release"></a>
+  <img src="https://img.shields.io/badge/Linux_targets-13-FFB000?style=flat-square" alt="13 Linux targets">
+  <img src="https://img.shields.io/badge/libc-static_musl-FF1688?style=flat-square" alt="Statically linked with musl">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/build_recipes-MIT-8EA9D8?style=flat-square" alt="MIT licensed build recipes"></a>
+</p>
+
+<p align="center">
+  <a href="#get-a-kit">Get a kit</a> ·
+  <a href="#put-it-to-work">Use it</a> ·
+  <a href="#inside-the-case">Toolkit</a> ·
+  <a href="#pick-a-target">Architectures</a> ·
+  <a href="#trust-what-you-carry">Trust</a> ·
+  <a href="#documentation">Docs</a>
+</p>
+
+> **Broken hosts rarely have the tool you need.**
+
+`statics` builds a portable Linux troubleshooting kit for machines where the package
+manager, network or base userspace cannot help. The repository contains the recipes,
+source pins, CI, verification and release machinery—not generated binaries. Build
+outputs stay in local files, GitHub Actions artifacts or release assets.
 
 Every target is compiled against musl with a pinned
-[Zig](https://ziglang.org/) toolchain. Docker provides the clean build
-environment, and QEMU user-mode emulation provides an execution smoke test for
-non-native architectures.
+[Zig](https://ziglang.org/) toolchain. Docker keeps the build environment clean; QEMU
+user-mode emulation proves that non-native outputs can actually start.
 
-## Quick start
+## At a glance
 
-Requirements: Git, GNU Make, Docker with Buildx, roughly 8 GB of free disk
-space for the first build, and an `amd64` or `arm64` Docker host.
+| 🧰 Carry it | 🐧 Run it | 🔐 Trust it |
+|---|---|---|
+| 51 physical executables, plus BusyBox and Dropbear links | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
+| Network, process, namespace, storage and hardware diagnosis | Static musl builds avoid a dependency on the target's libc | Deterministic archives, QEMU smoke tests and release attestations |
+
+## Get a kit
+
+### Release archive
+
+Choose the archive for the target machine from the
+[latest release](https://github.com/0typos/statics/releases/latest). Every archive has a
+checksum beside it:
 
 ```console
-# Clone this repository using the URL shown by your Git host, then:
+arch=x86_64
+sha256sum -c "statics-$arch.tar.xz.sha256"
+tar -xJf "statics-$arch.tar.xz"
+```
+
+Not sure which archive fits the device? Start with the
+[architecture and ABI guide](docs/ARCHITECTURES.md).
+
+### Build one
+
+Requirements: Git, GNU Make, Docker with Buildx, roughly 8 GB of free disk space for
+the first build, and an `amd64` or `arm64` Docker host.
+
+```console
+git clone https://github.com/0typos/statics.git
 cd statics
 make smoke ARCH=x86_64
 make build ARCH=x86_64
 ```
 
-`make smoke` performs a containerized cross-build and runs representative
-commands under QEMU. `make build` reuses those cached layers and exports the
-toolkit under `dist/x86_64/`.
+`make smoke` cross-builds in a container and runs representative commands under QEMU.
+`make build` reuses those cached layers and exports the kit under `dist/x86_64/`.
 
 ```console
 make list                     # show the complete target matrix
 make build ARCH=mipsel        # build one target
-make package ARCH=mipsel      # build and create dist/statics-mipsel.tar.xz
-make verify ARCH=mipsel       # verify an existing exported build
+make package ARCH=mipsel      # create dist/statics-mipsel.tar.xz
+make verify ARCH=mipsel       # verify an exported build
 make all                      # build every target
-make sources                  # export all checksum-verified source archives
+make sources                  # export checksum-verified source archives
 make source-package           # create dist/statics-sources.tar.xz
 ```
 
-`make help` is the command reference. Generated files live under `dist/` and
+`make help` is the compact command reference. Generated files live under `dist/` and
 `.build/`; both are ignored by Git.
 
-## Documentation
+## Put it to work
 
-| Guide | Use it for |
-| --- | --- |
-| [Building](docs/BUILDING.md) | Prerequisites, exact Make targets, artifact layout, verification, packaging, and deployment |
-| [Toolkit](docs/TOOLKIT.md) | Command examples, feature profiles, omissions, runtime data, and privileges |
-| [Architectures](docs/ARCHITECTURES.md) | Device identification, ABI selection, and QEMU coverage |
-| [Troubleshooting](docs/TROUBLESHOOTING.md) | Build, QEMU, architecture, permission, CA, Nmap, Lsof, and rsync failures |
-| [Contributing](CONTRIBUTING.md) | Adding a tool or target, updating sources, validation, and review expectations |
-| [Releasing](docs/RELEASING.md) | Release gates, assets, checksums, tags, and attestations |
-| [Security](SECURITY.md) | Supply-chain trust, artifact guarantees, and operational safety |
-| [Roadmap](docs/ROADMAP.md) | Candidate utilities, profiles, and deferred platforms |
+Keep the directory together when you copy it to a target. Nmap data, checksums,
+licenses and build metadata travel with the executables.
 
-## Toolkit
+```console
+TOOLKIT=/tmp/statics/x86_64
+export PATH="$TOOLKIT:$PATH"
 
-The bundle contains 44 physical executables plus BusyBox and Dropbear
-multi-call links, Nmap runtime data, checksums, an SPDX SBOM, and upstream
-license texts.
+ip -brief address
+ss -listening -numeric -tcp -udp
+curl --verbose --connect-timeout 5 https://example.com/
+strace -f -o /tmp/trace.log curl https://example.com/
+nmap --datadir "$TOOLKIT/share/nmap" -sT -sV 192.0.2.10
+```
 
-| Area | Outputs | Notes |
-| --- | --- | --- |
-| Rescue userspace | `busybox`, `nc`, `netcat` | Full BusyBox defconfig and convenient network applet links |
-| Remote access, relays, and transfer | `socat`, `ncat`, `rsync`, `dropbear`, `dbclient`, `scp` | socat carries TLS via the shared OpenSSL; Dropbear also supplies key and conversion tools, zlib disabled |
-| Network state and control | `ip`, `ss`, `bridge`, `tc`, `wg`, `ethtool` | iproute2 and ethtool include static libmnl netlink support |
-| Discovery, packet, and path diagnosis | `nmap`, `tcpdump`, `iperf3`, `mtr`, `mtr-packet` | Nmap and tcpdump use static libpcap; mtr is built without curses |
-| HTTP, TLS, DNS, and data | `curl`, `openssl`, `drill`, `jq` | TLS-capable tools share the pinned OpenSSL build |
-| Process diagnosis | `strace`, `lsof` | Syscall tracing plus process/file/socket correlation through Linux procfs |
-| Namespaces and privilege | `nsenter`, `unshare`, `lsns`, `setpriv`, `findmnt` | Enter, create, enumerate, constrain, and inspect Linux namespace state |
-| CAN and ISO-TP | `candump`, `cansend`, `cangen`, `canplayer`, `cansniffer`, `isotpdump`, `isotprecv`, `isotpsend`, `slcand`, `canbusload` | SocketCAN tools for field and vehicle networks |
-| Hardware buses | `i2cdetect`, `i2cdump`, `i2cget`, `i2cset`, `i2ctransfer`, `spi-config`, `spi-pipe` | Direct Linux I²C and spidev diagnosis |
+Absolute paths are safer when the host already has commands with the same names. The
+[toolkit guide](docs/TOOLKIT.md) covers feature profiles, required privileges, runtime
+data and safe starting commands.
 
-Convenience links expose useful BusyBox applets such as `ping`, `traceroute`,
-`nslookup`, `arping`, `wget`, `ifconfig`, and `netstat`. They do not add extra
-binary payload.
+## Inside the case
 
-The portable default intentionally disables selected optional integrations.
-In particular, keep Nmap's packaged `share/nmap/` directory with the
-executable, provide curl a trusted CA bundle when the target lacks one, and do
-not expect rsync to preserve ACLs or extended attributes. Nmap and Ncat are
-governed by the Nmap Public Source License, so review their packaged terms
-before deployment or redistribution.
+The bundle contains 51 physical executables plus BusyBox and Dropbear multi-call links,
+Nmap runtime data, checksums, an SPDX SBOM and upstream license texts.
 
-Static linking does not grant permissions or provide missing kernel support.
-Packet capture, raw probes, network changes, process tracing, and hardware-bus
-access still require the corresponding Linux capabilities, drivers, device
-nodes, and security policy. The [toolkit guide](docs/TOOLKIT.md) documents
-each profile and gives safe starting commands.
+| Area | Outputs | What they are for |
+|---|---|---|
+| Rescue userspace | `busybox`, `nc`, `netcat` | Shell recovery, basic reachability and familiar applet links |
+| Remote access and transfer | `socat`, `ncat`, `rsync`, `dropbear`, `dbclient`, `dropbearkey`, `dropbearconvert`, `scp` | Relays, emergency SSH and file movement |
+| Network state and control | `ip`, `ss`, `bridge`, `tc`, `wg`, `ethtool`, `nft` | Interfaces, routes, sockets, policy and NIC state |
+| Discovery and packet diagnosis | `nmap`, `tcpdump`, `iperf3`, `mtr`, `mtr-packet` | Services, captures, paths and throughput |
+| HTTP, TLS, DNS and data | `curl`, `openssl`, `drill`, `jq` | Protocol checks and structured output |
+| Process and storage diagnosis | `strace`, `lsof`, `e2fsck`, `dumpe2fs`, `tune2fs`, `mke2fs`, `smartctl`, `nvme` | Syscalls, open files, filesystems and device health |
+| Namespaces and privilege | `nsenter`, `unshare`, `lsns`, `setpriv`, `findmnt` | Enter, create, inspect and constrain Linux execution contexts |
+| CAN and ISO-TP | `candump`, `cansend`, `cangen`, `canplayer`, `cansniffer`, `isotp*`, `slcand`, `canbusload` | Field and vehicle networks |
+| Hardware buses | `i2cdetect`, `i2cdump`, `i2cget`, `i2cset`, `i2ctransfer`, `spi-config`, `spi-pipe` | Linux I²C and spidev diagnosis |
 
-`setns(2)` is a Linux system call rather than a separate standard utility.
-The bundled util-linux `nsenter` is its maintained command-line interface.
-`unshare`, `lsns`, `setpriv`, and `findmnt` cover the adjacent creation,
-enumeration, privilege, and mount-view workflows.
+Convenience links expose BusyBox applets such as `ping`, `traceroute`, `nslookup`,
+`arping`, `wget`, `ifconfig` and `netstat` without adding extra binary payload.
 
-## Supported Linux targets
+The portable default deliberately leaves some integrations out. Keep Nmap's packaged
+`share/nmap/` beside the executable, provide curl a trusted CA bundle when the target
+lacks one, and do not expect rsync to preserve ACLs or extended attributes. Nmap and
+Ncat use the Nmap Public Source License; review their packaged terms before deployment
+or redistribution.
+
+## Pick a target
 
 The matrix covers:
 
-- x86-64 and 32-bit x86
-- AArch64
-- ARMv6 hard-float and ARMv7 soft/hard-float
-- 32-bit MIPS in both endian modes
-- 32/64-bit PowerPC in big-endian and little-endian modes
-- RISC-V 64 and s390x
+| family | targets |
+|---|---|
+| x86 | `x86_64`, `i686` |
+| ARM | `aarch64`, `armv6-hardfloat`, `armv7-hardfloat`, `armv7-softfloat` |
+| MIPS | `mips`, `mipsel` |
+| PowerPC | `powerpc`, `powerpc64`, `powerpc64le` |
+| Other | `riscv64`, `s390x` |
 
-See the [architecture and ABI guide](docs/ARCHITECTURES.md) before selecting a
-device build. A successful static build does not replace kernel support for
-required system calls, network families, TUN, namespaces, packet sockets, or
-device ioctls.
+A successful static build removes the installed-libc dependency. It does not provide
+missing syscalls, network families, TUN support, namespaces, packet sockets or device
+drivers. Check the target kernel and ABI before heading into the field.
 
-## Reproducibility and source trust
+Static linking does not grant permissions. Packet capture, raw probes, network changes,
+process tracing and hardware-bus access still require the corresponding Linux
+capabilities, device nodes and security policy.
 
-[`sources.lock`](sources.lock) pins every compiler and upstream source archive
-by version, URL, and SHA-256. Fetches fail closed on a checksum mismatch.
-Builds set a fixed `SOURCE_DATE_EPOCH`, remove debug/symbol tables with Zig's
-cross-linker flags, and emit:
+## Trust what you carry
+
+[`sources.lock`](sources.lock) pins every compiler and upstream source archive by
+version, URL and SHA-256. Fetches fail closed on a checksum mismatch. Builds set a fixed
+`SOURCE_DATE_EPOCH`, strip debug and symbol tables with Zig's cross-linker flags, and
+emit:
 
 - `BUILDINFO` with the target and component versions
-- `SHA256SUMS` for every executable payload and Nmap runtime data file
-- the exact `sources.lock` used by the build
+- `SHA256SUMS` for every executable payload and Nmap runtime file
+- the exact `sources.lock` used for the build
 - `COMPONENTS.tsv` and a deterministic SPDX 2.3 SBOM
 - complete upstream notices under `licenses/`
 - the build-recipe MIT license as `BUILD_RECIPES_LICENSE`
 
-Most upstreams are fetched over HTTPS. Socat is the documented exception:
-its canonical hostname does not have a matching TLS certificate, so its
-release archive is fetched over HTTP and protected by the reviewed lock-file
-digest. See [SECURITY.md](SECURITY.md) for the trust model and update policy.
+Most upstreams are fetched over HTTPS. Socat is the documented exception: its canonical
+hostname has no matching TLS certificate, so the archive is fetched over HTTP and
+protected by the reviewed lock-file digest. [Security](SECURITY.md) documents that trust
+boundary and the update policy.
 
-The output contains GPL and other copyleft software. Binary bundles carry the
-relevant upstream license texts and a generated `THIRD_PARTY_NOTICES.md`.
-When redistributing artifacts, retain the build recipes and make corresponding
-source available. `make source-package` produces the exact upstream archive
-bundle used by a build.
-
-## Licensing
-
-Repository-authored build recipes, scripts, configuration, and documentation
-are licensed under the [MIT License](LICENSE), unless a file says otherwise.
-Patches or other material derived from an upstream project remain subject to
-that project's terms.
-
-That MIT license does not replace or override the licenses of the utilities,
-libraries, or source archives built by this project. Each upstream project
-retains its own copyright and license terms. [`components.tsv`](components.tsv)
-indexes those terms, and every binary bundle includes
-`THIRD_PARTY_NOTICES.md` plus the relevant texts under
-`licenses/<source>/`. The repository's MIT license is included separately in
-artifacts as `BUILD_RECIPES_LICENSE`.
-
-Redistributors are responsible for complying with every applicable upstream
-license, including corresponding-source obligations and Nmap's NPSL terms.
-This repository does not relicense upstream code or generated binaries.
+The output includes GPL and other copyleft software. `make source-package` produces the
+exact upstream archive set used by a build so corresponding source can travel with the
+binary kit.
 
 ## Automation
 
-GitHub Actions:
+A scheduled release check runs every month. When build inputs changed, it repins every
+component, rebuilds all thirteen architectures and publishes only after every
+verification gate passes. When nothing changed, it skips the build and release rather
+than republishing the same bits.
 
-- validates shell/Python and manifest structure on every change;
-- cross-builds the full architecture matrix;
-- verifies static linking and runs each core utility under QEMU;
-- uploads deterministic per-architecture archives as workflow artifacts;
-- exports a matching source-archive artifact;
-- independently rebuilds x86-64 twice and compares the complete outputs;
-- publishes checksummed binaries, SPDX SBOMs, notices, and corresponding
-  sources on `v*` tags;
-- attaches GitHub/Sigstore provenance and SBOM attestations for public
-  releases;
-- rebuilds the pins weekly to catch toolchain or infrastructure regressions;
-- checks upstream releases weekly and opens a checksum-refresh PR;
-- repins, builds, and releases every architecture monthly, publishing only
-  when every gate passes and skipping the build entirely when nothing has
-  changed since the last release;
-- keeps the most recent 24 monthly releases and removes the assets of older
-  ones, without ever deleting a tag;
-- retries a build once when it fails in its first ten minutes, which is where
-  registry, DNS, and mirror failures land. A failure past that point has
-  reached the compiler and is reported, never retried.
+Each candidate is validated, cross-built, verified as statically linked and smoke-run
+under QEMU. CI also rebuilds x86-64 twice and compares the complete output, publishes
+checksums, SBOMs, notices and matching sources, and attaches GitHub/Sigstore provenance
+and SBOM attestations. A weekly build catches toolchain regressions; a separate updater
+opens reviewed checksum-refresh PRs.
 
-Dependabot maintains Docker and GitHub Actions references. Source updates are
-kept separate because generic tarball releases are not a Dependabot ecosystem;
-[`scripts/update_sources.py`](scripts/update_sources.py) is the lock-file
-equivalent. Update PRs are intentionally not auto-merged: CI and review of
-release notes/signatures remain required. The updater explicitly dispatches
-the full build for its bot-created PR branch.
+Monthly repinning is intentionally unattended and never writes to `main`. The
+[release guide](docs/RELEASING.md) explains every gate, retention, retry and attestation
+rule, including how to disable the schedule.
 
-The monthly release publishes repinned upstream versions without that review,
-which is the point of an unattended release and also its main caveat. It never
-writes to `main`. See the [release guide](docs/RELEASING.md) to turn the
-refresh off, disable the schedule, or read what the automation is allowed to
-do.
+## Documentation
 
-See the [release guide](docs/RELEASING.md) for release gates, assets, and
-attestation verification.
+| Build | Operate | Trust | Extend |
+|---|---|---|---|
+| [Building](docs/BUILDING.md)<br>[Architectures](docs/ARCHITECTURES.md)<br>[Troubleshooting](docs/TROUBLESHOOTING.md) | [Toolkit](docs/TOOLKIT.md)<br>[Command examples](docs/TOOLKIT.md#common-network-checks) | [Security](SECURITY.md)<br>[Releasing](docs/RELEASING.md)<br>[Source pins](sources.lock) | [Contributing](CONTRIBUTING.md)<br>[Roadmap](docs/ROADMAP.md)<br>[Components](components.tsv) |
 
-## Adding a tool or architecture
+## Add to the kit
 
-Tool recipes are isolated under `scripts/builders/`, and architecture
-definitions live in one table, [`architectures.tsv`](architectures.tsv). The
-[contribution guide](CONTRIBUTING.md) gives complete checklists for adding
-either without weakening source, license, static-link, or verification
-coverage.
+Tool recipes are isolated under `scripts/builders/`; architecture definitions live in
+[`architectures.tsv`](architectures.tsv). The [contribution guide](CONTRIBUTING.md) has
+the checklists for adding either without weakening source, license, static-link or
+verification coverage.
 
-The prioritized tool backlog and selection criteria are in
-[docs/ROADMAP.md](docs/ROADMAP.md). Linux is the current contract. Darwin and
-Windows are future, separate target families because their libc, executable
-formats, networking APIs, and validation environments differ substantially.
+Linux is the current contract. Darwin and Windows remain separate future target
+families because their libc, executable formats, networking APIs and validation
+environments differ substantially.
+
+## Licensing
+
+Repository-authored build recipes, scripts, configuration and documentation are
+licensed under the [MIT License](LICENSE), unless a file says otherwise. That license
+does not replace or override the licenses of the utilities, libraries or source archives
+the project builds.
+
+[`components.tsv`](components.tsv) indexes the upstream terms. Every binary bundle
+includes `THIRD_PARTY_NOTICES.md` and the relevant texts under `licenses/<source>/`.
+Redistributors remain responsible for applicable corresponding-source obligations and
+Nmap's NPSL terms.
 
 ## Prior art
 
-This design draws useful ideas—and avoids the checked-in artifact model—from:
+`statics` draws useful ideas—and avoids the checked-in artifact model—from:
 
 - [perryflynn/static-binaries](https://github.com/perryflynn/static-binaries)
 - [andrew-d/static-binaries](https://github.com/andrew-d/static-binaries)

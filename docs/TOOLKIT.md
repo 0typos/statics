@@ -1,6 +1,6 @@
 # Toolkit guide
 
-The default bundle is a compact Linux troubleshooting kit: 44 physical
+The default bundle is a compact Linux troubleshooting kit: 51 physical
 executables, BusyBox applet links, Dropbear multi-call links, Nmap runtime
 data, license texts, checksums, and build metadata. Static linking removes the
 dependency on a target's installed libc; it does not replace kernel features,
@@ -27,10 +27,11 @@ Nmap data, notices, and licenses remain available.
 | --- | --- | --- |
 | Rescue userspace | `busybox`; `ping`, `ping6`, `traceroute`, `traceroute6`, `nslookup`, `wget`, `telnet`, `arp`, `arping`, `route`, `ifconfig`, `netstat`, `nc`, `netcat` | Shell recovery, basic reachability, and legacy network inspection |
 | Relays and remote access | `socat`, `ncat`, `dropbearmulti`; `dropbear`, `dbclient`, `dropbearkey`, `dropbearconvert`, `scp` | TCP/UDP/TLS relays, port checks, emergency SSH, and file copy |
-| Network control | `ip`, `ss`, `bridge`, `tc`, `wg`, `ethtool` | Addresses, routes, sockets, links, traffic control, WireGuard, and NIC state |
+| Network control | `ip`, `ss`, `bridge`, `tc`, `wg`, `ethtool`, `nft` | Addresses, routes, sockets, links, traffic control, WireGuard, firewall policy, and NIC state |
 | Discovery and packet diagnosis | `nmap`, `tcpdump`, `mtr`, `mtr-packet`, `iperf3` | Host/service discovery, capture, path analysis, and throughput |
 | Protocol and data checks | `curl`, `openssl`, `drill`, `jq`, `rsync` | HTTP, TLS, DNS, structured output, and efficient file transfer |
 | Process diagnosis | `strace`, `lsof` | System-call tracing and process/file/socket correlation |
+| Filesystems and storage | `e2fsck`, `dumpe2fs`, `tune2fs`, `mke2fs`; `fsck.ext2`, `fsck.ext3`, `fsck.ext4`, `mkfs.ext4`; `smartctl`, `nvme` | ext filesystem inspection and repair, drive health, and NVMe diagnosis |
 | Namespaces and privilege | `nsenter`, `unshare`, `lsns`, `setpriv`, `findmnt` | Enter, create, enumerate, constrain, and inspect namespace state |
 | CAN and ISO-TP | `candump`, `cansend`, `cangen`, `canplayer`, `cansniffer`, `isotpdump`, `isotprecv`, `isotpsend`, `slcand`, `canbusload` | SocketCAN and ISO-TP field diagnosis |
 | Hardware buses | `i2cdetect`, `i2cdump`, `i2cget`, `i2cset`, `i2ctransfer`, `spi-config`, `spi-pipe` | Linux I²C and spidev diagnosis |
@@ -155,6 +156,24 @@ Trace a command that is failing:
 strace -f -o /tmp/trace.log curl --connect-timeout 5 https://example.com/
 ```
 
+Inspect firewall state without changing it:
+
+```console
+nft list ruleset
+```
+
+Inventory storage and inspect an ext filesystem without writing to it:
+
+```console
+smartctl --scan-open
+nvme list
+dumpe2fs -h /dev/DEVICE
+e2fsck -n /dev/DEVICE
+```
+
+Block-device names are deliberately placeholders. Confirm the device and mount state
+before running any filesystem, SMART, or NVMe command.
+
 Measure throughput only when an `iperf3` peer has been intentionally started:
 
 ```console
@@ -252,6 +271,26 @@ Lsof reads Linux procfs. Results depend on procfs being mounted and on its
 kernel restrictions. An empty or partial listing does not necessarily mean
 the resource is unused.
 
+### Nftables
+
+Nftables uses static libnftnl, libmnl, and bundled mini-gmp. The interactive readline
+shell, JSON output, and xtables compatibility are disabled. Listing or changing rules
+depends on kernel nftables support and normally requires `CAP_NET_ADMIN`; rule changes
+can immediately cut off network access.
+
+### Filesystems, SMART, and NVMe
+
+E2fsprogs includes the ext2/3/4 checker, metadata inspection, tuning, and filesystem
+creation commands. Its libraries are bundled into the executables. `smartctl` carries
+its drive database inside the binary, so it needs no separate runtime database. The
+NVMe command is built without json-c; JSON-formatted output and features that depend on
+that library are unavailable.
+
+These programs operate on block devices and can destroy data when used in write,
+repair, format, firmware, or sanitize modes. Identify the device precisely, prefer
+read-only inspection first, and follow the filesystem or hardware vendor's recovery
+procedure. Device access usually requires root and the corresponding kernel driver.
+
 ### MTR and hardware tools
 
 MTR is built without its curses interface; use report mode. CAN, ISO-TP, I²C,
@@ -276,10 +315,12 @@ Exact rules vary by kernel and security policy, but these are common:
 | TCP connect checks, DNS, HTTP, TLS | Unprivileged network access |
 | ICMP/raw probes, some Nmap scan modes, packet capture | root or capabilities such as `CAP_NET_RAW` |
 | Address, route, link, WireGuard, bridge, or traffic-control changes | root or `CAP_NET_ADMIN` |
+| Inspect or change nftables rules | commonly root or `CAP_NET_ADMIN` |
 | Trace or inspect another user's process | root, ptrace permission, and compatible LSM policy |
 | Enter another process's namespaces | commonly root or `CAP_SYS_ADMIN` in the owning user namespace |
 | Create user/network/mount/PID namespaces | kernel namespace support plus the applicable sysctl, LSM, seccomp, and capability policy |
 | Read I²C/SPI devices or CAN interfaces | suitable device/interface permissions and drivers |
+| Inspect, repair, format, or manage block devices | usually root, device access, and the matching kernel driver |
 | Start a listener on a privileged port | root or `CAP_NET_BIND_SERVICE` |
 
 Do not add capabilities to the whole toolkit directory. If policy permits,
