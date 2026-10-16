@@ -16,7 +16,10 @@ awk -F '|' '
     /^#/ || NF == 0 { next }
     NF != 4 { print FNR ": malformed source lock record"; bad=1; next }
     seen[$1]++ { print FNR ": duplicate source " $1; bad=1 }
-    $3 !~ /^[0-9a-f]{64}$/ { print FNR ": invalid SHA-256 for " $1; bad=1 }
+    # No {64} interval: mawk, the awk on Ubuntu and CircleCI images, lacks it.
+    length($3) != 64 || $3 ~ /[^0-9a-f]/ {
+        print FNR ": invalid SHA-256 for " $1; bad=1
+    }
     $4 !~ /^https:\/\// && $1 != "socat" {
         print FNR ": non-HTTPS source " $1; bad=1
     }
