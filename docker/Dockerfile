@@ -1,9 +1,32 @@
 # syntax=docker/dockerfile:1.25.0@sha256:0adf442eae370b6087e08edc7c50b552d80ddf261576f4ebd6421006b2461f12
 
-FROM docker.io/library/debian:bookworm-slim@sha256:abd67ffcfa541b485a3dff59865ab629aa048a6c613e639d36e7456b0b229241 AS toolchain
+FROM docker.io/library/debian:bookworm-slim@sha256:abd67ffcfa541b485a3dff59865ab629aa048a6c613e639d36e7456b0b229241 AS base
+
+# Only the Zig records reach the toolchain stage, so repinning any other
+# upstream source leaves the toolchain layers cached. (GitHub's per-layer
+# cache benefits; CircleCI's single stage-cache key still hashes the whole
+# lock.)
+FROM base AS zig-pin
+COPY sources.lock /tmp/sources.lock
+RUN grep '^zig-' /tmp/sources.lock >/zig.lock
+
+FROM base AS toolchain
 
 ARG TARGETARCH
 ENV DEBIAN_FRONTEND=noninteractive
+# Install from the snapshot.debian.org date the base image was built from,
+# which it records beside each archive URI. The package set is then fixed by
+# the base digest alone: a cached layer and a fresh rebuild get identical
+# packages, and bumping the digest moves the snapshot with it. Snapshot
+# Release files are past their Valid-Until by design.
+RUN sed -i -E \
+        -e 's|^# (http://snapshot\.debian\.org/archive/[a-z-]+/[0-9]{8}T[0-9]{6}Z)$|URIs: \1|' \
+        -e '/^URIs: http:\/\/deb\.debian\.org\//d' \
+        /etc/apt/sources.list.d/debian.sources \
+    && [ "$(grep -c '^URIs: http://snapshot\.debian\.org/' /etc/apt/sources.list.d/debian.sources)" -eq 2 ] \
+    && ! grep -q 'deb\.debian\.org' /etc/apt/sources.list.d/debian.sources \
+    || { echo "base image no longer records exactly one snapshot.debian.org URI per archive; review the apt pin" >&2; exit 1; }; \
+    echo 'Acquire::Check-Valid-Until "false";' >/etc/apt/apt.conf.d/99snapshot
 # Acquire::Retries rides out transient mirror failures. It changes how a
 # package is fetched, never which package, so the build stays reproducible.
 RUN apt-get -o Acquire::Retries=3 update \
@@ -39,7 +62,7 @@ RUN printf 'meson==1.12.0 --hash=sha256:71f133147fa0fcfe8f4df49fa104577106494783
     && meson --version
 
 WORKDIR /workspace
-COPY sources.lock ./
+COPY --from=zig-pin /zig.lock /tmp/zig.lock
 COPY scripts/fetch.sh ./scripts/fetch.sh
 RUN chmod +x ./scripts/fetch.sh \
     && case "$TARGETARCH" in \
@@ -47,7 +70,7 @@ RUN chmod +x ./scripts/fetch.sh \
         arm64) zig_source=zig-aarch64 ;; \
         *) echo "unsupported builder architecture: $TARGETARCH" >&2; exit 1 ;; \
        esac \
-    && ./scripts/fetch.sh "$zig_source" /tmp/zig.tar.xz \
+    && SOURCES_LOCK=/tmp/zig.lock ./scripts/fetch.sh "$zig_source" /tmp/zig.tar.xz \
     && mkdir -p /opt/zig \
     && tar -xJf /tmp/zig.tar.xz -C /opt/zig --strip-components=1 \
     && rm /tmp/zig.tar.xz

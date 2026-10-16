@@ -28,6 +28,14 @@ GitHub Action are also pinned to immutable digests or full commit SHAs.
 A build stops before extraction when a source digest does not match.
 Dependabot maintains Docker and GitHub Actions pins.
 
+The builder's Debian packages are installed from the snapshot.debian.org date
+that the pinned base image records, so the base digest fixes them too. They
+are fetched over HTTP and accepted only with a valid Debian archive
+signature. Snapshot Release files are past their `Valid-Until` by design, so
+that freshness check is disabled: an on-path attacker could replay an older
+signed Release, though not alter a package. `BUILDINFO` records the snapshot
+and a digest of the installed package list, which exposes such a rollback.
+
 The weekly source updater discovers stable releases and computes new digests,
 but only opens a pull request. It does not merge into the default branch.
 Reviewers should inspect upstream release notes, compare published checksums,
@@ -64,8 +72,8 @@ Each build:
 - executes representative commands through QEMU;
 - exports the exact source archives as a companion artifact.
 
-CI also performs two independent uncached x86-64 builds and compares their
-complete output trees. Tagged public releases receive GitHub/Sigstore
+CI also rebuilds x86-64 without any cached layers and requires the result to
+be byte-identical to the archive it ships. Tagged public releases receive GitHub/Sigstore
 attestations linking each binary archive and SBOM to its workflow, repository,
 and commit. Attestations establish provenance; they are not a claim that the
 contents are vulnerability-free.

@@ -157,12 +157,11 @@ archives, builder images, and toolchain. CI confirms this by comparing the
 x86-64 archive it ships, which may come from cached layers, with an
 independent uncached rebuild run at twice the `make -j`.
 
-The toolchain image installs Debian packages from the live bookworm archive,
-so a cached layer can hold older packages than a fresh rebuild. If
-Reproducibility starts failing on every run without a repository change,
-suspect a Debian update: compare the two `BUILDINFO` files and the diff in
-the job log, then delete the stale `x86_64` layer cache (`gh cache list`,
-`gh cache delete`) so the next run rebuilds from current packages.
+The builder's Debian packages come from the snapshot.debian.org date that
+the pinned base image records, so the base digest alone fixes them and a
+cached layer can never hold different packages than a fresh rebuild.
+`BUILDINFO` records that snapshot and a digest of the installed package
+list. Bumping the base image digest moves the snapshot with it.
 
 ## Deploy a bundle
 

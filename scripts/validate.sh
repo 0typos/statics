@@ -108,9 +108,9 @@ if [[ -d $repo_root/.circleci ]] && grep -REn '^[[:space:]-]*image:' "$repo_root
     exit 1
 fi
 
-grep -Eq '^FROM [^[:space:]]+@sha256:[0-9a-f]{64} AS toolchain$' \
+grep -Eq '^FROM [^[:space:]]+@sha256:[0-9a-f]{64} AS base$' \
     "$repo_root/docker/Dockerfile" || {
-    echo "the toolchain base image must be pinned by SHA-256 digest" >&2
+    echo "the base image must be pinned by SHA-256 digest" >&2
     exit 1
 }
 

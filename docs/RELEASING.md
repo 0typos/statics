@@ -9,7 +9,8 @@ after:
 
 1. repository validation and ShellCheck pass;
 2. every architecture builds and passes static/QEMU verification;
-3. two independent, uncached x86-64 builds have identical contents;
+3. the x86-64 archive being released is byte-identical to an independent,
+   uncached rebuild;
 4. the corresponding-source archive is packaged;
 5. public releases receive GitHub/Sigstore attestations in isolated jobs;
 6. every downloaded release asset passes its portable SHA-256 file.
