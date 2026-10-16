@@ -1,0 +1,325 @@
+# CircleCI port of the Build workflow (.github/workflows/build.yml), trialled
+# side by side with GitHub Actions to compare wall-clock time.
+#
+# Scope: validation, the full architecture matrix with QEMU verification, the
+# reproducibility check, and the corresponding-source bundle. Attestation and
+# release publication stay on GitHub Actions, which owns the OIDC signing and
+# the release token. Because CircleCI publishes nothing, any branch may write
+# the shared stage cache; revisit that before this config ever releases.
+#
+# Where the time goes, and what this config does about it:
+#   - Actions caps the matrix at four concurrent arches; a cold build is four
+#     waves of ~12 minutes. Here every arch, both reproducibility builds, the
+#     source export, and validation start at once.
+#   - Reproducibility ran its two uncached builds back to back. They now run
+#     as two parallel jobs on separate machines, and a third compares them.
+#   - The toolchain and source stages are identical for every arch. One
+#     BuildKit cache, keyed on exactly the files those stages read, is shared
+#     by the whole matrix instead of one cache scope per arch.
+#   - QEMU installs in the background while the build runs.
+version: 2.1
+
+parameters:
+  arch_resource_class:
+    description: Machine size for each architecture build.
+    type: enum
+    enum: [medium, large, xlarge, 2xlarge]
+    default: xlarge
+  repro_resource_class:
+    description: >-
+      Machine size for the two uncached reproducibility builds. They are the
+      critical path, so they get the largest machines.
+    type: enum
+    enum: [medium, large, xlarge, 2xlarge]
+    default: 2xlarge
+
+executors:
+  builder:
+    parameters:
+      size:
+        type: string
+    machine:
+      image: ubuntu-2404:current
+    resource_class: << parameters.size >>
+    environment:
+      # Same transient-failure window as the GitHub workflow.
+      RETRY_WINDOW_SECONDS: "600"
+      DEBIAN_FRONTEND: noninteractive
+  python:
+    docker:
+      - image: cimg/python:3.15.0@sha256:be8e26200f38ad56bd7640f199e5f7d6b8b858906fc9f7c98bd20d83b3c5af13
+    resource_class: small
+  base:
+    docker:
+      - image: cimg/base:2026.10@sha256:64becfab2860932391d834a770033665874e287a655dbef26e38df060414a79a
+    resource_class: small
+
+commands:
+  skip-if-docs-only:
+    description: >-
+      End the job successfully when no build input changed. On main the push
+      is compared with its predecessor; elsewhere the branch is compared with
+      its merge base on main. Any doubt builds.
+    steps:
+      - run:
+          name: Decide whether anything build-relevant changed
+          command: |
+            set -euo pipefail
+
+            base=""
+            if [[ ${CIRCLE_BRANCH:-} == main ]]; then
+              base="<< pipeline.git.base_revision >>"
+            elif git fetch --quiet origin main; then
+              base=$(git merge-base FETCH_HEAD HEAD || true)
+            fi
+
+            paths=""
+            if [[ -n $base ]] && git cat-file -e "$base^{commit}" 2>/dev/null; then
+              paths=$(git diff --name-only "$base" HEAD)
+            fi
+
+            if [[ -z $paths ]]; then
+              echo "no usable file list; building"
+              exit 0
+            fi
+            printf '%s\n' "$paths" | sed 's/^/  /'
+            if printf '%s\n' "$paths" | ./scripts/build-relevant.sh --any; then
+              echo "build inputs changed; building"
+            else
+              echo "documentation only; skipping the expensive work"
+              circleci-agent step halt
+            fi
+
+  setup-buildx:
+    steps:
+      - run:
+          name: Start a BuildKit builder
+          # The default docker driver cannot import or export a local cache.
+          command: docker buildx create --name statics --driver docker-container --bootstrap --use
+
+  restore-stage-cache:
+    description: >-
+      Restore the shared toolchain-and-sources BuildKit cache. The key covers
+      every file those stages copy, so an exact hit is always valid and no
+      fallback key is offered.
+    steps:
+      - run:
+          name: Compute the stage cache key
+          # The host CPU architecture picks the Zig build in the toolchain
+          # stage. {{ arch }} is not used: on machine executors it carries a
+          # CPU model suffix that differs between resource classes.
+          command: |
+            { uname -m; cat docker/Dockerfile sources.lock scripts/fetch.sh scripts/fetch-sources.sh; } |
+              sha256sum >/tmp/stage-cache-key
+      - restore_cache:
+          name: Restore the toolchain and sources stages
+          keys:
+            - statics-stages-v1-{{ checksum "/tmp/stage-cache-key" }}
+
+  start-qemu-install:
+    steps:
+      - run:
+          name: Install QEMU in the background
+          background: true
+          command: |
+            rc=0
+            {
+              sudo apt-get -o DPkg::Lock::Timeout=300 -o Acquire::Retries=3 update
+              sudo apt-get -o DPkg::Lock::Timeout=300 -o Acquire::Retries=3 \
+                install --yes --no-install-recommends qemu-user-static
+            } >/tmp/qemu-install.log 2>&1 || rc=$?
+            echo "$rc" >/tmp/qemu-install.rc
+
+  wait-for-qemu:
+    steps:
+      - run:
+          name: Wait for the QEMU install
+          # verify.sh downgrades to static inspection without QEMU, so a
+          # failed install must fail the job rather than pass quietly.
+          command: |
+            for _ in $(seq 600); do
+              [[ -f /tmp/qemu-install.rc ]] && break
+              sleep 1
+            done
+            cat /tmp/qemu-install.log
+            [[ $(cat /tmp/qemu-install.rc 2>/dev/null) == 0 ]]
+
+jobs:
+  validate:
+    executor: python
+    steps:
+      - checkout
+      - run:
+          name: Install ShellCheck
+          command: |
+            sudo apt-get -o Acquire::Retries=3 update -qq
+            sudo apt-get -o Acquire::Retries=3 install --yes -qq shellcheck
+      - run:
+          name: Validate manifests and scripts
+          command: ./scripts/validate.sh
+      - run:
+          name: ShellCheck
+          command: shellcheck scripts/*.sh scripts/builders/*.sh scripts/lib/*.sh scripts/toolchain/*
+
+  build:
+    parameters:
+      arch:
+        type: string
+    executor:
+      name: builder
+      size: << pipeline.parameters.arch_resource_class >>
+    steps:
+      - checkout
+      - skip-if-docs-only
+      - start-qemu-install
+      - restore-stage-cache
+      - setup-buildx
+      - run:
+          name: Build << parameters.arch >>
+          no_output_timeout: 45m
+          command: |
+            set -euo pipefail
+            cache=()
+            if [[ -f /tmp/buildkit-cache/index.json ]]; then
+              cache=(--cache-from type=local,src=/tmp/buildkit-cache)
+            fi
+            ./scripts/retry-once.sh dist \
+              docker buildx build \
+                --file docker/Dockerfile \
+                --target artifact \
+                --build-arg ARCH=<< parameters.arch >> \
+                --build-arg JOBS="$(nproc)" \
+                "${cache[@]}" \
+                --output type=local,dest=dist \
+                .
+      - wait-for-qemu
+      - run:
+          name: Verify and package
+          command: |
+            ./scripts/verify.sh "dist/<< parameters.arch >>" "<< parameters.arch >>"
+            ./scripts/package.sh "<< parameters.arch >>"
+            mkdir -p artifacts
+            cp dist/statics-<< parameters.arch >>.* artifacts/
+      - store_artifacts:
+          path: artifacts
+          destination: statics-<< parameters.arch >>
+
+  reproducibility-build:
+    parameters:
+      copy:
+        type: string
+    executor:
+      name: builder
+      size: << pipeline.parameters.repro_resource_class >>
+    steps:
+      - checkout
+      - skip-if-docs-only
+      - setup-buildx
+      - run:
+          name: Build x86-64 without layer reuse (copy << parameters.copy >>)
+          no_output_timeout: 45m
+          command: |
+            ./scripts/retry-once.sh .build/repro-<< parameters.copy >> \
+              docker buildx build \
+                --no-cache \
+                --file docker/Dockerfile \
+                --target artifact \
+                --build-arg ARCH=x86_64 \
+                --build-arg JOBS="$(nproc)" \
+                --output type=local,dest=.build/repro-<< parameters.copy >> \
+                .
+      - run:
+          name: Bundle the output tree
+          # A tarball keeps symlinks as symlinks for diff --no-dereference.
+          command: tar -C .build -cf .build/repro-<< parameters.copy >>.tar repro-<< parameters.copy >>
+      - persist_to_workspace:
+          root: .build
+          paths:
+            - repro-<< parameters.copy >>.tar
+
+  reproducibility:
+    executor: base
+    steps:
+      - checkout
+      - skip-if-docs-only
+      - attach_workspace:
+          at: .build
+      - run:
+          name: Compare complete build outputs
+          command: |
+            tar -C .build -xf .build/repro-a.tar
+            tar -C .build -xf .build/repro-b.tar
+            diff --recursive --no-dereference .build/repro-a .build/repro-b
+
+  sources:
+    executor:
+      name: builder
+      size: large
+    steps:
+      - checkout
+      - skip-if-docs-only
+      - restore-stage-cache
+      - setup-buildx
+      - run:
+          name: Export verified upstream source archives
+          # Doubles as the cache writer: on a miss it exports the toolchain
+          # and source stages for the next pipeline's matrix.
+          command: |
+            set -euo pipefail
+            cache=(--cache-to type=local,dest=/tmp/buildkit-cache,mode=max)
+            if [[ -f /tmp/buildkit-cache/index.json ]]; then
+              cache=(--cache-from type=local,src=/tmp/buildkit-cache)
+            fi
+            ./scripts/retry-once.sh dist/sources \
+              docker buildx build \
+                --file docker/Dockerfile \
+                --target source-artifact \
+                "${cache[@]}" \
+                --output type=local,dest=dist/sources \
+                .
+      - save_cache:
+          name: Save the toolchain and sources stages
+          key: statics-stages-v1-{{ checksum "/tmp/stage-cache-key" }}
+          paths:
+            - /tmp/buildkit-cache
+      - run:
+          name: Package corresponding sources
+          command: |
+            ./scripts/package-sources.sh
+            mkdir -p artifacts
+            cp dist/statics-sources.tar.xz dist/statics-sources.tar.xz.sha256 artifacts/
+      - store_artifacts:
+          path: artifacts
+          destination: statics-sources
+
+workflows:
+  build:
+    jobs:
+      - validate
+      - build:
+          name: build-<< matrix.arch >>
+          matrix:
+            parameters:
+              arch:
+                - x86_64
+                - i686
+                - aarch64
+                - armv6-hardfloat
+                - armv7-hardfloat
+                - armv7-softfloat
+                - mips
+                - mipsel
+                - powerpc
+                - powerpc64
+                - powerpc64le
+                - riscv64
+                - s390x
+      - reproducibility-build:
+          name: reproducibility-build-<< matrix.copy >>
+          matrix:
+            parameters:
+              copy: [a, b]
+      - reproducibility:
+          requires:
+            - reproducibility-build
+      - sources

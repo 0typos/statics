@@ -63,6 +63,14 @@ if grep -REn \
     exit 1
 fi
 
+# Every CircleCI image needs a digest, except machine images such as
+# ubuntu-2404:current, which cannot be pinned that way.
+if [[ -d $repo_root/.circleci ]] && grep -REn '^[[:space:]-]*image:' "$repo_root/.circleci" |
+    grep -Ev 'image:[[:space:]]+ubuntu-[0-9]{4}:|@sha256:[0-9a-f]{64}'; then
+    echo "CircleCI images must be pinned by SHA-256 digest" >&2
+    exit 1
+fi
+
 grep -Eq '^FROM [^[:space:]]+@sha256:[0-9a-f]{64} AS toolchain$' \
     "$repo_root/docker/Dockerfile" || {
     echo "the toolchain base image must be pinned by SHA-256 digest" >&2

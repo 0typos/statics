@@ -55,6 +55,7 @@ workflow artifacts.
 | `scripts/check-docs.py` | Markdown structure and repository-local link checks |
 | `configs/` and `patches/` | Reviewed build configuration and minimal compatibility patches |
 | `.github/workflows/` | Validation, matrix build, release, and source-update automation |
+| `.circleci/config.yml` | CircleCI trial of the Build workflow: validation, matrix, reproducibility, and sources |
 | `docs/` | User, maintainer, architecture, release, and roadmap documentation |
 
 The TSV files are deliberately simple source-of-truth manifests. Keep prose
@@ -107,7 +108,8 @@ Add one record to `architectures.tsv` only after confirming:
 - the new target's limitations are documented in
   `docs/ARCHITECTURES.md`.
 
-Update the explicit matrix in `.github/workflows/build.yml`. A local build
+Update the explicit matrices in `.github/workflows/build.yml` and
+`.circleci/config.yml`. A local build
 being successful is not sufficient: test startup, licenses, runtime data,
 checksums, and the complete executable contract.
 
