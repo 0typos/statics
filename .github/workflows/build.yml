@@ -228,11 +228,11 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  reproducibility:
-    name: Reproducibility
+  reproducibility-build:
+    name: Reproducibility build
     needs: [validate, changes]
     runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
-    # Two uncached builds, plus headroom for one retry of a fast failure.
+    # One uncached build, plus headroom for one retry of a fast failure.
     timeout-minutes: 75
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -241,60 +241,77 @@ jobs:
           ref: ${{ inputs.ref }}
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
         if: needs.changes.outputs.build == 'true'
-      - name: Build x86-64 twice without layer reuse
+      - name: Build x86-64 without layer reuse
         if: needs.changes.outputs.build == 'true'
+        # Twice the matrix's make -j, so a dependence on build parallelism
+        # shows up as a mismatch without making this, the critical path, any
+        # slower. On the shared beefy host it takes the same core slice as one
+        # arch build and doubles that instead.
         run: |
           set -euo pipefail
-
-          window=${RETRY_WINDOW_SECONDS:-600}
-
-          # Same per-arch cap as the matrix: on the shared beefy host this job
-          # runs alongside the 13 arch builds, so it takes an equal core slice
-          # rather than its own -j nproc on top of them.
           if [ "${{ inputs.runner }}" = "beefy" ]; then
             jobs=$(( $(nproc) / 16 ))
             if [ "$jobs" -lt 1 ]; then jobs=1; fi
           else
             jobs=$(nproc)
           fi
+          jobs=$((jobs * 2))
           echo "reproducibility make -j budget: $jobs"
-
-          build_once() {
+          ./scripts/retry-once.sh dist \
             docker buildx build \
               --no-cache \
               --file docker/Dockerfile \
               --target artifact \
               --build-arg ARCH=x86_64 \
               --build-arg JOBS="$jobs" \
-              --output "type=local,dest=$1" \
+              --output type=local,dest=dist \
               .
-          }
+          ./scripts/package.sh x86_64
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: needs.changes.outputs.build == 'true'
+        with:
+          # Deliberately outside the statics-* pattern the release publishes.
+          name: reproducibility-x86_64
+          path: dist/statics-x86_64.tar.xz
+          if-no-files-found: error
+          retention-days: 14
 
-          build_with_one_retry() {
-            local dest=$1 started elapsed
-            started=$(date +%s)
-            if build_once "$dest"; then
-              return 0
-            fi
-            elapsed=$(($(date +%s) - started))
-            if ((elapsed > window)); then
-              echo "build failed after ${elapsed}s: real failure" >&2
-              return 1
-            fi
-            echo "build failed after ${elapsed}s: retrying once" >&2
-            # Discard the partial tree so the comparison only ever sees the
-            # output of a build that ran to completion.
-            rm -rf "$dest"
-            build_once "$dest"
-          }
-
-          build_with_one_retry .build/repro-a
-          build_with_one_retry .build/repro-b
+  reproducibility:
+    name: Reproducibility
+    # Compares the x86-64 archive the matrix built - the one that ships, and
+    # possibly from cached layers - with an independent uncached rebuild.
+    needs: [changes, build, reproducibility-build]
+    # Runs even when an unrelated arch failed; a missing archive fails the
+    # download, so this never passes without comparing.
+    if: ${{ !cancelled() }}
+    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
+    steps:
+      - name: Refuse to pass without knowing whether to compare
+        if: needs.changes.result != 'success'
+        run: exit 1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: needs.changes.outputs.build == 'true'
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.ref }}
+      - name: Download the shipped x86-64 archive
+        if: needs.changes.outputs.build == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: statics-x86_64
+          path: .build/shipped
+      - name: Download the independent rebuild
+        if: needs.changes.outputs.build == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: reproducibility-x86_64
+          path: .build/rebuilt
       - name: Compare complete build outputs
         if: needs.changes.outputs.build == 'true'
         run: >-
-          diff --recursive --no-dereference
-          .build/repro-a .build/repro-b
+          ./scripts/compare-builds.sh
+          .build/shipped/statics-x86_64.tar.xz
+          .build/rebuilt/statics-x86_64.tar.xz
 
   source-bundle:
     name: Build corresponding sources

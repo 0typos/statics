@@ -109,7 +109,8 @@ Add one record to `architectures.tsv` only after confirming:
   `docs/ARCHITECTURES.md`.
 
 Update the explicit matrices in `.github/workflows/build.yml` and
-`.circleci/config.yml`. A local build
+`.circleci/config.yml`; `scripts/validate.sh` fails until every one matches
+`architectures.tsv`. A local build
 being successful is not sufficient: test startup, licenses, runtime data,
 checksums, and the complete executable contract.
 

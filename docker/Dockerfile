@@ -70,12 +70,22 @@ ARG ARCH=x86_64
 # host the workflow passes a capped value so concurrent arch builds saturate
 # the cores instead of oversubscribing them into scheduler thrash.
 ARG JOBS
-COPY . .
+# Only what the build reads. Anything else in the context (CI config, docs,
+# verify.sh, dev tooling) must not invalidate every architecture's compile.
+COPY LICENSE architectures.tsv components.tsv ./
+COPY configs/ configs/
+COPY patches/ patches/
+COPY scripts/build.sh scripts/run-builder.sh scripts/merge-kconfig.sh \
+     scripts/collect-licenses.sh scripts/generate-sbom.py scripts/
+COPY scripts/lib/ scripts/lib/
+COPY scripts/builders/ scripts/builders/
+COPY scripts/toolchain/ scripts/toolchain/
 RUN chmod +x scripts/*.sh scripts/toolchain/* \
     && JOBS="$JOBS" scripts/build.sh "$ARCH" "/out/$ARCH"
 
 FROM builder AS test
 ARG ARCH=x86_64
+COPY --chmod=0755 scripts/verify.sh scripts/
 RUN apt-get -o Acquire::Retries=3 update \
     && apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
         qemu-user-static \

@@ -9,10 +9,11 @@
 #
 # Where the time goes, and what this config does about it:
 #   - Actions caps the matrix at four concurrent arches; a cold build is four
-#     waves of ~12 minutes. Here every arch, both reproducibility builds, the
+#     waves of ~12 minutes. Here every arch, the reproducibility rebuild, the
 #     source export, and validation start at once.
-#   - Reproducibility ran its two uncached builds back to back. They now run
-#     as two parallel jobs on separate machines, and a third compares them.
+#   - Reproducibility ran two uncached builds back to back. Here one uncached
+#     rebuild runs alongside the matrix and is compared with the x86-64
+#     archive the matrix built, so the check covers what would ship.
 #   - The toolchain and source stages are identical for every arch. One
 #     BuildKit cache, keyed on exactly the files those stages read, is shared
 #     by the whole matrix instead of one cache scope per arch.
@@ -28,7 +29,7 @@ parameters:
     default: large
   repro_resource_class:
     description: >-
-      Machine size for the two uncached reproducibility builds. They are the
+      Machine size for the uncached reproducibility rebuild. It is the
       critical path; raise this first on a plan that allows xlarge.
     type: enum
     enum: [medium, large, xlarge, 2xlarge]
@@ -135,8 +136,8 @@ commands:
     steps:
       - run:
           name: Wait for the QEMU install
-          # verify.sh downgrades to static inspection without QEMU, so a
-          # failed install must fail the job rather than pass quietly.
+          # verify.sh fails without QEMU anyway; this surfaces the install
+          # log instead of a bare "runner not found".
           command: |
             for _ in $(seq 600); do
               [[ -f /tmp/qemu-install.rc ]] && break
@@ -204,11 +205,16 @@ jobs:
       - store_artifacts:
           path: artifacts
           destination: statics-<< parameters.arch >>
+      - when:
+          condition:
+            equal: [x86_64, << parameters.arch >>]
+          steps:
+            - persist_to_workspace:
+                root: artifacts
+                paths:
+                  - statics-x86_64.tar.xz
 
   reproducibility-build:
-    parameters:
-      copy:
-        type: string
     executor:
       name: builder
       size: << pipeline.parameters.repro_resource_class >>
@@ -217,26 +223,27 @@ jobs:
       - skip-if-docs-only
       - setup-buildx
       - run:
-          name: Build x86-64 without layer reuse (copy << parameters.copy >>)
+          name: Build x86-64 without layer reuse
           no_output_timeout: 45m
+          # Twice the matrix's make -j, so a dependence on build parallelism
+          # shows up as a mismatch without slowing the critical path.
           command: |
-            ./scripts/retry-once.sh .build/repro-<< parameters.copy >> \
+            ./scripts/retry-once.sh dist \
               docker buildx build \
                 --no-cache \
                 --file docker/Dockerfile \
                 --target artifact \
                 --build-arg ARCH=x86_64 \
-                --build-arg JOBS="$(nproc)" \
-                --output type=local,dest=.build/repro-<< parameters.copy >> \
+                --build-arg JOBS="$(( $(nproc) * 2 ))" \
+                --output type=local,dest=dist \
                 .
-      - run:
-          name: Bundle the output tree
-          # A tarball keeps symlinks as symlinks for diff --no-dereference.
-          command: tar -C .build -cf .build/repro-<< parameters.copy >>.tar repro-<< parameters.copy >>
+            ./scripts/package.sh x86_64
+            mkdir -p rebuilt
+            mv dist/statics-x86_64.tar.xz rebuilt/
       - persist_to_workspace:
-          root: .build
+          root: .
           paths:
-            - repro-<< parameters.copy >>.tar
+            - rebuilt/statics-x86_64.tar.xz
 
   reproducibility:
     executor: base
@@ -246,11 +253,11 @@ jobs:
       - attach_workspace:
           at: .build
       - run:
-          name: Compare complete build outputs
-          command: |
-            tar -C .build -xf .build/repro-a.tar
-            tar -C .build -xf .build/repro-b.tar
-            diff --recursive --no-dereference .build/repro-a .build/repro-b
+          name: Compare the shipped archive with the uncached rebuild
+          command: >-
+            ./scripts/compare-builds.sh
+            .build/statics-x86_64.tar.xz
+            .build/rebuilt/statics-x86_64.tar.xz
 
   sources:
     executor:
@@ -315,12 +322,9 @@ workflows:
                 - powerpc64le
                 - riscv64
                 - s390x
-      - reproducibility-build:
-          name: reproducibility-build-<< matrix.copy >>
-          matrix:
-            parameters:
-              copy: [a, b]
+      - reproducibility-build
       - reproducibility:
           requires:
+            - build-x86_64
             - reproducibility-build
       - sources

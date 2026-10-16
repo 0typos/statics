@@ -153,8 +153,16 @@ terms are indexed by `COMPONENTS.tsv` and packaged under `licenses/`.
 
 Archives are normalized for stable ordering, ownership, and timestamps.
 Reproducibility still depends on identical repository inputs, source
-archives, builder images, and toolchain. CI confirms this by comparing two
-uncached x86-64 output trees.
+archives, builder images, and toolchain. CI confirms this by comparing the
+x86-64 archive it ships, which may come from cached layers, with an
+independent uncached rebuild run at twice the `make -j`.
+
+The toolchain image installs Debian packages from the live bookworm archive,
+so a cached layer can hold older packages than a fresh rebuild. If
+Reproducibility starts failing on every run without a repository change,
+suspect a Debian update: compare the two `BUILDINFO` files and the diff in
+the job log, then delete the stale `x86_64` layer cache (`gh cache list`,
+`gh cache delete`) so the next run rebuilds from current packages.
 
 ## Deploy a bundle
 
