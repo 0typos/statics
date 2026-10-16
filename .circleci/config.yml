@@ -24,14 +24,15 @@ parameters:
     description: Machine size for each architecture build.
     type: enum
     enum: [medium, large, xlarge, 2xlarge]
-    default: xlarge
+    # The Free plan, which carries the open source credits, stops at large.
+    default: large
   repro_resource_class:
     description: >-
       Machine size for the two uncached reproducibility builds. They are the
-      critical path, so they get the largest machines.
+      critical path; raise this first on a plan that allows xlarge.
     type: enum
     enum: [medium, large, xlarge, 2xlarge]
-    default: 2xlarge
+    default: large
 
 executors:
   builder:
