@@ -39,12 +39,6 @@ parameters:
     type: enum
     enum: [medium, large, xlarge, 2xlarge]
     default: large
-  binfmt_proof:
-    description: >-
-      Temporary. Build mips with QEMU binfmt registered before the build, with
-      and without the CONFIG_SITE cross-compiling fix, to confirm the hang.
-    type: boolean
-    default: false
 
 executors:
   builder:
@@ -345,63 +339,8 @@ jobs:
           path: artifacts
           destination: statics-sources
 
-  binfmt-proof:
-    parameters:
-      fixed:
-        type: boolean
-    executor:
-      name: builder
-      size: << pipeline.parameters.arch_resource_class >>
-    steps:
-      - checkout
-      - unless:
-          condition: << parameters.fixed >>
-          steps:
-            - run:
-                name: Use build.sh from before the fix
-                command: git checkout 2c98993 -- scripts/build.sh && ! grep -q cross_compiling scripts/build.sh
-      - run:
-          name: Register QEMU binfmt before building
-          command: |
-            sudo apt-get -o Acquire::Retries=3 update -qq
-            sudo apt-get -o Acquire::Retries=3 install --yes -qq qemu-user-static
-            cat /proc/sys/fs/binfmt_misc/qemu-mips
-      - run:
-          name: Log long-running emulated processes
-          background: true
-          command: |
-            for _ in $(seq 60); do
-              sleep 60
-              ps -eo etimes=,pcpu=,args= | awk '$1 > 120 && /qemu-mips/' | cut -c1-200 | sed "s/^/[$(date +%T)] /"
-            done
-      - setup-buildx
-      - toolchain-and-sources
-      - run:
-          name: Compile mips
-          no_output_timeout: 20m
-          command: >-
-            ./scripts/docker-build.sh artifact
-            --build-arg ARCH=mips
-            --build-arg JOBS="$(nproc)"
-            --build-arg COMPONENT_TIMEOUT=300
-            --output type=local,dest=dist
-      - run:
-          name: Long-running emulated processes seen
-          when: always
-          command: ps -eo etimes=,pcpu=,args= | awk '/qemu-mips/' | cut -c1-200 || true
-
 workflows:
-  binfmt-proof:
-    when: << pipeline.parameters.binfmt_proof >>
-    jobs:
-      - binfmt-proof:
-          name: binfmt-proof-<< matrix.fixed >>
-          matrix:
-            parameters:
-              fixed: [true, false]
   build:
-    when:
-      not: << pipeline.parameters.binfmt_proof >>
     jobs:
       - validate
       - build:
