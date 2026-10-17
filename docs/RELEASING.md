@@ -161,8 +161,9 @@ gate.
 
 ## Repository settings
 
-The default branch must require `Validate repository`, `Reproducibility`, and
-every `Build <architecture>` check before accepting changes. Keep force pushes
+The default branch must require CircleCI's `ci-ok` check before accepting
+changes; it passes only when validation, every architecture, and the source
+bundle pass. Keep force pushes
 and branch deletion disabled.
 
 Before the first public push, create the repository without initializing it,

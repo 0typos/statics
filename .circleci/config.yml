@@ -6,8 +6,8 @@
 #
 # Where the time goes, and what this config does about it:
 #   - Actions caps the matrix at four concurrent arches; a cold build is four
-#     waves of ~12 minutes. Here every arch, the reproducibility rebuild, the
-#     source export, and validation start at once.
+#     waves of ~12 minutes. Here every arch, the source export, and
+#     validation start at once.
 #   - Reproducibility ran two uncached builds back to back on every run. It
 #     is the slowest job and matters for what ships, and CircleCI releases
 #     nothing, so here it is an opt-in workflow (reproducibility=true): one
@@ -391,9 +391,11 @@ jobs:
           name: Compute the source bundle key
           # Everything the sources stage reads (Dockerfile, pins, fetch
           # scripts) plus the packaging script.
+          # package-sources.sh runs with the host's tar and xz.
           command: >-
-            cat docker/Dockerfile sources.lock scripts/fetch.sh
-            scripts/fetch-sources.sh scripts/package-sources.sh
+            { cat docker/Dockerfile sources.lock scripts/fetch.sh
+            scripts/fetch-sources.sh scripts/package-sources.sh;
+            tar --version | head -n 1; xz --version | head -n 1; }
             | sha256sum >/tmp/sources-inputs
       - unless:
           # As for the arch outputs: main never trusts a shared cache entry.
@@ -468,8 +470,8 @@ workflows:
             - validate
             - build
             - sources
-  # Opt-in: circleci pipeline run ... --param reproducibility=true. Its own
-  # x86-64 build is normally a cache hit, so it adds only the rebuild.
+  # Opt-in: circleci pipeline run ... --param reproducibility=true. Its x86-64
+  # build is a cache hit on branches; on main both builds are fresh.
   reproducibility:
     when: << pipeline.parameters.reproducibility >>
     jobs:
