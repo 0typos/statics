@@ -291,6 +291,9 @@ jobs:
           destination: statics-sources
 
   diagnose-mips:
+    parameters:
+      copy:
+        type: integer
     executor:
       name: builder
       size: << pipeline.parameters.arch_resource_class >>
@@ -306,13 +309,17 @@ jobs:
       - run:
           name: Watchdog for a spinning compiler or linker
           background: true
+          shell: /bin/bash
           command: |
+            set +e
             mkdir -p /tmp/diag
-            # Any zig/ld/clang process past 180 s of wall time is far beyond
+            exec >/tmp/diag/watchdog.log 2>&1
+            set -x
+            # Any zig/ld/clang process past 240 s of wall time is far beyond
             # its local runtime; dump it twice a minute apart, then end the
             # build so the job does not idle into the output timeout.
             for _ in $(seq 240); do
-              pids=$(ps -eo pid=,etimes=,comm= | awk '$2 > 180 && $3 ~ /^(zig|ld|ld\.lld|lld|clang.*|cc1.*)$/ {print $1}')
+              pids=$(ps -eo pid=,etimes=,comm= | awk '$2 > 240 && $3 ~ /^(zig|ld|ld\.lld|lld|clang.*|cc1.*)$/ {print $1}')
               if [ -n "$pids" ]; then
                 for round in 1 2; do
                   for pid in $pids; do
@@ -352,16 +359,23 @@ jobs:
       - run:
           name: Show the dumps
           when: always
-          command: cat /tmp/diag/*.txt 2>/dev/null || echo "no process exceeded 180 s"
+          command: |
+            ls -la /tmp/diag
+            cat /tmp/diag/pid-*.txt 2>/dev/null || echo "no process exceeded 240 s"
+            tail -20 /tmp/diag/watchdog.log
       - store_artifacts:
           path: /tmp/diag
-          destination: diag
+          destination: diag-<< parameters.copy >>
 
 workflows:
   diagnose-mips:
     when: << pipeline.parameters.diagnose_mips >>
     jobs:
-      - diagnose-mips
+      - diagnose-mips:
+          name: diagnose-mips-<< matrix.copy >>
+          matrix:
+            parameters:
+              copy: [1, 2, 3]
   build:
     when:
       not: << pipeline.parameters.diagnose_mips >>
