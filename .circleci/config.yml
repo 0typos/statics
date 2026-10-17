@@ -19,6 +19,9 @@
 #     every job here pulls it as a layer cache (scripts/docker-build.sh).
 #   - Toolchain, sources, and compile are separate steps with plain BuildKit
 #     output, so each one's time and log are visible on its own.
+#   - Each arch's verified output is cached under a digest of every build
+#     input (scripts/build-inputs-digest.sh); unchanged inputs skip the
+#     toolchain, sources, and compile and go straight to verification.
 #   - QEMU installs in the background while the build runs.
 version: 2.1
 
@@ -36,12 +39,6 @@ parameters:
     type: enum
     enum: [medium, large, xlarge, 2xlarge]
     default: large
-  diagnose_mips:
-    description: >-
-      Temporary. Run only the mips build with a watchdog that dumps the
-      process that hangs at nmap's final link on CircleCI hardware.
-    type: boolean
-    default: false
 
 executors:
   builder:
@@ -105,7 +102,9 @@ commands:
       - run:
           name: Start a BuildKit builder
           # The default docker driver cannot import a registry cache.
-          command: docker buildx create --name statics --driver docker-container --bootstrap --use
+          command: |
+            if [ -n "${STATICS_CACHED:-}" ]; then echo "output restored from cache"; exit 0; fi
+            docker buildx create --name statics --driver docker-container --bootstrap --use
 
   toolchain-and-sources:
     description: >-
@@ -120,11 +119,13 @@ commands:
       - run:
           name: Toolchain (published image as cache)
           command: >-
+            if [ -n "${STATICS_CACHED:-}" ]; then echo "output restored from cache"; exit 0; fi;
             ./scripts/retry-once.sh .build/none
             ./scripts/docker-build.sh toolchain --output type=cacheonly
       - run:
           name: Fetch and verify upstream sources
           command: >-
+            if [ -n "${STATICS_CACHED:-}" ]; then echo "output restored from cache"; exit 0; fi;
             ./scripts/retry-once.sh .build/none
             ./scripts/docker-build.sh sources
             << parameters.extra-args >>
@@ -186,6 +187,28 @@ jobs:
       - checkout
       - skip-if-docs-only
       - start-qemu-install
+      - run:
+          name: Compute the build input digest
+          command: |
+            { echo "<< parameters.arch >>"; ./scripts/build-inputs-digest.sh; } >/tmp/build-inputs
+            cat /tmp/build-inputs
+      - restore_cache:
+          name: Restore compiled output for unchanged inputs
+          # A branch reads its own entries and main's but saves only its own,
+          # so no branch can seed output that main restores. x86-64 output is
+          # also checked against the uncached rebuild in every pipeline.
+          keys:
+            - statics-out-v1-<< parameters.arch >>-{{ .Branch }}-{{ checksum "/tmp/build-inputs" }}
+            - statics-out-v1-<< parameters.arch >>-main-{{ checksum "/tmp/build-inputs" }}
+      - run:
+          name: Use the restored output when present
+          command: |
+            if [ -f "dist/<< parameters.arch >>/BUILDINFO" ]; then
+              echo 'export STATICS_CACHED=1' >>"$BASH_ENV"
+              echo "inputs unchanged: skipping toolchain, sources, and compile"
+            else
+              echo "no cached output for these inputs: building"
+            fi
       - setup-buildx
       - toolchain-and-sources
       - run:
@@ -194,6 +217,7 @@ jobs:
           # silent stretch longer than the slowest component means a hang.
           no_output_timeout: 20m
           command: >-
+            if [ -n "${STATICS_CACHED:-}" ]; then echo "output restored from cache"; exit 0; fi;
             ./scripts/retry-once.sh dist
             ./scripts/docker-build.sh artifact
             --build-arg ARCH=<< parameters.arch >>
@@ -207,6 +231,11 @@ jobs:
             ./scripts/package.sh "<< parameters.arch >>"
             mkdir -p artifacts
             cp dist/statics-<< parameters.arch >>.* artifacts/
+      - save_cache:
+          name: Save the verified output for these inputs
+          key: statics-out-v1-<< parameters.arch >>-{{ .Branch }}-{{ checksum "/tmp/build-inputs" }}
+          paths:
+            - dist/<< parameters.arch >>
       - store_artifacts:
           path: artifacts
           destination: statics-<< parameters.arch >>
@@ -290,95 +319,8 @@ jobs:
           path: artifacts
           destination: statics-sources
 
-  diagnose-mips:
-    parameters:
-      copy:
-        type: integer
-    executor:
-      name: builder
-      size: << pipeline.parameters.arch_resource_class >>
-    steps:
-      - checkout
-      - run:
-          name: Host CPU
-          command: |
-            lscpu
-            grep -m1 -o 'flags.*' /proc/cpuinfo | tr ' ' '\n' | grep -E 'avx|sse4|bmi|sha' | sort | tr '\n' ' '; echo
-      - setup-buildx
-      - toolchain-and-sources
-      - run:
-          name: Watchdog for a spinning compiler or linker
-          background: true
-          shell: /bin/bash
-          command: |
-            set +e
-            mkdir -p /tmp/diag
-            exec >/tmp/diag/watchdog.log 2>&1
-            set -x
-            # Any zig/ld/clang process past 240 s of wall time is far beyond
-            # its local runtime; dump it twice a minute apart, then end the
-            # build so the job does not idle into the output timeout.
-            for _ in $(seq 240); do
-              pids=$(ps -eo pid=,etimes=,comm= | awk '$2 > 240 && $3 ~ /^(zig|ld|ld\.lld|lld|clang.*|cc1.*)$/ {print $1}')
-              if [ -n "$pids" ]; then
-                for round in 1 2; do
-                  for pid in $pids; do
-                    out=/tmp/diag/pid-$pid-round-$round.txt
-                    {
-                      echo "== ps"; ps -o pid,ppid,etimes,pcpu,rss,nlwp,stat,args -p "$pid" -ww
-                      echo "== parents"; p=$pid; while [ "$p" -gt 1 ]; do ps -o pid=,ppid=,args= -p "$p" -ww; p=$(ps -o ppid= -p "$p" | tr -d ' '); done
-                      echo "== cmdline"; sudo tr '\0' ' ' < /proc/$pid/cmdline; echo
-                      echo "== cwd"; sudo readlink /proc/$pid/cwd
-                      echo "== status"; sudo cat /proc/$pid/status
-                      echo "== threads (tid state utime stime wchan)"
-                      for task in /proc/$pid/task/*; do
-                        tid=${task##*/}
-                        echo "$tid $(sudo awk '{print $3, $14, $15}' $task/stat) $(sudo cat $task/wchan 2>/dev/null)"
-                        sudo cat $task/stack 2>/dev/null | sed 's/^/    /'
-                      done
-                      echo "== syscalls for 5 s"; sudo timeout 5 strace -f -c -p "$pid" 2>&1 | tail -25
-                    } >"$out" 2>&1
-                  done
-                  sleep 60
-                done
-                touch /tmp/diag/done
-                pkill -f 'docker buildx build' || true
-                exit 0
-              fi
-              sleep 15
-            done
-      - run:
-          name: Compile mips (watched)
-          no_output_timeout: 25m
-          command: >-
-            ./scripts/docker-build.sh artifact
-            --build-arg ARCH=mips
-            --build-arg JOBS="$(nproc)"
-            --output type=local,dest=dist
-            || { [ -f /tmp/diag/done ] && echo "watchdog ended the build after dumping"; exit 1; }
-      - run:
-          name: Show the dumps
-          when: always
-          command: |
-            ls -la /tmp/diag
-            cat /tmp/diag/pid-*.txt 2>/dev/null || echo "no process exceeded 240 s"
-            tail -20 /tmp/diag/watchdog.log
-      - store_artifacts:
-          path: /tmp/diag
-          destination: diag-<< parameters.copy >>
-
 workflows:
-  diagnose-mips:
-    when: << pipeline.parameters.diagnose_mips >>
-    jobs:
-      - diagnose-mips:
-          name: diagnose-mips-<< matrix.copy >>
-          matrix:
-            parameters:
-              copy: [1, 2, 3]
   build:
-    when:
-      not: << pipeline.parameters.diagnose_mips >>
     jobs:
       - validate
       - build:

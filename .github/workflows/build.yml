@@ -128,7 +128,10 @@ jobs:
     timeout-minutes: 60
     strategy:
       fail-fast: false
-      max-parallel: ${{ (inputs.runner == 'beefy' && 16) || 4 }}
+      # Hosted runners give a public repository 20 concurrent jobs, enough for
+      # the whole matrix plus the reproducibility and source jobs at once; a
+      # cap of 4 made a cold run four waves deep (71 min against ~15).
+      max-parallel: ${{ (inputs.runner == 'beefy' && 16) || 20 }}
       matrix:
         arch:
           - x86_64

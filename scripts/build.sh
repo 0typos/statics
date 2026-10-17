@@ -37,6 +37,9 @@ export CXX="$repo_root/scripts/toolchain/cxx"
 export AR="$repo_root/scripts/toolchain/ar"
 export RANLIB="$repo_root/scripts/toolchain/ranlib"
 export JOBS=${JOBS:-$(getconf _NPROCESSORS_ONLN)}
+# Per-component hang guard (run-builder.sh). The slowest component takes a
+# few minutes on a 4-core CI runner; empty disables it.
+export STATICS_COMPONENT_TIMEOUT=${STATICS_COMPONENT_TIMEOUT-15m}
 export STATICS_ARCH=$arch
 export SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-0}
 export KCONFIG_NOTIMESTAMP=1
