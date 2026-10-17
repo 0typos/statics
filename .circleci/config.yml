@@ -39,6 +39,11 @@ parameters:
     type: enum
     enum: [medium, large, xlarge, 2xlarge]
     default: large
+  store_artifacts:
+    description: >-
+      Keep the archives as downloadable artifacts on a branch other than main.
+    type: boolean
+    default: false
   reproducibility:
     description: >-
       Also rebuild x86-64 without cache and compare it with the shipped
@@ -138,6 +143,27 @@ commands:
             << parameters.extra-args >>
             --output type=cacheonly
 
+  store-artifacts-if-wanted:
+    description: >-
+      Store downloadable artifacts only on main or when asked for: each
+      pipeline's archives total ~240 MiB, retained for the plan's artifact
+      period, and nothing else reads them.
+    parameters:
+      path:
+        type: string
+      destination:
+        type: string
+    steps:
+      - when:
+          condition:
+            or:
+              - equal: [main, << pipeline.git.branch >>]
+              - << pipeline.parameters.store_artifacts >>
+          steps:
+            - store_artifacts:
+                path: << parameters.path >>
+                destination: << parameters.destination >>
+
   start-qemu-install:
     steps:
       - run:
@@ -205,22 +231,29 @@ jobs:
             } >/tmp/build-inputs
             cat /tmp/build-inputs
       - restore_cache:
-          name: Restore compiled output for unchanged inputs
-          # This config saves under the branch's own key and reads main's.
-          # That is convention, not isolation: a branch runs its own config
-          # and caches are per project, so anyone who can push could seed
-          # main's keys. x86-64 is still compared with an uncached rebuild in
-          # every pipeline, and CircleCI publishes nothing.
+          name: Restore the packaged output for unchanged inputs
+          # One entry per arch and input digest, shared by every branch:
+          # caches are per project and a branch runs its own config, so
+          # per-branch keys only duplicated entries without isolating them.
+          # CircleCI publishes nothing; GitHub Actions releases do not use
+          # these entries.
           keys:
-            - statics-out-v2-<< parameters.arch >>-{{ .Branch }}-{{ checksum "/tmp/build-inputs" }}
-            - statics-out-v2-<< parameters.arch >>-main-{{ checksum "/tmp/build-inputs" }}
+            - statics-out-v3-<< parameters.arch >>-{{ checksum "/tmp/build-inputs" }}
       - run:
           name: Use the restored output when present
+          # The cache holds the packaged archive (~10 MiB xz, about half the
+          # unpacked tree's cache size). It must match its saved digest, and
+          # after unpacking it is verified and repackaged like a fresh build.
           command: |
-            if [ -f "dist/<< parameters.arch >>/BUILDINFO" ] && [ -f "dist/cached-<< parameters.arch >>.sha256" ]; then
+            arch=<< parameters.arch >>
+            if [ -f "dist/statics-$arch.tar.xz" ] &&
+              (cd dist && sha256sum --check "statics-$arch.tar.xz.sha256"); then
+              mv "dist/statics-$arch.tar.xz.sha256" "dist/cached-$arch.sha256"
+              tar -xJf "dist/statics-$arch.tar.xz" -C dist
               echo 'export STATICS_CACHED=1' >>"$BASH_ENV"
               echo "inputs unchanged: skipping toolchain, sources, and compile"
             else
+              rm -rf dist
               echo "no cached output for these inputs: building"
             fi
       - setup-buildx
@@ -248,26 +281,27 @@ jobs:
             ./scripts/verify.sh "dist/$arch" "$arch"
             ./scripts/package.sh "$arch"
             # package.sh is deterministic, so restored output must repackage
-            # to the archive digest saved with it; this catches a damaged
-            # restore in files verify.sh does not check (notices, SBOM).
+            # to the very archive that was cached; this also covers files
+            # verify.sh does not check (notices, SBOM).
             if [ -n "${STATICS_CACHED:-}" ]; then
               cmp "dist/cached-$arch.sha256" "dist/statics-$arch.tar.xz.sha256"
             fi
-            cp "dist/statics-$arch.tar.xz.sha256" "dist/cached-$arch.sha256"
             mkdir -p artifacts
             cp dist/statics-$arch.* artifacts/
       - save_cache:
-          name: Save the verified output for these inputs
-          key: statics-out-v2-<< parameters.arch >>-{{ .Branch }}-{{ checksum "/tmp/build-inputs" }}
+          name: Save the packaged output for these inputs
+          key: statics-out-v3-<< parameters.arch >>-{{ checksum "/tmp/build-inputs" }}
           paths:
-            - dist/<< parameters.arch >>
-            - dist/cached-<< parameters.arch >>.sha256
-      - store_artifacts:
+            - dist/statics-<< parameters.arch >>.tar.xz
+            - dist/statics-<< parameters.arch >>.tar.xz.sha256
+      - store-artifacts-if-wanted:
           path: artifacts
           destination: statics-<< parameters.arch >>
       - when:
           condition:
-            equal: [x86_64, << parameters.arch >>]
+            and:
+              - << pipeline.parameters.reproducibility >>
+              - equal: [x86_64, << parameters.arch >>]
           steps:
             - persist_to_workspace:
                 root: artifacts
@@ -339,8 +373,7 @@ jobs:
       - restore_cache:
           name: Restore the packaged sources for unchanged pins
           keys:
-            - statics-sources-v1-{{ .Branch }}-{{ checksum "/tmp/sources-inputs" }}
-            - statics-sources-v1-main-{{ checksum "/tmp/sources-inputs" }}
+            - statics-sources-v2-{{ checksum "/tmp/sources-inputs" }}
       - run:
           name: Use the restored bundle when present
           command: |
@@ -365,11 +398,11 @@ jobs:
             cp dist/statics-sources.tar.xz dist/statics-sources.tar.xz.sha256 artifacts/
       - save_cache:
           name: Save the packaged sources for these pins
-          key: statics-sources-v1-{{ .Branch }}-{{ checksum "/tmp/sources-inputs" }}
+          key: statics-sources-v2-{{ checksum "/tmp/sources-inputs" }}
           paths:
             - dist/statics-sources.tar.xz
             - dist/statics-sources.tar.xz.sha256
-      - store_artifacts:
+      - store-artifacts-if-wanted:
           path: artifacts
           destination: statics-sources
 
