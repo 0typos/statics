@@ -175,6 +175,11 @@ pull requests**. The source updater needs that repository-level switch to open
 its branch. It then explicitly dispatches `build.yml`, because events created
 with the workflow token do not start another workflow automatically.
 
+After the `Toolchain image` workflow first publishes
+`statics-toolchain`, set that GHCR package's visibility to public so CI on
+other providers can pull it anonymously. Until then builds still pass; they
+just build the toolchain stage themselves.
+
 Release maintainers should also enable GitHub private vulnerability reporting
 when available and keep Actions artifact attestations permitted for public
 tag builds. Enable Dependabot alerts and security updates, and protect the

@@ -181,6 +181,15 @@ make -f "$dag" -j"$JOBS" --output-sync=target all
     echo "zig_cpu=$ZIG_CPU"
     echo "autoconf_host=$AUTOCONF_HOST"
     echo "zig_version=$("$ZIG" version)"
+    # Inside the Docker builder, record the host toolchain too: autotools,
+    # perl, and python shape the output, so their versions are an input.
+    apt_sources=/etc/apt/sources.list.d/debian.sources
+    if grep -q '^URIs: http://snapshot\.debian\.org/' "$apt_sources" 2>/dev/null &&
+        command -v dpkg-query >/dev/null; then
+        echo "debian_snapshot=$(grep -m 1 -oE '[0-9]{8}T[0-9]{6}Z' "$apt_sources")"
+        echo "debian_packages_sha256=$(dpkg-query -W -f '${Package}=${Version}\n' |
+            LC_ALL=C sort | sha256sum | cut -d ' ' -f 1)"
+    fi
     echo "libc=musl"
     echo "source_date_epoch=$SOURCE_DATE_EPOCH"
     echo
