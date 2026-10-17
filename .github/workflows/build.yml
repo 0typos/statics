@@ -108,6 +108,8 @@ jobs:
           fi
           printf '%s\n' "$paths" | sed 's/^/  /' >>"$GITHUB_STEP_SUMMARY"
 
+  # Runs alongside the builds rather than gating them, which put ~40 s of
+  # runner start-up in front of every build; release still requires it.
   validate:
     name: Validate repository
     runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
@@ -123,7 +125,7 @@ jobs:
 
   build:
     name: Build ${{ matrix.arch }}
-    needs: [validate, changes]
+    needs: [changes]
     runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 60
     strategy:
@@ -256,7 +258,7 @@ jobs:
 
   reproducibility-build:
     name: Reproducibility build
-    needs: [validate, changes]
+    needs: [changes]
     runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
     # One rebuild without cache (sources and compile; the toolchain too on a
     # release), plus headroom for one retry of a fast failure.
@@ -371,7 +373,7 @@ jobs:
   source-bundle:
     name: Build corresponding sources
     if: github.event_name != 'pull_request'
-    needs: [validate, changes]
+    needs: [changes]
     runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -501,6 +503,7 @@ jobs:
       always() &&
       (inputs.release_tag != '' ||
       startsWith(github.ref, 'refs/tags/v')) &&
+      needs.validate.result == 'success' &&
       needs.build.result == 'success' &&
       needs.reproducibility.result == 'success' &&
       needs.source-bundle.result == 'success' &&
@@ -509,6 +512,7 @@ jobs:
       (needs.attest_source.result == 'success' ||
       needs.attest_source.result == 'skipped')
     needs:
+      - validate
       - build
       - reproducibility
       - source-bundle
