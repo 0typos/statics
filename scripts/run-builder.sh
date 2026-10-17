@@ -21,7 +21,9 @@ limit=${STATICS_COMPONENT_TIMEOUT:-}
 if [[ -n $limit && -z ${STATICS_UNDER_TIMEOUT:-} ]]; then
     started=$SECONDS
     rc=0
-    STATICS_UNDER_TIMEOUT=1 timeout --kill-after=30s "${limit}s" "$0" "$@" || rc=$?
+    # KILL, not TERM: the tree is discarded, and a grandchild that ignored
+    # TERM would otherwise outlive its shell and keep writing into it.
+    STATICS_UNDER_TIMEOUT=1 timeout --signal=KILL "${limit}s" "$0" "$@" || rc=$?
     # Only a run that reached the limit counts; an OOM kill also exits 137.
     if ((rc == 124 || rc == 137)) && ((SECONDS - started >= limit)); then
         echo "==> $1/$2 still running after ${limit}s; treating it as hung" >&2

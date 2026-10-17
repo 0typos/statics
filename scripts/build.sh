@@ -45,6 +45,10 @@ export ZIG_GLOBAL_CACHE_DIR="$WORK_DIR/zig-cache/global"
 export ZIG_LOCAL_CACHE_DIR="$WORK_DIR/zig-cache/local"
 # Per-component hang guard in seconds (run-builder.sh); empty disables it.
 export STATICS_COMPONENT_TIMEOUT=${STATICS_COMPONENT_TIMEOUT:-}
+if [[ -n $STATICS_COMPONENT_TIMEOUT && ! $STATICS_COMPONENT_TIMEOUT =~ ^[0-9]+$ ]]; then
+    echo "STATICS_COMPONENT_TIMEOUT must be whole seconds: $STATICS_COMPONENT_TIMEOUT" >&2
+    exit 2
+fi
 export STATICS_ARCH=$arch
 export SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-0}
 export KCONFIG_NOTIMESTAMP=1
@@ -114,6 +118,22 @@ done
 
 rm -rf "$WORK_DIR" "$OUTPUT_DIR"
 mkdir -p "$WORK_DIR" "$OUTPUT_DIR" "$DEPS_PREFIX"
+
+# Autoconf decides it is cross compiling only when its test binary fails to
+# run. With QEMU registered in binfmt_misc, which CI does to verify and many
+# dev hosts have, a foreign test binary runs, configure starts executing
+# target probes under emulation, and both its results and the artifacts
+# change; one of curl's probes spun forever under qemu-mips on CircleCI. For
+# targets this host cannot run natively, say so up front. Builders that set
+# their own CONFIG_SITE (nmap) also pass --build, which has the same effect.
+case "$(uname -m):$arch" in
+    x86_64:x86_64 | x86_64:i686 | aarch64:aarch64)
+        ;;
+    *)
+        printf 'cross_compiling=yes\n' >"$WORK_DIR/config.site"
+        export CONFIG_SITE="$WORK_DIR/config.site"
+        ;;
+esac
 
 for source in "${sources[@]}"; do
     mkdir "$WORK_DIR/$source"
