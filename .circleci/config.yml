@@ -4,19 +4,21 @@
 # Scope: validation, the full architecture matrix with QEMU verification, the
 # reproducibility check, and the corresponding-source bundle. Attestation and
 # release publication stay on GitHub Actions, which owns the OIDC signing and
-# the release token. Because CircleCI publishes nothing, any branch may write
-# the shared stage cache; revisit that before this config ever releases.
+# the release token.
 #
 # Where the time goes, and what this config does about it:
 #   - Actions caps the matrix at four concurrent arches; a cold build is four
 #     waves of ~12 minutes. Here every arch, the reproducibility rebuild, the
 #     source export, and validation start at once.
-#   - Reproducibility ran two uncached builds back to back. Here one uncached
-#     rebuild runs alongside the matrix and is compared with the x86-64
-#     archive the matrix built, so the check covers what would ship.
-#   - The toolchain and source stages are identical for every arch. One
-#     BuildKit cache, keyed on exactly the files those stages read, is shared
-#     by the whole matrix instead of one cache scope per arch.
+#   - Reproducibility ran two uncached builds back to back. Here one rebuild
+#     of sources and compile without cache runs alongside the matrix and is
+#     compared with the x86-64 archive the matrix built. CircleCI releases
+#     nothing, so it never needs the release path's full toolchain rebuild.
+#   - The toolchain stage (Debian packages and a 3-4 minute Zig download) is
+#     identical for every arch. toolchain.yml publishes it from main, and
+#     every job here pulls it as a layer cache (scripts/docker-build.sh).
+#   - Toolchain, sources, and compile are separate steps with plain BuildKit
+#     output, so each one's time and log are visible on its own.
 #   - QEMU installs in the background while the build runs.
 version: 2.1
 
@@ -29,7 +31,7 @@ parameters:
     default: large
   repro_resource_class:
     description: >-
-      Machine size for the uncached reproducibility rebuild. It is the
+      Machine size for the reproducibility rebuild. It is the
       critical path; raise this first on a plan that allows xlarge.
     type: enum
     enum: [medium, large, xlarge, 2xlarge]
@@ -96,27 +98,31 @@ commands:
     steps:
       - run:
           name: Start a BuildKit builder
-          # The default docker driver cannot import or export a local cache.
+          # The default docker driver cannot import a registry cache.
           command: docker buildx create --name statics --driver docker-container --bootstrap --use
 
-  restore-stage-cache:
+  toolchain-and-sources:
     description: >-
-      Restore the shared toolchain-and-sources BuildKit cache. The key covers
-      every file those stages copy, so an exact hit is always valid and no
-      fallback key is offered.
+      Pull the published toolchain as a layer cache, then fetch and verify the
+      upstream sources. Both land in the job's BuildKit cache for the compile.
+    parameters:
+      extra-args:
+        description: Extra buildx arguments for the sources step.
+        type: string
+        default: ""
     steps:
       - run:
-          name: Compute the stage cache key
-          # The host CPU architecture picks the Zig build in the toolchain
-          # stage. {{ arch }} is not used: on machine executors it carries a
-          # CPU model suffix that differs between resource classes.
-          command: |
-            { uname -m; cat docker/Dockerfile sources.lock scripts/fetch.sh scripts/fetch-sources.sh; } |
-              sha256sum >/tmp/stage-cache-key
-      - restore_cache:
-          name: Restore the toolchain and sources stages
-          keys:
-            - statics-stages-v1-{{ checksum "/tmp/stage-cache-key" }}
+          name: Toolchain (published image as cache)
+          command: >-
+            ./scripts/retry-once.sh .build/none
+            ./scripts/docker-build.sh toolchain --output type=cacheonly
+      - run:
+          name: Fetch and verify upstream sources
+          command: >-
+            ./scripts/retry-once.sh .build/none
+            ./scripts/docker-build.sh sources
+            << parameters.extra-args >>
+            --output type=cacheonly
 
   start-qemu-install:
     steps:
@@ -174,26 +180,19 @@ jobs:
       - checkout
       - skip-if-docs-only
       - start-qemu-install
-      - restore-stage-cache
       - setup-buildx
+      - toolchain-and-sources
       - run:
-          name: Build << parameters.arch >>
-          no_output_timeout: 45m
-          command: |
-            set -euo pipefail
-            cache=()
-            if [[ -f /tmp/buildkit-cache/index.json ]]; then
-              cache=(--cache-from type=local,src=/tmp/buildkit-cache)
-            fi
-            ./scripts/retry-once.sh dist \
-              docker buildx build \
-                --file docker/Dockerfile \
-                --target artifact \
-                --build-arg ARCH=<< parameters.arch >> \
-                --build-arg JOBS="$(nproc)" \
-                "${cache[@]}" \
-                --output type=local,dest=dist \
-                .
+          name: Compile << parameters.arch >>
+          # make --output-sync prints each component when it finishes, so a
+          # silent stretch longer than the slowest component means a hang.
+          no_output_timeout: 20m
+          command: >-
+            ./scripts/retry-once.sh dist
+            ./scripts/docker-build.sh artifact
+            --build-arg ARCH=<< parameters.arch >>
+            --build-arg JOBS="$(nproc)"
+            --output type=local,dest=dist
       - wait-for-qemu
       - run:
           name: Verify and package
@@ -222,21 +221,22 @@ jobs:
       - checkout
       - skip-if-docs-only
       - setup-buildx
+      - toolchain-and-sources:
+          extra-args: --no-cache-filter sources
       - run:
-          name: Build x86-64 without layer reuse
-          no_output_timeout: 45m
+          name: Compile x86-64 without cache
+          no_output_timeout: 20m
           # Twice the matrix's make -j, so a dependence on build parallelism
-          # shows up as a mismatch without slowing the critical path.
+          # shows up as a mismatch without slowing the critical path. The
+          # toolchain comes from the published image; toolchain.yml is what
+          # rebuilds that stage from scratch.
           command: |
             ./scripts/retry-once.sh dist \
-              docker buildx build \
-                --no-cache \
-                --file docker/Dockerfile \
-                --target artifact \
+              ./scripts/docker-build.sh artifact \
+                --no-cache-filter builder \
                 --build-arg ARCH=x86_64 \
                 --build-arg JOBS="$(( $(nproc) * 2 ))" \
-                --output type=local,dest=dist \
-                .
+                --output type=local,dest=dist
             ./scripts/package.sh x86_64
             mkdir -p rebuilt
             mv dist/statics-x86_64.tar.xz rebuilt/
@@ -253,7 +253,7 @@ jobs:
       - attach_workspace:
           at: .build
       - run:
-          name: Compare the shipped archive with the uncached rebuild
+          name: Compare the shipped archive with the rebuild
           command: >-
             ./scripts/compare-builds.sh
             .build/statics-x86_64.tar.xz
@@ -266,30 +266,14 @@ jobs:
     steps:
       - checkout
       - skip-if-docs-only
-      - restore-stage-cache
       - setup-buildx
+      - toolchain-and-sources
       - run:
           name: Export verified upstream source archives
-          # Doubles as the cache writer: on a miss it exports the toolchain
-          # and source stages for the next pipeline's matrix.
-          command: |
-            set -euo pipefail
-            cache=(--cache-to type=local,dest=/tmp/buildkit-cache,mode=max)
-            if [[ -f /tmp/buildkit-cache/index.json ]]; then
-              cache=(--cache-from type=local,src=/tmp/buildkit-cache)
-            fi
-            ./scripts/retry-once.sh dist/sources \
-              docker buildx build \
-                --file docker/Dockerfile \
-                --target source-artifact \
-                "${cache[@]}" \
-                --output type=local,dest=dist/sources \
-                .
-      - save_cache:
-          name: Save the toolchain and sources stages
-          key: statics-stages-v1-{{ checksum "/tmp/stage-cache-key" }}
-          paths:
-            - /tmp/buildkit-cache
+          command: >-
+            ./scripts/retry-once.sh dist/sources
+            ./scripts/docker-build.sh source-artifact
+            --output type=local,dest=dist/sources
       - run:
           name: Package corresponding sources
           command: |

@@ -9,8 +9,8 @@ after:
 
 1. repository validation and ShellCheck pass;
 2. every architecture builds and passes static/QEMU verification;
-3. the x86-64 archive being released is byte-identical to an independent,
-   uncached rebuild;
+3. the x86-64 archive being released is byte-identical to an independent
+   rebuild without any cache, toolchain included;
 4. the corresponding-source archive is packaged;
 5. public releases receive GitHub/Sigstore attestations in isolated jobs;
 6. every downloaded release asset passes its portable SHA-256 file.
@@ -40,7 +40,7 @@ make package ARCH=x86_64
 
 The branch protection and latest `Build` workflow must be green for the full
 matrix. The local x86-64 package is a fast preflight, not a substitute for
-that matrix, the uncached reproducibility job, or the corresponding-source
+that matrix, the reproducibility job, or the corresponding-source
 job.
 
 Review:
@@ -175,6 +175,11 @@ permissions by default and enable **Allow GitHub Actions to create and approve
 pull requests**. The source updater needs that repository-level switch to open
 its branch. It then explicitly dispatches `build.yml`, because events created
 with the workflow token do not start another workflow automatically.
+
+After the `Toolchain image` workflow first publishes
+`statics-toolchain`, set that GHCR package's visibility to public so CI on
+other providers can pull it anonymously. Until then builds still pass; they
+just build the toolchain stage themselves.
 
 Release maintainers should also enable GitHub private vulnerability reporting
 when available and keep Actions artifact attestations permitted for public

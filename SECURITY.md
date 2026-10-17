@@ -36,6 +36,17 @@ that freshness check is disabled: an on-path attacker could replay an older
 signed Release, though not alter a package. `BUILDINFO` records the snapshot
 and a digest of the installed package list, which exposes such a rollback.
 
+CI pulls the toolchain stage from `ghcr.io/0typos/statics-toolchain:main` as a
+layer cache. The `Toolchain image` workflow publishes it only from `main`, but
+the package itself is writable by any workflow in this repository and by any
+token with package write access, so it is not a trust boundary. BuildKit
+reuses its layers wherever their cache keys match, so a planted toolchain
+would reach the matrix build. Release builds therefore do not depend on it:
+their reproducibility rebuild ignores the image and builds the toolchain from
+scratch, so planted layers produce a mismatch and block the release. The
+Dockerfile is the only definition of the toolchain, and any tag rebuilds from
+the repository without the image.
+
 The weekly source updater discovers stable releases and computes new digests,
 but only opens a pull request. It does not merge into the default branch.
 Reviewers should inspect upstream release notes, compare published checksums,
@@ -45,7 +56,8 @@ The monthly release workflow is different and deserves explicit attention: it
 repins to the latest upstream releases, builds them, and publishes the result
 without a maintainer reading upstream release notes or verifying upstream
 signatures first. Every mechanical gate still applies — digest pinning, static
-linking, QEMU verification, uncached reproducibility, SBOM, and attestations —
+linking, QEMU verification, reproducibility against a rebuild without cache,
+SBOM, and attestations —
 so an automated release is as reproducible and as attributable as a manual
 one. What it lacks is human judgement about the upstream code it pins. Those
 releases are built from a commit on `automation/monthly-release`, never from
@@ -72,8 +84,10 @@ Each build:
 - executes representative commands through QEMU;
 - exports the exact source archives as a companion artifact.
 
-CI also rebuilds x86-64 without any cached layers and requires the result to
-be byte-identical to the archive it ships. Tagged public releases receive GitHub/Sigstore
+CI also rebuilds x86-64 without cache and requires the result to be
+byte-identical to the archive it ships. On pull requests and `main` that
+rebuild reuses the published toolchain stage (below); on a release it rebuilds
+the toolchain from scratch as well. Tagged public releases receive GitHub/Sigstore
 attestations linking each binary archive and SBOM to its workflow, repository,
 and commit. Attestations establish provenance; they are not a claim that the
 contents are vulnerability-free.

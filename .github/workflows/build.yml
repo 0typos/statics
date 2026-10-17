@@ -43,6 +43,11 @@ env:
   # break takes far longer to reach. Only a failure inside this window is
   # retried, and only once, so a real breakage never costs a second full build.
   RETRY_WINDOW_SECONDS: 600
+  # Published by toolchain.yml and pulled as a layer cache only; see
+  # scripts/docker-build.sh. Plain progress keeps every build step's log
+  # readable, down to the component being compiled.
+  TOOLCHAIN_IMAGE: ghcr.io/${{ github.repository_owner }}/statics-toolchain:main
+  BUILDKIT_PROGRESS: plain
 
 jobs:
   changes:
@@ -162,10 +167,20 @@ jobs:
           fi
           echo "JOBS=$j" >> "$GITHUB_ENV"
           echo "per-arch make -j budget: $j (nproc=$(nproc), runner=${{ inputs.runner || 'hosted' }})"
+      - name: Toolchain (published image as cache)
+        if: needs.changes.outputs.build == 'true'
+        run: >-
+          ./scripts/retry-once.sh .build/none
+          ./scripts/docker-build.sh toolchain --output type=cacheonly
+      - name: Fetch and verify upstream sources
+        if: needs.changes.outputs.build == 'true'
+        run: >-
+          ./scripts/retry-once.sh .build/none
+          ./scripts/docker-build.sh sources --output type=cacheonly
       - name: Mark the build start
         if: needs.changes.outputs.build == 'true'
         run: echo "build_started=$(date +%s)" >>"$GITHUB_ENV"
-      - name: Build ${{ matrix.arch }}
+      - name: Compile ${{ matrix.arch }}
         if: needs.changes.outputs.build == 'true'
         id: build
         continue-on-error: true
@@ -178,7 +193,9 @@ jobs:
             ARCH=${{ matrix.arch }}
             JOBS=${{ env.JOBS }}
           outputs: type=local,dest=dist
-          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-from: |
+            type=registry,ref=${{ env.TOOLCHAIN_IMAGE }}
+            type=gha,scope=${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
       - name: Classify a failed build
         id: classify
@@ -195,7 +212,9 @@ jobs:
             ARCH=${{ matrix.arch }}
             JOBS=${{ env.JOBS }}
           outputs: type=local,dest=dist
-          cache-from: type=gha,scope=${{ matrix.arch }}
+          cache-from: |
+            type=registry,ref=${{ env.TOOLCHAIN_IMAGE }}
+            type=gha,scope=${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
       - name: Fail on an unretried build failure
         if: >-
@@ -232,7 +251,8 @@ jobs:
     name: Reproducibility build
     needs: [validate, changes]
     runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
-    # One uncached build, plus headroom for one retry of a fast failure.
+    # One rebuild without cache (sources and compile; the toolchain too on a
+    # release), plus headroom for one retry of a fast failure.
     timeout-minutes: 75
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -241,7 +261,38 @@ jobs:
           ref: ${{ inputs.ref }}
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
         if: needs.changes.outputs.build == 'true'
-      - name: Build x86-64 without layer reuse
+      - name: Choose the rebuild scope
+        if: needs.changes.outputs.build == 'true'
+        # Anyone who can run a workflow here can write the published toolchain
+        # image, and the matrix trusts it. A release therefore rebuilds the
+        # toolchain from scratch too, so a planted toolchain cannot reproduce
+        # the shipped archive. Other runs reuse the image for speed.
+        env:
+          RELEASE: ${{ inputs.release_tag != '' || startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          if [ "$RELEASE" = true ]; then
+            echo "TOOLCHAIN_IMAGE=" >>"$GITHUB_ENV"
+            echo "TOOLCHAIN_FRESH=true" >>"$GITHUB_ENV"
+            echo "release: rebuilding the toolchain without the published image"
+          else
+            echo "toolchain from $TOOLCHAIN_IMAGE"
+          fi
+      - name: Toolchain
+        if: needs.changes.outputs.build == 'true'
+        run: |
+          fresh=()
+          if [ "${TOOLCHAIN_FRESH:-}" = true ]; then
+            fresh=(--no-cache-filter zig-pin --no-cache-filter toolchain)
+          fi
+          ./scripts/retry-once.sh .build/none \
+            ./scripts/docker-build.sh toolchain "${fresh[@]}" --output type=cacheonly
+      - name: Fetch and verify upstream sources without cache
+        if: needs.changes.outputs.build == 'true'
+        run: >-
+          ./scripts/retry-once.sh .build/none
+          ./scripts/docker-build.sh sources --no-cache-filter sources
+          --output type=cacheonly
+      - name: Compile x86-64 without cache
         if: needs.changes.outputs.build == 'true'
         # Twice the matrix's make -j, so a dependence on build parallelism
         # shows up as a mismatch without making this, the critical path, any
@@ -258,14 +309,11 @@ jobs:
           jobs=$((jobs * 2))
           echo "reproducibility make -j budget: $jobs"
           ./scripts/retry-once.sh dist \
-            docker buildx build \
-              --no-cache \
-              --file docker/Dockerfile \
-              --target artifact \
+            ./scripts/docker-build.sh artifact \
+              --no-cache-filter builder \
               --build-arg ARCH=x86_64 \
               --build-arg JOBS="$jobs" \
-              --output type=local,dest=dist \
-              .
+              --output type=local,dest=dist
           ./scripts/package.sh x86_64
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: needs.changes.outputs.build == 'true'
@@ -279,7 +327,7 @@ jobs:
   reproducibility:
     name: Reproducibility
     # Compares the x86-64 archive the matrix built - the one that ships, and
-    # possibly from cached layers - with an independent uncached rebuild.
+    # possibly from cached layers - with an independent rebuild without cache.
     needs: [changes, build, reproducibility-build]
     # Runs even when an unrelated arch failed; a missing archive fails the
     # download, so this never passes without comparing.
@@ -338,7 +386,9 @@ jobs:
           file: docker/Dockerfile
           target: source-artifact
           outputs: type=local,dest=dist/sources
-          cache-from: type=gha,scope=sources
+          cache-from: |
+            type=registry,ref=${{ env.TOOLCHAIN_IMAGE }}
+            type=gha,scope=sources
           cache-to: type=gha,mode=max,scope=sources
       - name: Classify a failed export
         id: classify
@@ -352,7 +402,9 @@ jobs:
           file: docker/Dockerfile
           target: source-artifact
           outputs: type=local,dest=dist/sources
-          cache-from: type=gha,scope=sources
+          cache-from: |
+            type=registry,ref=${{ env.TOOLCHAIN_IMAGE }}
+            type=gha,scope=sources
           cache-to: type=gha,mode=max,scope=sources
       - name: Fail on an unretried export failure
         if: >-

@@ -54,7 +54,8 @@ workflow artifacts.
 | `scripts/verify.sh` | Artifact contract, static checks, checksums, and QEMU smoke tests |
 | `scripts/check-docs.py` | Markdown structure and repository-local link checks |
 | `configs/` and `patches/` | Reviewed build configuration and minimal compatibility patches |
-| `.github/workflows/` | Validation, matrix build, release, and source-update automation |
+| `.github/workflows/` | Validation, matrix build, release, source-update, and toolchain-image automation |
+| `scripts/docker-build.sh` | Runs one Dockerfile target with the published toolchain image as a layer cache |
 | `.circleci/config.yml` | CircleCI trial of the Build workflow: validation, matrix, reproducibility, and sources |
 | `docs/` | User, maintainer, architecture, release, and roadmap documentation |
 
