@@ -36,6 +36,12 @@ parameters:
     type: enum
     enum: [medium, large, xlarge, 2xlarge]
     default: large
+  diagnose_mips:
+    description: >-
+      Temporary. Run only the mips build with a watchdog that dumps the
+      process that hangs at nmap's final link on CircleCI hardware.
+    type: boolean
+    default: false
 
 executors:
   builder:
@@ -284,8 +290,81 @@ jobs:
           path: artifacts
           destination: statics-sources
 
+  diagnose-mips:
+    executor:
+      name: builder
+      size: << pipeline.parameters.arch_resource_class >>
+    steps:
+      - checkout
+      - run:
+          name: Host CPU
+          command: |
+            lscpu
+            grep -m1 -o 'flags.*' /proc/cpuinfo | tr ' ' '\n' | grep -E 'avx|sse4|bmi|sha' | sort | tr '\n' ' '; echo
+      - setup-buildx
+      - toolchain-and-sources
+      - run:
+          name: Watchdog for a spinning compiler or linker
+          background: true
+          command: |
+            mkdir -p /tmp/diag
+            # Any zig/ld/clang process past 180 s of wall time is far beyond
+            # its local runtime; dump it twice a minute apart, then end the
+            # build so the job does not idle into the output timeout.
+            for _ in $(seq 240); do
+              pids=$(ps -eo pid=,etimes=,comm= | awk '$2 > 180 && $3 ~ /^(zig|ld|ld\.lld|lld|clang.*|cc1.*)$/ {print $1}')
+              if [ -n "$pids" ]; then
+                for round in 1 2; do
+                  for pid in $pids; do
+                    out=/tmp/diag/pid-$pid-round-$round.txt
+                    {
+                      echo "== ps"; ps -o pid,ppid,etimes,pcpu,rss,nlwp,stat,args -p "$pid" -ww
+                      echo "== parents"; p=$pid; while [ "$p" -gt 1 ]; do ps -o pid=,ppid=,args= -p "$p" -ww; p=$(ps -o ppid= -p "$p" | tr -d ' '); done
+                      echo "== cmdline"; sudo tr '\0' ' ' < /proc/$pid/cmdline; echo
+                      echo "== cwd"; sudo readlink /proc/$pid/cwd
+                      echo "== status"; sudo cat /proc/$pid/status
+                      echo "== threads (tid state utime stime wchan)"
+                      for task in /proc/$pid/task/*; do
+                        tid=${task##*/}
+                        echo "$tid $(sudo awk '{print $3, $14, $15}' $task/stat) $(sudo cat $task/wchan 2>/dev/null)"
+                        sudo cat $task/stack 2>/dev/null | sed 's/^/    /'
+                      done
+                      echo "== syscalls for 5 s"; sudo timeout 5 strace -f -c -p "$pid" 2>&1 | tail -25
+                    } >"$out" 2>&1
+                  done
+                  sleep 60
+                done
+                touch /tmp/diag/done
+                pkill -f 'docker buildx build' || true
+                exit 0
+              fi
+              sleep 15
+            done
+      - run:
+          name: Compile mips (watched)
+          no_output_timeout: 25m
+          command: >-
+            ./scripts/docker-build.sh artifact
+            --build-arg ARCH=mips
+            --build-arg JOBS="$(nproc)"
+            --output type=local,dest=dist
+            || { [ -f /tmp/diag/done ] && echo "watchdog ended the build after dumping"; exit 1; }
+      - run:
+          name: Show the dumps
+          when: always
+          command: cat /tmp/diag/*.txt 2>/dev/null || echo "no process exceeded 180 s"
+      - store_artifacts:
+          path: /tmp/diag
+          destination: diag
+
 workflows:
+  diagnose-mips:
+    when: << pipeline.parameters.diagnose_mips >>
+    jobs:
+      - diagnose-mips
   build:
+    when:
+      not: << pipeline.parameters.diagnose_mips >>
     jobs:
       - validate
       - build:
