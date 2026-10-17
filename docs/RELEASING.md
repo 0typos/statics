@@ -9,7 +9,8 @@ after:
 
 1. repository validation and ShellCheck pass;
 2. every architecture builds and passes static/QEMU verification;
-3. two independent, uncached x86-64 builds have identical contents;
+3. the x86-64 archive being released is byte-identical to an independent
+   rebuild without any cache, toolchain included;
 4. the corresponding-source archive is packaged;
 5. public releases receive GitHub/Sigstore attestations in isolated jobs;
 6. every downloaded release asset passes its portable SHA-256 file.
@@ -39,7 +40,7 @@ make package ARCH=x86_64
 
 The branch protection and latest `Build` workflow must be green for the full
 matrix. The local x86-64 package is a fast preflight, not a substitute for
-that matrix, the uncached reproducibility job, or the corresponding-source
+that matrix, the reproducibility job, or the corresponding-source
 job.
 
 Review:
@@ -160,8 +161,9 @@ gate.
 
 ## Repository settings
 
-The default branch must require `Validate repository`, `Reproducibility`, and
-every `Build <architecture>` check before accepting changes. Keep force pushes
+The default branch must require CircleCI's `ci-ok` check before accepting
+changes; it passes only when validation, every architecture, and the source
+bundle pass. Keep force pushes
 and branch deletion disabled.
 
 Before the first public push, create the repository without initializing it,

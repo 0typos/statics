@@ -153,8 +153,13 @@ terms are indexed by `COMPONENTS.tsv` and packaged under `licenses/`.
 
 Archives are normalized for stable ordering, ownership, and timestamps.
 Reproducibility still depends on identical repository inputs, source
-archives, builder images, and toolchain. CI confirms this by comparing two
-uncached x86-64 output trees.
+archives, builder images, and toolchain. CI checks this on releases, on the
+weekly scheduled build, and on manual dispatch by comparing the x86-64
+archive it ships, which may come from cached layers, with an independent
+rebuild without cache at twice the `make -j`; a release rebuilds the
+toolchain as well. Pull requests and pushes skip the rebuild for speed, so a
+change that breaks reproducibility surfaces at the next weekly run or
+release rather than on its pull request.
 
 The builder's Debian packages come from the snapshot.debian.org date that
 the pinned base image records, so the base digest alone fixes them and a
@@ -162,13 +167,13 @@ cached layer can never hold different packages than a fresh rebuild.
 `BUILDINFO` records that snapshot and a digest of the installed package
 list. Bumping the base image digest moves the snapshot with it.
 
-The `Toolchain image` workflow builds the Dockerfile's toolchain stage from
-scratch on `main` and publishes it as
-`ghcr.io/0typos/statics-toolchain:main`, for CI to pull as a layer cache
-through `scripts/docker-build.sh`. It is never a `FROM`: the Dockerfile
-remains the only definition, BuildKit reuses the image's layers only when
-they match what the Dockerfile would build, and a missing image just means
-the stage is built locally. `TOOLCHAIN_IMAGE=''` disables it.
+CI does not rebuild the toolchain stage in every job. The `Toolchain image`
+workflow builds it from scratch on `main` and publishes it as
+`ghcr.io/0typos/statics-toolchain:main`, and every CI build pulls it as a
+layer cache through `scripts/docker-build.sh`. It is never a `FROM`: the
+Dockerfile remains the only definition, BuildKit reuses the image's layers
+only when they match what the Dockerfile would build, and a missing image
+just means the stage is built locally. `TOOLCHAIN_IMAGE=''` disables it.
 
 ## Deploy a bundle
 

@@ -37,6 +37,18 @@ export CXX="$repo_root/scripts/toolchain/cxx"
 export AR="$repo_root/scripts/toolchain/ar"
 export RANLIB="$repo_root/scripts/toolchain/ranlib"
 export JOBS=${JOBS:-$(getconf _NPROCESSORS_ONLN)}
+# Every build gets its own cold Zig cache. Zig does not replay compiler
+# warnings on a cache hit, and configure scripts that accept a flag only when
+# a probe compiles silently (ldns) then reach different results from a warm
+# cache: a second build in the same cache produced a different drill.
+export ZIG_GLOBAL_CACHE_DIR="$WORK_DIR/zig-cache/global"
+export ZIG_LOCAL_CACHE_DIR="$WORK_DIR/zig-cache/local"
+# Per-component hang guard in seconds (run-builder.sh); empty disables it.
+export STATICS_COMPONENT_TIMEOUT=${STATICS_COMPONENT_TIMEOUT:-}
+if [[ -n $STATICS_COMPONENT_TIMEOUT && ! $STATICS_COMPONENT_TIMEOUT =~ ^[0-9]+$ ]]; then
+    echo "STATICS_COMPONENT_TIMEOUT must be whole seconds: $STATICS_COMPONENT_TIMEOUT" >&2
+    exit 2
+fi
 export STATICS_ARCH=$arch
 export SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-0}
 export KCONFIG_NOTIMESTAMP=1
@@ -107,6 +119,22 @@ done
 rm -rf "$WORK_DIR" "$OUTPUT_DIR"
 mkdir -p "$WORK_DIR" "$OUTPUT_DIR" "$DEPS_PREFIX"
 
+# Autoconf decides it is cross compiling only when its test binary fails to
+# run. With QEMU registered in binfmt_misc, which CI does to verify and many
+# dev hosts have, a foreign test binary runs, configure starts executing
+# target probes under emulation, and both its results and the artifacts
+# change; one of curl's probes spun forever under qemu-mips on CircleCI. For
+# targets this host cannot run natively, say so up front. Builders that set
+# their own CONFIG_SITE (nmap) also pass --build, which has the same effect.
+case "$(uname -m):$arch" in
+    x86_64:x86_64 | x86_64:i686 | aarch64:aarch64)
+        ;;
+    *)
+        printf 'cross_compiling=yes\n' >"$WORK_DIR/config.site"
+        export CONFIG_SITE="$WORK_DIR/config.site"
+        ;;
+esac
+
 for source in "${sources[@]}"; do
     mkdir "$WORK_DIR/$source"
     cp -a "$SOURCES_DIR/$source/." "$WORK_DIR/$source/"
@@ -173,7 +201,13 @@ dag=$WORK_DIR/dag.mk
     emit nvme-cli nvme build_nvme_cli libnvme
 } > "$dag"
 
-make -f "$dag" -j"$JOBS" --output-sync=target all
+if ! make -f "$dag" -j"$JOBS" --output-sync=target all; then
+    if [[ -f $WORK_DIR/.hung && -z ${STATICS_RESTARTED:-} ]]; then
+        echo "==> a component hung; rebuilding $arch once from a clean tree" >&2
+        STATICS_RESTARTED=1 exec "$repo_root/scripts/build.sh" "$arch" "$output_dir"
+    fi
+    exit 1
+fi
 
 {
     echo "architecture=$arch"

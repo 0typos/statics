@@ -1,0 +1,485 @@
+# CI for pushes and pull requests: validation, the full architecture matrix
+# with QEMU verification, and the corresponding-source bundle. `ci-ok` is the
+# one status branch protection requires. Releases, attestation, the weekly
+# reproducibility rebuild, and the toolchain image stay on GitHub Actions,
+# which owns the OIDC signing and the release token.
+#
+# Where the time goes, and what this config does about it:
+#   - Actions caps the matrix at four concurrent arches; a cold build is four
+#     waves of ~12 minutes. Here every arch, the source export, and
+#     validation start at once.
+#   - Reproducibility ran two uncached builds back to back on every run. It
+#     is the slowest job and matters for what ships, and CircleCI releases
+#     nothing, so here it is an opt-in workflow (reproducibility=true): one
+#     rebuild without cache compared with the x86-64 archive that would ship.
+#   - The toolchain stage (Debian packages and a 3-4 minute Zig download) is
+#     identical for every arch. toolchain.yml publishes it from main, and
+#     every job here pulls it as a layer cache (scripts/docker-build.sh).
+#   - Toolchain, sources, and compile are separate steps with plain BuildKit
+#     output, so each one's time and log are visible on its own.
+#   - On branches, each arch's verified output is cached under a digest of
+#     every build input (scripts/build-inputs-digest.sh); unchanged inputs
+#     skip the toolchain, sources, and compile and go straight to
+#     verification. Caches are shared by every branch and a branch runs its
+#     own config, so main never restores them: it always builds.
+#   - QEMU downloads in the background while the build runs and installs
+#     after it, so binfmt never changes under a running configure.
+version: 2.1
+
+parameters:
+  arch_resource_class:
+    description: Machine size for each architecture build.
+    type: enum
+    enum: [medium, large, xlarge, 2xlarge]
+    # The Free plan, which carries the open source credits, stops at large.
+    default: large
+  repro_resource_class:
+    description: >-
+      Machine size for the reproducibility rebuild. It is the
+      critical path; raise this first on a plan that allows xlarge.
+    type: enum
+    enum: [medium, large, xlarge, 2xlarge]
+    default: large
+  store_artifacts:
+    description: >-
+      Keep the archives as downloadable artifacts on a branch other than main.
+    type: boolean
+    default: false
+  reproducibility:
+    description: >-
+      Also rebuild x86-64 without cache and compare it with the shipped
+      archive. CircleCI releases nothing, so this is opt-in; GitHub Actions
+      runs it for releases and weekly.
+    type: boolean
+    default: false
+
+executors:
+  builder:
+    parameters:
+      size:
+        type: string
+    machine:
+      image: ubuntu-2404:current
+    resource_class: << parameters.size >>
+    environment:
+      # Same transient-failure window as the GitHub workflow.
+      RETRY_WINDOW_SECONDS: "600"
+      DEBIAN_FRONTEND: noninteractive
+  python:
+    docker:
+      - image: cimg/python:3.15.0@sha256:be8e26200f38ad56bd7640f199e5f7d6b8b858906fc9f7c98bd20d83b3c5af13
+    resource_class: small
+  base:
+    docker:
+      - image: cimg/base:2026.10@sha256:64becfab2860932391d834a770033665874e287a655dbef26e38df060414a79a
+    resource_class: small
+
+commands:
+  skip-if-docs-only:
+    description: >-
+      End the job successfully when a branch changes no build input relative
+      to its merge base on main. Main always builds, so a docs-only push can
+      never turn a broken tree green. Any doubt builds.
+    steps:
+      - run:
+          name: Decide whether anything build-relevant changed
+          command: |
+            set -euo pipefail
+
+            base=""
+            if [[ ${CIRCLE_BRANCH:-} == main ]]; then
+              echo "main always builds"
+              exit 0
+            elif git fetch --quiet origin main; then
+              base=$(git merge-base FETCH_HEAD HEAD || true)
+            fi
+
+            paths=""
+            if [[ -n $base ]] && git cat-file -e "$base^{commit}" 2>/dev/null; then
+              paths=$(git diff --name-only "$base" HEAD)
+            fi
+
+            if [[ -z $paths ]]; then
+              echo "no usable file list; building"
+              exit 0
+            fi
+            printf '%s\n' "$paths" | sed 's/^/  /'
+            if printf '%s\n' "$paths" | ./scripts/build-relevant.sh --any; then
+              echo "build inputs changed; building"
+            else
+              echo "documentation only; skipping the expensive work"
+              circleci-agent step halt
+            fi
+
+  setup-buildx:
+    steps:
+      - run:
+          name: Start a BuildKit builder
+          # The default docker driver cannot import a registry cache.
+          command: |
+            if [ -n "${STATICS_CACHED:-}" ]; then echo "output restored from cache"; exit 0; fi
+            docker buildx create --name statics --driver docker-container --bootstrap --use
+
+  toolchain-and-sources:
+    description: >-
+      Pull the published toolchain as a layer cache, then fetch and verify the
+      upstream sources. Both land in the job's BuildKit cache for the compile.
+    parameters:
+      extra-args:
+        description: Extra buildx arguments for the sources step.
+        type: string
+        default: ""
+    steps:
+      - run:
+          name: Toolchain (published image as cache)
+          command: >-
+            if [ -n "${STATICS_CACHED:-}" ]; then echo "output restored from cache"; exit 0; fi;
+            ./scripts/retry-once.sh .build/none
+            ./scripts/docker-build.sh toolchain --output type=cacheonly
+      - run:
+          name: Fetch and verify upstream sources
+          command: >-
+            if [ -n "${STATICS_CACHED:-}" ]; then echo "output restored from cache"; exit 0; fi;
+            ./scripts/retry-once.sh .build/none
+            ./scripts/docker-build.sh sources
+            << parameters.extra-args >>
+            --output type=cacheonly
+
+  store-artifacts-if-wanted:
+    description: >-
+      Store downloadable artifacts only on main or when asked for: each
+      pipeline's archives total ~240 MiB, retained for the plan's artifact
+      period, and nothing else reads them.
+    parameters:
+      path:
+        type: string
+      destination:
+        type: string
+    steps:
+      - when:
+          condition:
+            or:
+              - equal: [main, << pipeline.git.branch >>]
+              - << pipeline.parameters.store_artifacts >>
+          steps:
+            - store_artifacts:
+                path: << parameters.path >>
+                destination: << parameters.destination >>
+
+  start-qemu-download:
+    steps:
+      - run:
+          name: Download QEMU in the background
+          # Download only: installing registers binfmt handlers, which would
+          # let a running configure execute foreign binaries mid-build.
+          background: true
+          command: |
+            rc=0
+            {
+              sudo apt-get -o DPkg::Lock::Timeout=300 -o Acquire::Retries=3 update
+              sudo apt-get -o DPkg::Lock::Timeout=300 -o Acquire::Retries=3 \
+                install --yes --no-install-recommends --download-only qemu-user-static
+            } >/tmp/qemu-download.log 2>&1 || rc=$?
+            echo "$rc" >/tmp/qemu-download.rc
+
+  install-qemu:
+    steps:
+      - run:
+          name: Install QEMU
+          # verify.sh fails without QEMU anyway; this surfaces the download
+          # log instead of a bare "runner not found".
+          command: |
+            for _ in $(seq 600); do
+              [[ -f /tmp/qemu-download.rc ]] && break
+              sleep 1
+            done
+            cat /tmp/qemu-download.log
+            [[ $(cat /tmp/qemu-download.rc 2>/dev/null) == 0 ]]
+            sudo apt-get -o DPkg::Lock::Timeout=300 \
+              install --yes --no-install-recommends --no-download qemu-user-static
+
+jobs:
+  validate:
+    executor: python
+    steps:
+      - checkout
+      - run:
+          name: Install ShellCheck
+          command: |
+            sudo apt-get -o Acquire::Retries=3 update -qq
+            sudo apt-get -o Acquire::Retries=3 install --yes -qq shellcheck
+      - run:
+          name: Validate manifests and scripts
+          command: ./scripts/validate.sh
+      - run:
+          name: ShellCheck
+          command: shellcheck scripts/*.sh scripts/builders/*.sh scripts/lib/*.sh scripts/toolchain/*
+
+  build:
+    parameters:
+      arch:
+        type: string
+    executor:
+      name: builder
+      size: << pipeline.parameters.arch_resource_class >>
+    steps:
+      - checkout
+      - skip-if-docs-only
+      - start-qemu-download
+      - run:
+          name: Compute the build input digest
+          command: |
+            # The compile step's own arguments are inputs the digest cannot
+            # see, so the key records them too; keep the two lists equal.
+            # package.sh runs with the machine image's tar and xz, so their
+            # versions are inputs to the cached archive as well.
+            {
+              echo "artifact ARCH=<< parameters.arch >> COMPONENT_TIMEOUT=600"
+              tar --version | head -n 1
+              xz --version | head -n 1
+              ./scripts/build-inputs-digest.sh
+            } >/tmp/build-inputs
+            cat /tmp/build-inputs
+      - unless:
+          # One entry per arch and input digest, shared by every branch:
+          # caches are per project and a branch runs its own config, so any
+          # branch can write the key main would read. Main therefore never
+          # restores; branches trust entries only as far as they trust other
+          # collaborators' branches. Releases rebuild on GitHub Actions.
+          condition:
+            equal: [main, << pipeline.git.branch >>]
+          steps:
+            - restore_cache:
+                name: Restore the packaged output for unchanged inputs
+                keys:
+                  - statics-out-v4-<< parameters.arch >>-{{ checksum "/tmp/build-inputs" }}
+      - run:
+          name: Use the restored output when present
+          # The cache holds the packaged archive (~10 MiB xz, about half the
+          # unpacked tree's cache size). It must match its saved digest, and
+          # after unpacking it is verified and repackaged like a fresh build.
+          command: |
+            arch=<< parameters.arch >>
+            if [ -f "dist/statics-$arch.tar.xz" ] &&
+              (cd dist && sha256sum --check "statics-$arch.tar.xz.sha256"); then
+              mv "dist/statics-$arch.tar.xz.sha256" "dist/cached-$arch.sha256"
+              tar -xJf "dist/statics-$arch.tar.xz" -C dist
+              echo 'export STATICS_CACHED=1' >>"$BASH_ENV"
+              echo "inputs unchanged: skipping toolchain, sources, and compile"
+            else
+              rm -rf dist
+              echo "no cached output for these inputs: building"
+            fi
+      - setup-buildx
+      - toolchain-and-sources
+      - run:
+          name: Compile << parameters.arch >>
+          # COMPONENT_TIMEOUT=600: a whole arch builds in about 7.5 minutes on
+          # large, so no single component nears 600 s unless the host is ~1.4x
+          # slower than measured. Output is live, so 20 silent minutes means
+          # a hang the guard failed to break.
+          no_output_timeout: 20m
+          command: >-
+            if [ -n "${STATICS_CACHED:-}" ]; then echo "output restored from cache"; exit 0; fi;
+            ./scripts/retry-once.sh dist
+            ./scripts/docker-build.sh artifact
+            --build-arg ARCH=<< parameters.arch >>
+            --build-arg JOBS="$(nproc)"
+            --build-arg COMPONENT_TIMEOUT=600
+            --output type=local,dest=dist
+      - install-qemu
+      - run:
+          name: Verify and package
+          command: |
+            arch=<< parameters.arch >>
+            ./scripts/verify.sh "dist/$arch" "$arch"
+            ./scripts/package.sh "$arch"
+            # package.sh is deterministic, so restored output must repackage
+            # to the very archive that was cached; this also covers files
+            # verify.sh does not check (notices, SBOM).
+            if [ -n "${STATICS_CACHED:-}" ]; then
+              cmp "dist/cached-$arch.sha256" "dist/statics-$arch.tar.xz.sha256"
+            fi
+            mkdir -p artifacts
+            cp dist/statics-$arch.* artifacts/
+      - save_cache:
+          name: Save the packaged output for these inputs
+          key: statics-out-v4-<< parameters.arch >>-{{ checksum "/tmp/build-inputs" }}
+          paths:
+            - dist/statics-<< parameters.arch >>.tar.xz
+            - dist/statics-<< parameters.arch >>.tar.xz.sha256
+      - store-artifacts-if-wanted:
+          path: artifacts
+          destination: statics-<< parameters.arch >>
+      - when:
+          condition:
+            and:
+              - << pipeline.parameters.reproducibility >>
+              - equal: [x86_64, << parameters.arch >>]
+          steps:
+            - persist_to_workspace:
+                root: artifacts
+                paths:
+                  - statics-x86_64.tar.xz
+
+  reproducibility-build:
+    executor:
+      name: builder
+      size: << pipeline.parameters.repro_resource_class >>
+    steps:
+      - checkout
+      - skip-if-docs-only
+      - setup-buildx
+      - toolchain-and-sources:
+          extra-args: --no-cache-filter sources
+      - run:
+          name: Compile x86-64 without cache
+          no_output_timeout: 20m
+          # Twice the matrix's make -j, so a dependence on build parallelism
+          # shows up as a mismatch without slowing the critical path. The
+          # toolchain comes from the published image; toolchain.yml is what
+          # rebuilds that stage from scratch.
+          command: |
+            ./scripts/retry-once.sh dist \
+              ./scripts/docker-build.sh artifact \
+                --no-cache-filter builder \
+                --build-arg ARCH=x86_64 \
+                --build-arg JOBS="$(( $(nproc) * 2 ))" \
+                --build-arg COMPONENT_TIMEOUT=600 \
+                --output type=local,dest=dist
+            ./scripts/package.sh x86_64
+            mkdir -p rebuilt
+            mv dist/statics-x86_64.tar.xz rebuilt/
+      - persist_to_workspace:
+          root: .
+          paths:
+            - rebuilt/statics-x86_64.tar.xz
+
+  reproducibility:
+    executor: base
+    steps:
+      - checkout
+      - skip-if-docs-only
+      - attach_workspace:
+          at: .build
+      - run:
+          name: Compare the shipped archive with the rebuild
+          command: >-
+            ./scripts/compare-builds.sh
+            .build/statics-x86_64.tar.xz
+            .build/rebuilt/statics-x86_64.tar.xz
+
+  ci-ok:
+    # The single required status. The matrix follows architectures.tsv, so
+    # requiring each arch job would drift whenever an arch is added or
+    # removed. Jobs that halt on docs-only changes count as successful.
+    executor: base
+    steps:
+      - run:
+          name: Every required job passed
+          command: echo "validate, all architectures, and sources passed"
+
+  sources:
+    # Network-bound: fetching gains nothing from more cores.
+    executor:
+      name: builder
+      size: medium
+    steps:
+      - checkout
+      - skip-if-docs-only
+      - run:
+          name: Compute the source bundle key
+          # Everything the sources stage reads (Dockerfile, pins, fetch
+          # scripts) plus the packaging script.
+          # package-sources.sh runs with the host's tar and xz.
+          command: >-
+            { cat docker/Dockerfile sources.lock scripts/fetch.sh
+            scripts/fetch-sources.sh scripts/package-sources.sh;
+            tar --version | head -n 1; xz --version | head -n 1; }
+            | sha256sum >/tmp/sources-inputs
+      - unless:
+          # As for the arch outputs: main never trusts a shared cache entry.
+          condition:
+            equal: [main, << pipeline.git.branch >>]
+          steps:
+            - restore_cache:
+                name: Restore the packaged sources for unchanged pins
+                keys:
+                  - statics-sources-v2-{{ checksum "/tmp/sources-inputs" }}
+      - run:
+          name: Use the restored bundle when present
+          command: |
+            if [ -f dist/statics-sources.tar.xz ] && (cd dist && sha256sum --check statics-sources.tar.xz.sha256); then
+              echo 'export STATICS_CACHED=1' >>"$BASH_ENV"
+              echo "pins unchanged: skipping export and packaging"
+            fi
+      - setup-buildx
+      - toolchain-and-sources
+      - run:
+          name: Export verified upstream source archives
+          command: >-
+            if [ -n "${STATICS_CACHED:-}" ]; then echo "bundle restored from cache"; exit 0; fi;
+            ./scripts/retry-once.sh dist/sources
+            ./scripts/docker-build.sh source-artifact
+            --output type=local,dest=dist/sources
+      - run:
+          name: Package corresponding sources
+          command: |
+            if [ -z "${STATICS_CACHED:-}" ]; then ./scripts/package-sources.sh; fi
+            mkdir -p artifacts
+            cp dist/statics-sources.tar.xz dist/statics-sources.tar.xz.sha256 artifacts/
+      - save_cache:
+          name: Save the packaged sources for these pins
+          key: statics-sources-v2-{{ checksum "/tmp/sources-inputs" }}
+          paths:
+            - dist/statics-sources.tar.xz
+            - dist/statics-sources.tar.xz.sha256
+      - store-artifacts-if-wanted:
+          path: artifacts
+          destination: statics-sources
+
+workflows:
+  build:
+    # The reproducibility run brings its own x86-64 build; running both would
+    # build the same uncached commit twice.
+    when:
+      not: << pipeline.parameters.reproducibility >>
+    jobs:
+      - validate
+      - build:
+          name: build-<< matrix.arch >>
+          matrix:
+            parameters:
+              arch:
+                - x86_64
+                - i686
+                - aarch64
+                - armv6-hardfloat
+                - armv7-hardfloat
+                - armv7-softfloat
+                - mips
+                - mipsel
+                - powerpc
+                - powerpc64
+                - powerpc64le
+                - riscv64
+                - s390x
+      - sources
+      - ci-ok:
+          requires:
+            - validate
+            - build
+            - sources
+  # Opt-in: circleci pipeline run ... --param reproducibility=true. Its x86-64
+  # build is a cache hit on branches; on main both builds are fresh.
+  reproducibility:
+    when: << pipeline.parameters.reproducibility >>
+    jobs:
+      - build:
+          name: build-x86_64
+          arch: x86_64
+      - reproducibility-build
+      - reproducibility:
+          requires:
+            - build-x86_64
+            - reproducibility-build

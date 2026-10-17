@@ -1,10 +1,11 @@
 name: Build
 
+# Pushes and pull requests build on CircleCI (.circleci/config.yml). This
+# workflow keeps what needs GitHub's OIDC and release token, or a
+# reproducibility rebuild: tags, releases, the weekly run, and dispatch.
 on:
   push:
-    branches: [main]
     tags: ["v*"]
-  pull_request:
   workflow_dispatch:
     inputs:
       runner:
@@ -43,6 +44,11 @@ env:
   # break takes far longer to reach. Only a failure inside this window is
   # retried, and only once, so a real breakage never costs a second full build.
   RETRY_WINDOW_SECONDS: 600
+  # Published by toolchain.yml and pulled as a layer cache only; see
+  # scripts/docker-build.sh. Plain progress keeps every build step's log
+  # readable, down to the component being compiled.
+  TOOLCHAIN_IMAGE: ghcr.io/${{ github.repository_owner }}/statics-toolchain:main
+  BUILDKIT_PROGRESS: plain
 
 jobs:
   changes:
@@ -103,6 +109,8 @@ jobs:
           fi
           printf '%s\n' "$paths" | sed 's/^/  /' >>"$GITHUB_STEP_SUMMARY"
 
+  # Runs alongside the builds rather than gating them, which put ~40 s of
+  # runner start-up in front of every build; release still requires it.
   validate:
     name: Validate repository
     runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
@@ -118,12 +126,15 @@ jobs:
 
   build:
     name: Build ${{ matrix.arch }}
-    needs: [validate, changes]
+    needs: [changes]
     runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
-      max-parallel: ${{ (inputs.runner == 'beefy' && 16) || 4 }}
+      # Hosted runners give a public repository 20 concurrent jobs, enough for
+      # the whole matrix plus the reproducibility and source jobs at once; a
+      # cap of 4 made a cold run four waves deep (71 min against ~15).
+      max-parallel: ${{ (inputs.runner == 'beefy' && 16) || 20 }}
       matrix:
         arch:
           - x86_64
@@ -162,12 +173,26 @@ jobs:
           fi
           echo "JOBS=$j" >> "$GITHUB_ENV"
           echo "per-arch make -j budget: $j (nproc=$(nproc), runner=${{ inputs.runner || 'hosted' }})"
+      - name: Toolchain (published image as cache)
+        if: needs.changes.outputs.build == 'true'
+        run: >-
+          ./scripts/retry-once.sh .build/none
+          ./scripts/docker-build.sh toolchain --output type=cacheonly
+      - name: Fetch and verify upstream sources
+        if: needs.changes.outputs.build == 'true'
+        run: >-
+          ./scripts/retry-once.sh .build/none
+          ./scripts/docker-build.sh sources --output type=cacheonly
       - name: Mark the build start
         if: needs.changes.outputs.build == 'true'
         run: echo "build_started=$(date +%s)" >>"$GITHUB_ENV"
-      - name: Build ${{ matrix.arch }}
+      - name: Compile ${{ matrix.arch }}
         if: needs.changes.outputs.build == 'true'
         id: build
+        # mode=min caches only the final artifact layer (~50 MB), keyed on the
+        # whole stage chain, so unchanged inputs still skip the compile. mode=max
+        # also stored the toolchain and sources layers in every arch's scope,
+        # ~1.5 GB each, and the matrix evicted itself from the 10 GB cache.
         continue-on-error: true
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
@@ -178,8 +203,10 @@ jobs:
             ARCH=${{ matrix.arch }}
             JOBS=${{ env.JOBS }}
           outputs: type=local,dest=dist
-          cache-from: type=gha,scope=${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+          cache-from: |
+            type=registry,ref=${{ env.TOOLCHAIN_IMAGE }}
+            type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=min,scope=${{ matrix.arch }}
       - name: Classify a failed build
         id: classify
         if: steps.build.outcome == 'failure'
@@ -195,8 +222,10 @@ jobs:
             ARCH=${{ matrix.arch }}
             JOBS=${{ env.JOBS }}
           outputs: type=local,dest=dist
-          cache-from: type=gha,scope=${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+          cache-from: |
+            type=registry,ref=${{ env.TOOLCHAIN_IMAGE }}
+            type=gha,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=min,scope=${{ matrix.arch }}
       - name: Fail on an unretried build failure
         if: >-
           steps.build.outcome == 'failure' &&
@@ -228,11 +257,23 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  reproducibility:
-    name: Reproducibility
-    needs: [validate, changes]
+  reproducibility-build:
+    name: Reproducibility build
+    needs: [changes]
+    # Only where the result is relied on: releases (tags and release_tag, which
+    # includes the monthly release), the weekly scheduled run, and manual
+    # dispatch. It is the slowest job and nothing else waits for it, so
+    # skipping it on pull requests and pushes takes a warm run from ~8 to ~3
+    # minutes; a nondeterminism regression then surfaces at the next weekly
+    # run or release instead of on its pull request.
+    if: >-
+      inputs.release_tag != '' ||
+      startsWith(github.ref, 'refs/tags/v') ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
-    # Two uncached builds, plus headroom for one retry of a fast failure.
+    # One rebuild without cache (sources and compile; the toolchain too on a
+    # release), plus headroom for one retry of a fast failure.
     timeout-minutes: 75
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -241,65 +282,115 @@ jobs:
           ref: ${{ inputs.ref }}
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
         if: needs.changes.outputs.build == 'true'
-      - name: Build x86-64 twice without layer reuse
+      - name: Choose the rebuild scope
+        if: needs.changes.outputs.build == 'true'
+        # Anyone who can run a workflow here can write the published toolchain
+        # image, and the matrix trusts it. A release therefore rebuilds the
+        # toolchain from scratch too, so a planted toolchain cannot reproduce
+        # the shipped archive. Other runs reuse the image for speed.
+        env:
+          RELEASE: ${{ inputs.release_tag != '' || startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          if [ "$RELEASE" = true ]; then
+            echo "TOOLCHAIN_IMAGE=" >>"$GITHUB_ENV"
+            echo "TOOLCHAIN_FRESH=true" >>"$GITHUB_ENV"
+            echo "release: rebuilding the toolchain without the published image"
+          else
+            echo "toolchain from $TOOLCHAIN_IMAGE"
+          fi
+      - name: Toolchain
         if: needs.changes.outputs.build == 'true'
         run: |
+          fresh=()
+          if [ "${TOOLCHAIN_FRESH:-}" = true ]; then
+            fresh=(--no-cache-filter zig-pin --no-cache-filter toolchain)
+          fi
+          ./scripts/retry-once.sh .build/none \
+            ./scripts/docker-build.sh toolchain "${fresh[@]}" --output type=cacheonly
+      - name: Fetch and verify upstream sources without cache
+        if: needs.changes.outputs.build == 'true'
+        run: >-
+          ./scripts/retry-once.sh .build/none
+          ./scripts/docker-build.sh sources --no-cache-filter sources
+          --output type=cacheonly
+      - name: Compile x86-64 without cache
+        if: needs.changes.outputs.build == 'true'
+        # Twice the matrix's make -j, so a dependence on build parallelism
+        # shows up as a mismatch without making this, the critical path, any
+        # slower. On the shared beefy host it takes the same core slice as one
+        # arch build and doubles that instead.
+        run: |
           set -euo pipefail
-
-          window=${RETRY_WINDOW_SECONDS:-600}
-
-          # Same per-arch cap as the matrix: on the shared beefy host this job
-          # runs alongside the 13 arch builds, so it takes an equal core slice
-          # rather than its own -j nproc on top of them.
           if [ "${{ inputs.runner }}" = "beefy" ]; then
             jobs=$(( $(nproc) / 16 ))
             if [ "$jobs" -lt 1 ]; then jobs=1; fi
           else
             jobs=$(nproc)
           fi
+          jobs=$((jobs * 2))
           echo "reproducibility make -j budget: $jobs"
-
-          build_once() {
-            docker buildx build \
-              --no-cache \
-              --file docker/Dockerfile \
-              --target artifact \
+          ./scripts/retry-once.sh dist \
+            ./scripts/docker-build.sh artifact \
+              --no-cache-filter builder \
               --build-arg ARCH=x86_64 \
               --build-arg JOBS="$jobs" \
-              --output "type=local,dest=$1" \
-              .
-          }
+              --output type=local,dest=dist
+          ./scripts/package.sh x86_64
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: needs.changes.outputs.build == 'true'
+        with:
+          # Deliberately outside the statics-* pattern the release publishes.
+          name: reproducibility-x86_64
+          path: dist/statics-x86_64.tar.xz
+          if-no-files-found: error
+          retention-days: 14
 
-          build_with_one_retry() {
-            local dest=$1 started elapsed
-            started=$(date +%s)
-            if build_once "$dest"; then
-              return 0
-            fi
-            elapsed=$(($(date +%s) - started))
-            if ((elapsed > window)); then
-              echo "build failed after ${elapsed}s: real failure" >&2
-              return 1
-            fi
-            echo "build failed after ${elapsed}s: retrying once" >&2
-            # Discard the partial tree so the comparison only ever sees the
-            # output of a build that ran to completion.
-            rm -rf "$dest"
-            build_once "$dest"
-          }
-
-          build_with_one_retry .build/repro-a
-          build_with_one_retry .build/repro-b
+  reproducibility:
+    name: Reproducibility
+    # Compares the x86-64 archive the matrix built - the one that ships, and
+    # possibly from cached layers - with an independent rebuild without cache.
+    needs: [changes, build, reproducibility-build]
+    # Runs even when an unrelated arch failed; a missing archive fails the
+    # download, so this never passes without comparing. Skipped, and so
+    # passing as a required check, only when the rebuild was skipped by
+    # design; a failed change detection still runs it, and it refuses.
+    if: >-
+      !cancelled() &&
+      (needs.reproducibility-build.result != 'skipped' ||
+      needs.changes.result != 'success')
+    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
+    steps:
+      - name: Refuse to pass without knowing whether to compare
+        if: needs.changes.result != 'success'
+        run: exit 1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: needs.changes.outputs.build == 'true'
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.ref }}
+      - name: Download the shipped x86-64 archive
+        if: needs.changes.outputs.build == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: statics-x86_64
+          path: .build/shipped
+      - name: Download the independent rebuild
+        if: needs.changes.outputs.build == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: reproducibility-x86_64
+          path: .build/rebuilt
       - name: Compare complete build outputs
         if: needs.changes.outputs.build == 'true'
         run: >-
-          diff --recursive --no-dereference
-          .build/repro-a .build/repro-b
+          ./scripts/compare-builds.sh
+          .build/shipped/statics-x86_64.tar.xz
+          .build/rebuilt/statics-x86_64.tar.xz
 
   source-bundle:
     name: Build corresponding sources
     if: github.event_name != 'pull_request'
-    needs: [validate, changes]
+    needs: [changes]
     runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -321,8 +412,10 @@ jobs:
           file: docker/Dockerfile
           target: source-artifact
           outputs: type=local,dest=dist/sources
-          cache-from: type=gha,scope=sources
-          cache-to: type=gha,mode=max,scope=sources
+          cache-from: |
+            type=registry,ref=${{ env.TOOLCHAIN_IMAGE }}
+            type=gha,scope=sources
+          cache-to: type=gha,mode=min,scope=sources
       - name: Classify a failed export
         id: classify
         if: steps.export.outcome == 'failure'
@@ -335,8 +428,10 @@ jobs:
           file: docker/Dockerfile
           target: source-artifact
           outputs: type=local,dest=dist/sources
-          cache-from: type=gha,scope=sources
-          cache-to: type=gha,mode=max,scope=sources
+          cache-from: |
+            type=registry,ref=${{ env.TOOLCHAIN_IMAGE }}
+            type=gha,scope=sources
+          cache-to: type=gha,mode=min,scope=sources
       - name: Fail on an unretried export failure
         if: >-
           steps.export.outcome == 'failure' &&
@@ -425,6 +520,7 @@ jobs:
       always() &&
       (inputs.release_tag != '' ||
       startsWith(github.ref, 'refs/tags/v')) &&
+      needs.validate.result == 'success' &&
       needs.build.result == 'success' &&
       needs.reproducibility.result == 'success' &&
       needs.source-bundle.result == 'success' &&
@@ -433,6 +529,7 @@ jobs:
       (needs.attest_source.result == 'success' ||
       needs.attest_source.result == 'skipped')
     needs:
+      - validate
       - build
       - reproducibility
       - source-bundle
