@@ -155,7 +155,7 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ inputs.ref }}
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         if: needs.changes.outputs.build == 'true'
       - name: Compute per-arch build parallelism
         if: needs.changes.outputs.build == 'true'
@@ -194,7 +194,7 @@ jobs:
         # also stored the toolchain and sources layers in every arch's scope,
         # ~1.5 GB each, and the matrix evicted itself from the 10 GB cache.
         continue-on-error: true
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: docker/Dockerfile
@@ -213,7 +213,7 @@ jobs:
         run: ./scripts/retry-window.sh "$build_started"
       - name: Retry ${{ matrix.arch }} once
         if: steps.classify.outputs.retry == 'true'
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: docker/Dockerfile
@@ -245,7 +245,7 @@ jobs:
         run: |
           ./scripts/verify.sh "dist/$TARGET_ARCH" "$TARGET_ARCH"
           ./scripts/package.sh "$TARGET_ARCH"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: needs.changes.outputs.build == 'true'
         with:
           name: statics-${{ matrix.arch }}
@@ -280,7 +280,7 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ inputs.ref }}
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         if: needs.changes.outputs.build == 'true'
       - name: Choose the rebuild scope
         if: needs.changes.outputs.build == 'true'
@@ -336,7 +336,7 @@ jobs:
               --build-arg JOBS="$jobs" \
               --output type=local,dest=dist
           ./scripts/package.sh x86_64
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: needs.changes.outputs.build == 'true'
         with:
           # Deliberately outside the statics-* pattern the release publishes.
@@ -370,13 +370,13 @@ jobs:
           ref: ${{ inputs.ref }}
       - name: Download the shipped x86-64 archive
         if: needs.changes.outputs.build == 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: statics-x86_64
           path: .build/shipped
       - name: Download the independent rebuild
         if: needs.changes.outputs.build == 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: reproducibility-x86_64
           path: .build/rebuilt
@@ -397,7 +397,7 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ inputs.ref }}
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         if: needs.changes.outputs.build == 'true'
       - name: Mark the export start
         if: needs.changes.outputs.build == 'true'
@@ -406,7 +406,7 @@ jobs:
         if: needs.changes.outputs.build == 'true'
         id: export
         continue-on-error: true
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: docker/Dockerfile
@@ -422,7 +422,7 @@ jobs:
         run: ./scripts/retry-window.sh "$build_started"
       - name: Retry the source export once
         if: steps.classify.outputs.retry == 'true'
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: docker/Dockerfile
@@ -440,7 +440,7 @@ jobs:
       - name: Package corresponding sources
         if: needs.changes.outputs.build == 'true'
         run: ./scripts/package-sources.sh
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: needs.changes.outputs.build == 'true'
         with:
           name: statics-sources
@@ -481,7 +481,7 @@ jobs:
           - s390x
     steps:
       - name: Download ${{ matrix.arch }} release assets
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: statics-${{ matrix.arch }}
           path: attest
@@ -505,7 +505,7 @@ jobs:
       id-token: write # Sign the attestation through GitHub OIDC.
     steps:
       - name: Download corresponding-source assets
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: statics-sources
           path: attest
@@ -545,7 +545,7 @@ jobs:
       RELEASE_SHA: ${{ inputs.ref }}
     steps:
       - name: Download release assets
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: statics-*
           path: release
