@@ -153,11 +153,13 @@ terms are indexed by `COMPONENTS.tsv` and packaged under `licenses/`.
 
 Archives are normalized for stable ordering, ownership, and timestamps.
 Reproducibility still depends on identical repository inputs, source
-archives, builder images, and toolchain. CI checks this by comparing the
-x86-64 archive it ships, which may come from cached layers, with an
-independent rebuild without cache at twice the `make -j`. On pull requests
-and `main` that rebuild reuses the published toolchain stage, so it checks the
-sources and compile; on a release it rebuilds the toolchain as well.
+archives, builder images, and toolchain. CI checks this on releases, on the
+weekly scheduled build, and on manual dispatch by comparing the x86-64
+archive it ships, which may come from cached layers, with an independent
+rebuild without cache at twice the `make -j`; a release rebuilds the
+toolchain as well. Pull requests and pushes skip the rebuild for speed, so a
+change that breaks reproducibility surfaces at the next weekly run or
+release rather than on its pull request.
 
 The builder's Debian packages come from the snapshot.debian.org date that
 the pinned base image records, so the base digest alone fixes them and a

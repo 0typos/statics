@@ -84,10 +84,10 @@ Each build:
 - executes representative commands through QEMU;
 - exports the exact source archives as a companion artifact.
 
-CI also rebuilds x86-64 without cache and requires the result to be
-byte-identical to the archive it ships. On pull requests and `main` that
-rebuild reuses the published toolchain stage (below); on a release it rebuilds
-the toolchain from scratch as well. Tagged public releases receive GitHub/Sigstore
+Every release also rebuilds x86-64 without any cache, toolchain included, and
+requires the result to be byte-identical to the archive it ships. The weekly
+scheduled build runs the same comparison on the published toolchain stage
+(below); pull requests and pushes skip it for speed. Tagged public releases receive GitHub/Sigstore
 attestations linking each binary archive and SBOM to its workflow, repository,
 and commit. Attestations establish provenance; they are not a claim that the
 contents are vulnerability-free.

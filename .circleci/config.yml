@@ -10,10 +10,10 @@
 #   - Actions caps the matrix at four concurrent arches; a cold build is four
 #     waves of ~12 minutes. Here every arch, the reproducibility rebuild, the
 #     source export, and validation start at once.
-#   - Reproducibility ran two uncached builds back to back. Here one rebuild
-#     of sources and compile without cache runs alongside the matrix and is
-#     compared with the x86-64 archive the matrix built. CircleCI releases
-#     nothing, so it never needs the release path's full toolchain rebuild.
+#   - Reproducibility ran two uncached builds back to back on every run. It
+#     is the slowest job and matters for what ships, and CircleCI releases
+#     nothing, so here it is an opt-in workflow (reproducibility=true): one
+#     rebuild without cache compared with the x86-64 archive that would ship.
 #   - The toolchain stage (Debian packages and a 3-4 minute Zig download) is
 #     identical for every arch. toolchain.yml publishes it from main, and
 #     every job here pulls it as a layer cache (scripts/docker-build.sh).
@@ -39,6 +39,13 @@ parameters:
     type: enum
     enum: [medium, large, xlarge, 2xlarge]
     default: large
+  reproducibility:
+    description: >-
+      Also rebuild x86-64 without cache and compare it with the shipped
+      archive. CircleCI releases nothing, so this is opt-in; GitHub Actions
+      runs it for releases and weekly.
+    type: boolean
+    default: false
 
 executors:
   builder:
@@ -321,20 +328,47 @@ jobs:
     steps:
       - checkout
       - skip-if-docs-only
+      - run:
+          name: Compute the source bundle key
+          # Everything the sources stage reads (Dockerfile, pins, fetch
+          # scripts) plus the packaging script.
+          command: >-
+            cat docker/Dockerfile sources.lock scripts/fetch.sh
+            scripts/fetch-sources.sh scripts/package-sources.sh
+            | sha256sum >/tmp/sources-inputs
+      - restore_cache:
+          name: Restore the packaged sources for unchanged pins
+          keys:
+            - statics-sources-v1-{{ .Branch }}-{{ checksum "/tmp/sources-inputs" }}
+            - statics-sources-v1-main-{{ checksum "/tmp/sources-inputs" }}
+      - run:
+          name: Use the restored bundle when present
+          command: |
+            if [ -f dist/statics-sources.tar.xz ] && (cd dist && sha256sum --check statics-sources.tar.xz.sha256); then
+              echo 'export STATICS_CACHED=1' >>"$BASH_ENV"
+              echo "pins unchanged: skipping export and packaging"
+            fi
       - setup-buildx
       - toolchain-and-sources
       - run:
           name: Export verified upstream source archives
           command: >-
+            if [ -n "${STATICS_CACHED:-}" ]; then echo "bundle restored from cache"; exit 0; fi;
             ./scripts/retry-once.sh dist/sources
             ./scripts/docker-build.sh source-artifact
             --output type=local,dest=dist/sources
       - run:
           name: Package corresponding sources
           command: |
-            ./scripts/package-sources.sh
+            if [ -z "${STATICS_CACHED:-}" ]; then ./scripts/package-sources.sh; fi
             mkdir -p artifacts
             cp dist/statics-sources.tar.xz dist/statics-sources.tar.xz.sha256 artifacts/
+      - save_cache:
+          name: Save the packaged sources for these pins
+          key: statics-sources-v1-{{ .Branch }}-{{ checksum "/tmp/sources-inputs" }}
+          paths:
+            - dist/statics-sources.tar.xz
+            - dist/statics-sources.tar.xz.sha256
       - store_artifacts:
           path: artifacts
           destination: statics-sources
@@ -361,9 +395,17 @@ workflows:
                 - powerpc64le
                 - riscv64
                 - s390x
+      - sources
+  # Opt-in: circleci pipeline run ... --param reproducibility=true. Its own
+  # x86-64 build is normally a cache hit, so it adds only the rebuild.
+  reproducibility:
+    when: << pipeline.parameters.reproducibility >>
+    jobs:
+      - build:
+          name: build-x86_64
+          arch: x86_64
       - reproducibility-build
       - reproducibility:
           requires:
             - build-x86_64
             - reproducibility-build
-      - sources
