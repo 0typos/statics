@@ -28,6 +28,21 @@ GitHub Action are also pinned to immutable digests or full commit SHAs.
 A build stops before extraction when a source digest does not match.
 Dependabot maintains Docker and GitHub Actions pins.
 
+The builder's Debian packages are installed from the snapshot.debian.org date
+that the pinned base image records, so the base digest fixes them too. They
+are fetched over HTTP and accepted only with a valid Debian archive
+signature. Snapshot Release files are past their `Valid-Until` by design, so
+that freshness check is disabled: an on-path attacker could replay an older
+signed Release, though not alter a package. `BUILDINFO` records the snapshot
+and a digest of the installed package list, which exposes such a rollback.
+
+The `Toolchain image` workflow publishes the toolchain stage to
+`ghcr.io/0typos/statics-toolchain` from `main`. The package is writable by any
+workflow in this repository and by any token with package write access, so it
+is not a trust boundary, and release builds must not depend on it. The
+Dockerfile is the only definition of the toolchain, and any tag rebuilds from
+the repository without the image.
+
 The weekly source updater discovers stable releases and computes new digests,
 but only opens a pull request. It does not merge into the default branch.
 Reviewers should inspect upstream release notes, compare published checksums,
