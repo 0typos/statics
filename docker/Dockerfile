@@ -3,9 +3,7 @@
 FROM docker.io/library/debian:bookworm-slim@sha256:abd67ffcfa541b485a3dff59865ab629aa048a6c613e639d36e7456b0b229241 AS base
 
 # Only the Zig records reach the toolchain stage, so repinning any other
-# upstream source leaves the toolchain layers cached. (GitHub's per-layer
-# cache benefits; CircleCI's single stage-cache key still hashes the whole
-# lock.)
+# upstream source leaves the toolchain layers cached.
 FROM base AS zig-pin
 COPY sources.lock /tmp/sources.lock
 RUN grep '^zig-' /tmp/sources.lock >/zig.lock

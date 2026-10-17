@@ -1,10 +1,8 @@
-# CircleCI port of the Build workflow (.github/workflows/build.yml), trialled
-# side by side with GitHub Actions to compare wall-clock time.
-#
-# Scope: validation, the full architecture matrix with QEMU verification, the
-# reproducibility check, and the corresponding-source bundle. Attestation and
-# release publication stay on GitHub Actions, which owns the OIDC signing and
-# the release token.
+# CI for pushes and pull requests: validation, the full architecture matrix
+# with QEMU verification, and the corresponding-source bundle. `ci-ok` is the
+# one status branch protection requires. Releases, attestation, the weekly
+# reproducibility rebuild, and the toolchain image stay on GitHub Actions,
+# which owns the OIDC signing and the release token.
 #
 # Where the time goes, and what this config does about it:
 #   - Actions caps the matrix at four concurrent arches; a cold build is four
@@ -19,10 +17,13 @@
 #     every job here pulls it as a layer cache (scripts/docker-build.sh).
 #   - Toolchain, sources, and compile are separate steps with plain BuildKit
 #     output, so each one's time and log are visible on its own.
-#   - Each arch's verified output is cached under a digest of every build
-#     input (scripts/build-inputs-digest.sh); unchanged inputs skip the
-#     toolchain, sources, and compile and go straight to verification.
-#   - QEMU installs in the background while the build runs.
+#   - On branches, each arch's verified output is cached under a digest of
+#     every build input (scripts/build-inputs-digest.sh); unchanged inputs
+#     skip the toolchain, sources, and compile and go straight to
+#     verification. Caches are shared by every branch and a branch runs its
+#     own config, so main never restores them: it always builds.
+#   - QEMU downloads in the background while the build runs and installs
+#     after it, so binfmt never changes under a running configure.
 version: 2.1
 
 parameters:
@@ -76,9 +77,9 @@ executors:
 commands:
   skip-if-docs-only:
     description: >-
-      End the job successfully when no build input changed. On main the push
-      is compared with its predecessor; elsewhere the branch is compared with
-      its merge base on main. Any doubt builds.
+      End the job successfully when a branch changes no build input relative
+      to its merge base on main. Main always builds, so a docs-only push can
+      never turn a broken tree green. Any doubt builds.
     steps:
       - run:
           name: Decide whether anything build-relevant changed
@@ -87,7 +88,8 @@ commands:
 
             base=""
             if [[ ${CIRCLE_BRANCH:-} == main ]]; then
-              base="<< pipeline.git.base_revision >>"
+              echo "main always builds"
+              exit 0
             elif git fetch --quiet origin main; then
               base=$(git merge-base FETCH_HEAD HEAD || true)
             fi
@@ -164,33 +166,37 @@ commands:
                 path: << parameters.path >>
                 destination: << parameters.destination >>
 
-  start-qemu-install:
+  start-qemu-download:
     steps:
       - run:
-          name: Install QEMU in the background
+          name: Download QEMU in the background
+          # Download only: installing registers binfmt handlers, which would
+          # let a running configure execute foreign binaries mid-build.
           background: true
           command: |
             rc=0
             {
               sudo apt-get -o DPkg::Lock::Timeout=300 -o Acquire::Retries=3 update
               sudo apt-get -o DPkg::Lock::Timeout=300 -o Acquire::Retries=3 \
-                install --yes --no-install-recommends qemu-user-static
-            } >/tmp/qemu-install.log 2>&1 || rc=$?
-            echo "$rc" >/tmp/qemu-install.rc
+                install --yes --no-install-recommends --download-only qemu-user-static
+            } >/tmp/qemu-download.log 2>&1 || rc=$?
+            echo "$rc" >/tmp/qemu-download.rc
 
-  wait-for-qemu:
+  install-qemu:
     steps:
       - run:
-          name: Wait for the QEMU install
-          # verify.sh fails without QEMU anyway; this surfaces the install
+          name: Install QEMU
+          # verify.sh fails without QEMU anyway; this surfaces the download
           # log instead of a bare "runner not found".
           command: |
             for _ in $(seq 600); do
-              [[ -f /tmp/qemu-install.rc ]] && break
+              [[ -f /tmp/qemu-download.rc ]] && break
               sleep 1
             done
-            cat /tmp/qemu-install.log
-            [[ $(cat /tmp/qemu-install.rc 2>/dev/null) == 0 ]]
+            cat /tmp/qemu-download.log
+            [[ $(cat /tmp/qemu-download.rc 2>/dev/null) == 0 ]]
+            sudo apt-get -o DPkg::Lock::Timeout=300 \
+              install --yes --no-install-recommends --no-download qemu-user-static
 
 jobs:
   validate:
@@ -219,26 +225,34 @@ jobs:
     steps:
       - checkout
       - skip-if-docs-only
-      - start-qemu-install
+      - start-qemu-download
       - run:
           name: Compute the build input digest
           command: |
             # The compile step's own arguments are inputs the digest cannot
             # see, so the key records them too; keep the two lists equal.
+            # package.sh runs with the machine image's tar and xz, so their
+            # versions are inputs to the cached archive as well.
             {
               echo "artifact ARCH=<< parameters.arch >> COMPONENT_TIMEOUT=600"
+              tar --version | head -n 1
+              xz --version | head -n 1
               ./scripts/build-inputs-digest.sh
             } >/tmp/build-inputs
             cat /tmp/build-inputs
-      - restore_cache:
-          name: Restore the packaged output for unchanged inputs
+      - unless:
           # One entry per arch and input digest, shared by every branch:
-          # caches are per project and a branch runs its own config, so
-          # per-branch keys only duplicated entries without isolating them.
-          # CircleCI publishes nothing; GitHub Actions releases do not use
-          # these entries.
-          keys:
-            - statics-out-v3-<< parameters.arch >>-{{ checksum "/tmp/build-inputs" }}
+          # caches are per project and a branch runs its own config, so any
+          # branch can write the key main would read. Main therefore never
+          # restores; branches trust entries only as far as they trust other
+          # collaborators' branches. Releases rebuild on GitHub Actions.
+          condition:
+            equal: [main, << pipeline.git.branch >>]
+          steps:
+            - restore_cache:
+                name: Restore the packaged output for unchanged inputs
+                keys:
+                  - statics-out-v4-<< parameters.arch >>-{{ checksum "/tmp/build-inputs" }}
       - run:
           name: Use the restored output when present
           # The cache holds the packaged archive (~10 MiB xz, about half the
@@ -273,7 +287,7 @@ jobs:
             --build-arg JOBS="$(nproc)"
             --build-arg COMPONENT_TIMEOUT=600
             --output type=local,dest=dist
-      - wait-for-qemu
+      - install-qemu
       - run:
           name: Verify and package
           command: |
@@ -290,7 +304,7 @@ jobs:
             cp dist/statics-$arch.* artifacts/
       - save_cache:
           name: Save the packaged output for these inputs
-          key: statics-out-v3-<< parameters.arch >>-{{ checksum "/tmp/build-inputs" }}
+          key: statics-out-v4-<< parameters.arch >>-{{ checksum "/tmp/build-inputs" }}
           paths:
             - dist/statics-<< parameters.arch >>.tar.xz
             - dist/statics-<< parameters.arch >>.tar.xz.sha256
@@ -355,10 +369,21 @@ jobs:
             .build/statics-x86_64.tar.xz
             .build/rebuilt/statics-x86_64.tar.xz
 
+  ci-ok:
+    # The single required status. The matrix follows architectures.tsv, so
+    # requiring each arch job would drift whenever an arch is added or
+    # removed. Jobs that halt on docs-only changes count as successful.
+    executor: base
+    steps:
+      - run:
+          name: Every required job passed
+          command: echo "validate, all architectures, and sources passed"
+
   sources:
+    # Network-bound: fetching gains nothing from more cores.
     executor:
       name: builder
-      size: large
+      size: medium
     steps:
       - checkout
       - skip-if-docs-only
@@ -370,10 +395,15 @@ jobs:
             cat docker/Dockerfile sources.lock scripts/fetch.sh
             scripts/fetch-sources.sh scripts/package-sources.sh
             | sha256sum >/tmp/sources-inputs
-      - restore_cache:
-          name: Restore the packaged sources for unchanged pins
-          keys:
-            - statics-sources-v2-{{ checksum "/tmp/sources-inputs" }}
+      - unless:
+          # As for the arch outputs: main never trusts a shared cache entry.
+          condition:
+            equal: [main, << pipeline.git.branch >>]
+          steps:
+            - restore_cache:
+                name: Restore the packaged sources for unchanged pins
+                keys:
+                  - statics-sources-v2-{{ checksum "/tmp/sources-inputs" }}
       - run:
           name: Use the restored bundle when present
           command: |
@@ -408,6 +438,10 @@ jobs:
 
 workflows:
   build:
+    # The reproducibility run brings its own x86-64 build; running both would
+    # build the same uncached commit twice.
+    when:
+      not: << pipeline.parameters.reproducibility >>
     jobs:
       - validate
       - build:
@@ -429,6 +463,11 @@ workflows:
                 - riscv64
                 - s390x
       - sources
+      - ci-ok:
+          requires:
+            - validate
+            - build
+            - sources
   # Opt-in: circleci pipeline run ... --param reproducibility=true. Its own
   # x86-64 build is normally a cache hit, so it adds only the rebuild.
   reproducibility:

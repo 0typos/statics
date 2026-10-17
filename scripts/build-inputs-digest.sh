@@ -10,7 +10,9 @@ set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 
-NOT_INPUTS='^(README\.md|CONTRIBUTING\.md|SECURITY\.md|docs/|assets/|\.github/|\.circleci/|flake\.(nix|lock)|Makefile|scripts/(verify|validate|compare-builds|package|package-sources|retry-once|retry-window|build-inputs-digest)\.sh|scripts/(check-docs|update_sources)\.py)'
+# Directories match by prefix, files exactly. package.sh is an input: CI
+# caches its archive, and a hit must repackage to the same bytes.
+NOT_INPUTS='^((docs|assets|\.github|\.circleci)/|(README\.md|CONTRIBUTING\.md|SECURITY\.md|flake\.(nix|lock)|Makefile|scripts/(verify|validate|compare-builds|package-sources|retry-once|retry-window|build-inputs-digest)\.sh|scripts/(check-docs|update_sources)\.py)$)'
 
 cd "$repo_root"
 # Mode and working-tree content of each tracked input, so the digest matches

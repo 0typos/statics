@@ -56,7 +56,7 @@ workflow artifacts.
 | `configs/` and `patches/` | Reviewed build configuration and minimal compatibility patches |
 | `.github/workflows/` | Validation, matrix build, release, source-update, and toolchain-image automation |
 | `scripts/docker-build.sh` | Runs one Dockerfile target with the published toolchain image as a layer cache |
-| `.circleci/config.yml` | CircleCI trial of the Build workflow: validation, matrix, reproducibility, and sources |
+| `.circleci/config.yml` | Push and pull request CI: validation, matrix, sources, and the required `ci-ok` status |
 | `docs/` | User, maintainer, architecture, release, and roadmap documentation |
 
 The TSV files are deliberately simple source-of-truth manifests. Keep prose
