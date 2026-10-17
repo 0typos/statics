@@ -186,6 +186,10 @@ jobs:
       - name: Compile ${{ matrix.arch }}
         if: needs.changes.outputs.build == 'true'
         id: build
+        # mode=min caches only the final artifact layer (~50 MB), keyed on the
+        # whole stage chain, so unchanged inputs still skip the compile. mode=max
+        # also stored the toolchain and sources layers in every arch's scope,
+        # ~1.5 GB each, and the matrix evicted itself from the 10 GB cache.
         continue-on-error: true
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
@@ -199,7 +203,7 @@ jobs:
           cache-from: |
             type=registry,ref=${{ env.TOOLCHAIN_IMAGE }}
             type=gha,scope=${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=min,scope=${{ matrix.arch }}
       - name: Classify a failed build
         id: classify
         if: steps.build.outcome == 'failure'
@@ -218,7 +222,7 @@ jobs:
           cache-from: |
             type=registry,ref=${{ env.TOOLCHAIN_IMAGE }}
             type=gha,scope=${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.arch }}
+          cache-to: type=gha,mode=min,scope=${{ matrix.arch }}
       - name: Fail on an unretried build failure
         if: >-
           steps.build.outcome == 'failure' &&
@@ -392,7 +396,7 @@ jobs:
           cache-from: |
             type=registry,ref=${{ env.TOOLCHAIN_IMAGE }}
             type=gha,scope=sources
-          cache-to: type=gha,mode=max,scope=sources
+          cache-to: type=gha,mode=min,scope=sources
       - name: Classify a failed export
         id: classify
         if: steps.export.outcome == 'failure'
@@ -408,7 +412,7 @@ jobs:
           cache-from: |
             type=registry,ref=${{ env.TOOLCHAIN_IMAGE }}
             type=gha,scope=sources
-          cache-to: type=gha,mode=max,scope=sources
+          cache-to: type=gha,mode=min,scope=sources
       - name: Fail on an unretried export failure
         if: >-
           steps.export.outcome == 'failure' &&
