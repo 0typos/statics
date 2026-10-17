@@ -190,20 +190,24 @@ jobs:
       - run:
           name: Compute the build input digest
           command: |
-            { echo "<< parameters.arch >>"; ./scripts/build-inputs-digest.sh; } >/tmp/build-inputs
+            # Bump compile-v1 whenever the compile step's target or build
+            # arguments below change: they are inputs this digest cannot see.
+            { echo "compile-v1 << parameters.arch >>"; ./scripts/build-inputs-digest.sh; } >/tmp/build-inputs
             cat /tmp/build-inputs
       - restore_cache:
           name: Restore compiled output for unchanged inputs
-          # A branch reads its own entries and main's but saves only its own,
-          # so no branch can seed output that main restores. x86-64 output is
-          # also checked against the uncached rebuild in every pipeline.
+          # This config saves under the branch's own key and reads main's.
+          # That is convention, not isolation: a branch runs its own config
+          # and caches are per project, so anyone who can push could seed
+          # main's keys. x86-64 is still compared with an uncached rebuild in
+          # every pipeline, and CircleCI publishes nothing.
           keys:
-            - statics-out-v1-<< parameters.arch >>-{{ .Branch }}-{{ checksum "/tmp/build-inputs" }}
-            - statics-out-v1-<< parameters.arch >>-main-{{ checksum "/tmp/build-inputs" }}
+            - statics-out-v2-<< parameters.arch >>-{{ .Branch }}-{{ checksum "/tmp/build-inputs" }}
+            - statics-out-v2-<< parameters.arch >>-main-{{ checksum "/tmp/build-inputs" }}
       - run:
           name: Use the restored output when present
           command: |
-            if [ -f "dist/<< parameters.arch >>/BUILDINFO" ]; then
+            if [ -f "dist/<< parameters.arch >>/BUILDINFO" ] && [ -f "dist/cached-<< parameters.arch >>.sha256" ]; then
               echo 'export STATICS_CACHED=1' >>"$BASH_ENV"
               echo "inputs unchanged: skipping toolchain, sources, and compile"
             else
@@ -213,8 +217,8 @@ jobs:
       - toolchain-and-sources
       - run:
           name: Compile << parameters.arch >>
-          # make --output-sync prints each component when it finishes, so a
-          # silent stretch longer than the slowest component means a hang.
+          # Output is live, so 20 silent minutes means a hang that the
+          # 10-minute component guard (COMPONENT_TIMEOUT) failed to break.
           no_output_timeout: 20m
           command: >-
             if [ -n "${STATICS_CACHED:-}" ]; then echo "output restored from cache"; exit 0; fi;
@@ -222,20 +226,30 @@ jobs:
             ./scripts/docker-build.sh artifact
             --build-arg ARCH=<< parameters.arch >>
             --build-arg JOBS="$(nproc)"
+            --build-arg COMPONENT_TIMEOUT=600
             --output type=local,dest=dist
       - wait-for-qemu
       - run:
           name: Verify and package
           command: |
-            ./scripts/verify.sh "dist/<< parameters.arch >>" "<< parameters.arch >>"
-            ./scripts/package.sh "<< parameters.arch >>"
+            arch=<< parameters.arch >>
+            ./scripts/verify.sh "dist/$arch" "$arch"
+            ./scripts/package.sh "$arch"
+            # package.sh is deterministic, so restored output must repackage
+            # to the archive digest saved with it; this catches a damaged
+            # restore in files verify.sh does not check (notices, SBOM).
+            if [ -n "${STATICS_CACHED:-}" ]; then
+              cmp "dist/cached-$arch.sha256" "dist/statics-$arch.tar.xz.sha256"
+            fi
+            cp "dist/statics-$arch.tar.xz.sha256" "dist/cached-$arch.sha256"
             mkdir -p artifacts
-            cp dist/statics-<< parameters.arch >>.* artifacts/
+            cp dist/statics-$arch.* artifacts/
       - save_cache:
           name: Save the verified output for these inputs
-          key: statics-out-v1-<< parameters.arch >>-{{ .Branch }}-{{ checksum "/tmp/build-inputs" }}
+          key: statics-out-v2-<< parameters.arch >>-{{ .Branch }}-{{ checksum "/tmp/build-inputs" }}
           paths:
             - dist/<< parameters.arch >>
+            - dist/cached-<< parameters.arch >>.sha256
       - store_artifacts:
           path: artifacts
           destination: statics-<< parameters.arch >>
@@ -271,6 +285,7 @@ jobs:
                 --no-cache-filter builder \
                 --build-arg ARCH=x86_64 \
                 --build-arg JOBS="$(( $(nproc) * 2 ))" \
+                --build-arg COMPONENT_TIMEOUT=600 \
                 --output type=local,dest=dist
             ./scripts/package.sh x86_64
             mkdir -p rebuilt

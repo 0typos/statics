@@ -37,9 +37,14 @@ export CXX="$repo_root/scripts/toolchain/cxx"
 export AR="$repo_root/scripts/toolchain/ar"
 export RANLIB="$repo_root/scripts/toolchain/ranlib"
 export JOBS=${JOBS:-$(getconf _NPROCESSORS_ONLN)}
-# Per-component hang guard (run-builder.sh). The slowest component takes a
-# few minutes on a 4-core CI runner; empty disables it.
-export STATICS_COMPONENT_TIMEOUT=${STATICS_COMPONENT_TIMEOUT-15m}
+# Every build gets its own cold Zig cache. Zig does not replay compiler
+# warnings on a cache hit, and configure scripts that accept a flag only when
+# a probe compiles silently (ldns) then reach different results from a warm
+# cache: a second build in the same cache produced a different drill.
+export ZIG_GLOBAL_CACHE_DIR="$WORK_DIR/zig-cache/global"
+export ZIG_LOCAL_CACHE_DIR="$WORK_DIR/zig-cache/local"
+# Per-component hang guard in seconds (run-builder.sh); empty disables it.
+export STATICS_COMPONENT_TIMEOUT=${STATICS_COMPONENT_TIMEOUT:-}
 export STATICS_ARCH=$arch
 export SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-0}
 export KCONFIG_NOTIMESTAMP=1
@@ -176,7 +181,13 @@ dag=$WORK_DIR/dag.mk
     emit nvme-cli nvme build_nvme_cli libnvme
 } > "$dag"
 
-make -f "$dag" -j"$JOBS" --output-sync=target all
+if ! make -f "$dag" -j"$JOBS" --output-sync=target all; then
+    if [[ -f $WORK_DIR/.hung && -z ${STATICS_RESTARTED:-} ]]; then
+        echo "==> a component hung; rebuilding $arch once from a clean tree" >&2
+        STATICS_RESTARTED=1 exec "$repo_root/scripts/build.sh" "$arch" "$output_dir"
+    fi
+    exit 1
+fi
 
 {
     echo "architecture=$arch"

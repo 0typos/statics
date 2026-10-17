@@ -93,6 +93,9 @@ ARG ARCH=x86_64
 # host the workflow passes a capped value so concurrent arch builds saturate
 # the cores instead of oversubscribing them into scheduler thrash.
 ARG JOBS
+# Seconds before a component is treated as hung and the build restarts once
+# (scripts/run-builder.sh). Empty disables it; CircleCI sets it.
+ARG COMPONENT_TIMEOUT
 # Only what the build reads. Anything else in the context (CI config, docs,
 # verify.sh, dev tooling) must not invalidate every architecture's compile.
 COPY LICENSE architectures.tsv components.tsv ./
@@ -103,8 +106,14 @@ COPY scripts/build.sh scripts/run-builder.sh scripts/merge-kconfig.sh \
 COPY scripts/lib/ scripts/lib/
 COPY scripts/builders/ scripts/builders/
 COPY scripts/toolchain/ scripts/toolchain/
+# The work tree (a copy of every source plus objects, ~0.9 GB per arch) is
+# removed in the same layer: it is never read again, and keeping it made each
+# arch's exported layer cache about a gigabyte, enough for the 13 arches to
+# evict one another from GitHub's 10 GB cache.
 RUN chmod +x scripts/*.sh scripts/toolchain/* \
-    && JOBS="$JOBS" scripts/build.sh "$ARCH" "/out/$ARCH"
+    && JOBS="$JOBS" STATICS_COMPONENT_TIMEOUT="$COMPONENT_TIMEOUT" \
+        scripts/build.sh "$ARCH" "/out/$ARCH" \
+    && rm -rf /build
 
 FROM builder AS test
 ARG ARCH=x86_64

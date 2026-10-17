@@ -11,21 +11,23 @@ if [[ $# -ne 2 ]]; then
     exit 2
 fi
 
-# A component that runs past STATICS_COMPONENT_TIMEOUT is treated as hung and
-# run once more. CircleCI hosts have intermittently livelocked a single
-# process at 100% of one core (nmap's final mips link, 2 of 6 runs) where the
-# same step normally takes under a second; a genuine failure still fails.
+# A component still running after STATICS_COMPONENT_TIMEOUT seconds is
+# treated as hung: it is killed and marked, and build.sh restarts the whole
+# architecture once from a clean tree. Builders patch and link in place, so
+# re-running one component on its own partial tree is not safe. CircleCI
+# hosts have intermittently livelocked one process at 100% of a core (nmap's
+# final mips link, 2 of 6 runs) where the step normally takes under a second.
 limit=${STATICS_COMPONENT_TIMEOUT:-}
 if [[ -n $limit && -z ${STATICS_UNDER_TIMEOUT:-} ]]; then
-    for attempt in 1 2; do
-        rc=0
-        STATICS_UNDER_TIMEOUT=1 timeout --kill-after=30s "$limit" "$0" "$@" || rc=$?
-        if ((rc != 124 && rc != 137)); then
-            exit "$rc"
-        fi
-        echo "==> $1/$2 exceeded $limit on attempt $attempt (exit $rc); treating it as hung" >&2
-    done
-    exit 124
+    started=$SECONDS
+    rc=0
+    STATICS_UNDER_TIMEOUT=1 timeout --kill-after=30s "${limit}s" "$0" "$@" || rc=$?
+    # Only a run that reached the limit counts; an OOM kill also exits 137.
+    if ((rc == 124 || rc == 137)) && ((SECONDS - started >= limit)); then
+        echo "==> $1/$2 still running after ${limit}s; treating it as hung" >&2
+        touch "$WORK_DIR/.hung"
+    fi
+    exit "$rc"
 fi
 
 source "$repo_root/scripts/lib/build-common.sh"
