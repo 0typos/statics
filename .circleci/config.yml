@@ -1,27 +1,37 @@
-# CI for pushes and pull requests: validation, the full architecture matrix
-# with QEMU verification, and the corresponding-source bundle. `ci-ok` is the
-# one status branch protection requires. Releases, attestation, the weekly
-# reproducibility rebuild, and the toolchain image stay on GitHub Actions,
-# which owns the OIDC signing and the release token.
+# All CI and release automation; the repository has no GitHub Actions.
+#
+#   - Pushes and pull requests (workflow `build`): validation, the full
+#     architecture matrix with QEMU verification, and the corresponding-source
+#     bundle. `ci-ok` is the one status branch protection requires.
+#   - A v* tag (workflow `release`, also the monthly schedule): every gate
+#     from a fresh build, the uncached reproducibility comparison, keyless
+#     Sigstore signing through CircleCI's OIDC identity, then the GitHub
+#     Release (scripts/release-candidate.sh, scripts/publish-release.sh).
+#   - Schedules set `task`: weekly `reproducibility`, monthly
+#     `monthly-release`, weekly `update-sources`.
+#   - Main also republishes the GHCR toolchain image when its inputs change.
+#
+# GitHub credentials live in the `statics-publish` context, which CircleCI
+# only hands to pipelines on main or a v* tag, never to an SSH rerun. Only
+# repository admins can create v* tags (GitHub ruleset), so branch and pull
+# request pipelines never see them. Only jobs that publish request it.
 #
 # Where the time goes, and what this config does about it:
-#   - Actions caps the matrix at four concurrent arches; a cold build is four
-#     waves of ~12 minutes. Here every arch, the source export, and
-#     validation start at once.
-#   - Reproducibility ran two uncached builds back to back on every run. It
-#     is the slowest job and matters for what ships, and CircleCI releases
-#     nothing, so here it is an opt-in workflow (reproducibility=true): one
-#     rebuild without cache compared with the x86-64 archive that would ship.
+#   - Every arch, the source export, and validation start at once.
+#   - Reproducibility runs two uncached builds, so pushes skip it; releases
+#     and the weekly schedule run it.
 #   - The toolchain stage (Debian packages and a 3-4 minute Zig download) is
-#     identical for every arch. toolchain.yml publishes it from main, and
-#     every job here pulls it as a layer cache (scripts/docker-build.sh).
+#     identical for every arch. Main publishes it to GHCR, and every job
+#     pulls it as a layer cache (scripts/docker-build.sh). Releases trust it
+#     for speed only: their reproducibility rebuild rebuilds the toolchain
+#     from scratch, so a planted image cannot reproduce the shipped archive.
 #   - Toolchain, sources, and compile are separate steps with plain BuildKit
 #     output, so each one's time and log are visible on its own.
 #   - On branches, each arch's verified output is cached under a digest of
 #     every build input (scripts/build-inputs-digest.sh); unchanged inputs
 #     skip the toolchain, sources, and compile and go straight to
 #     verification. Caches are shared by every branch and a branch runs its
-#     own config, so main never restores them: it always builds.
+#     own config, so main and releases never restore them: they always build.
 #   - QEMU downloads in the background while the build runs and installs
 #     after it, so binfmt never changes under a running configure.
 version: 2.1
@@ -45,11 +55,19 @@ parameters:
       Keep the archives as downloadable artifacts on a branch other than main.
     type: boolean
     default: false
-  reproducibility:
+  task:
     description: >-
-      Also rebuild x86-64 without cache and compare it with the shipped
-      archive. CircleCI releases nothing, so this is opt-in; GitHub Actions
-      runs it for releases and weekly.
+      What a scheduled or manual pipeline does. `ci` is a push or pull
+      request; tag pipelines release whatever this says.
+    type: enum
+    enum: [ci, reproducibility, monthly-release, update-sources]
+    default: ci
+  refresh_sources:
+    description: Monthly release only. Repin every upstream component first.
+    type: boolean
+    default: true
+  force:
+    description: Monthly release only. Release even when nothing changed.
     type: boolean
     default: false
 
@@ -62,7 +80,7 @@ executors:
       image: ubuntu-2404:current
     resource_class: << parameters.size >>
     environment:
-      # Same transient-failure window as the GitHub workflow.
+      # Only a failure this early is retried; see scripts/retry-window.sh.
       RETRY_WINDOW_SECONDS: "600"
       DEBIAN_FRONTEND: noninteractive
   python:
@@ -125,6 +143,10 @@ commands:
       Pull the published toolchain as a layer cache, then fetch and verify the
       upstream sources. Both land in the job's BuildKit cache for the compile.
     parameters:
+      toolchain-args:
+        description: Extra buildx arguments for the toolchain step.
+        type: string
+        default: ""
       extra-args:
         description: Extra buildx arguments for the sources step.
         type: string
@@ -135,7 +157,9 @@ commands:
           command: >-
             if [ -n "${STATICS_CACHED:-}" ]; then echo "output restored from cache"; exit 0; fi;
             ./scripts/retry-once.sh .build/none
-            ./scripts/docker-build.sh toolchain --output type=cacheonly
+            ./scripts/docker-build.sh toolchain
+            << parameters.toolchain-args >>
+            --output type=cacheonly
       - run:
           name: Fetch and verify upstream sources
           command: >-
@@ -198,11 +222,63 @@ commands:
             sudo apt-get -o DPkg::Lock::Timeout=300 \
               install --yes --no-install-recommends --no-download qemu-user-static
 
+  install-release-tools:
+    description: Install gh and cosign, pinned to their release checksums.
+    steps:
+      - run:
+          name: Install gh and cosign
+          command: |
+            set -euo pipefail
+            tools=$(mktemp -d)
+            curl -fsSLo "$tools/gh.tar.gz" \
+              https://github.com/cli/cli/releases/download/v2.102.0/gh_2.102.0_linux_amd64.tar.gz
+            curl -fsSLo "$tools/cosign" \
+              https://github.com/sigstore/cosign/releases/download/v3.1.3/cosign-linux-amd64
+            printf '%s  %s\n' \
+              bb766f710eef8ede859c18578c72c327597cd4c8a85b06001b1f3843c6019386 gh.tar.gz \
+              4629c757b7618056f8ddd7e2625ae9fdd94c0372a65049520bc7d9df9efc7f71 cosign |
+              (cd "$tools" && sha256sum --check --strict)
+            tar -xzf "$tools/gh.tar.gz" -C "$tools"
+            mkdir -p "$HOME/bin"
+            install -m 0755 "$tools/gh_2.102.0_linux_amd64/bin/gh" "$tools/cosign" "$HOME/bin/"
+            echo 'export PATH="$HOME/bin:$PATH"' >>"$BASH_ENV"
+
+  use-release-candidate:
+    description: >-
+      Check out the commit release-candidate chose, or end the job
+      successfully when there is nothing to release.
+    steps:
+      - attach_workspace:
+          at: /tmp/ws
+      - run:
+          name: Check out the release candidate
+          command: |
+            set -euo pipefail
+            if [[ $(cat /tmp/ws/release/release) != true ]]; then
+              echo "nothing to release: $(cat /tmp/ws/release/reason)"
+              circleci-agent step halt
+              exit 0
+            fi
+            ref=$(cat /tmp/ws/release/ref)
+            if [[ $(git rev-parse HEAD) != "$ref" ]]; then
+              git fetch --quiet origin "$ref"
+              git checkout --quiet --detach "$ref"
+            fi
+            echo "releasing $(cat /tmp/ws/release/tag) from $ref"
+
 jobs:
   validate:
+    parameters:
+      release:
+        type: boolean
+        default: false
     executor: python
     steps:
       - checkout
+      - when:
+          condition: << parameters.release >>
+          steps:
+            - use-release-candidate
       - run:
           name: Install ShellCheck
           command: |
@@ -219,12 +295,25 @@ jobs:
     parameters:
       arch:
         type: string
+      release:
+        description: >-
+          Build the release candidate fresh and hand the packaged archive to
+          the publish job.
+        type: boolean
+        default: false
     executor:
       name: builder
       size: << pipeline.parameters.arch_resource_class >>
     steps:
       - checkout
-      - skip-if-docs-only
+      - when:
+          condition: << parameters.release >>
+          steps:
+            - use-release-candidate
+      - unless:
+          condition: << parameters.release >>
+          steps:
+            - skip-if-docs-only
       - start-qemu-download
       - run:
           name: Compute the build input digest
@@ -243,11 +332,13 @@ jobs:
       - unless:
           # One entry per arch and input digest, shared by every branch:
           # caches are per project and a branch runs its own config, so any
-          # branch can write the key main would read. Main therefore never
-          # restores; branches trust entries only as far as they trust other
-          # collaborators' branches. Releases rebuild on GitHub Actions.
+          # branch can write the key main would read. Main and releases
+          # therefore never restore; branches trust entries only as far as
+          # they trust other collaborators' branches.
           condition:
-            equal: [main, << pipeline.git.branch >>]
+            or:
+              - << parameters.release >>
+              - equal: [main, << pipeline.git.branch >>]
           steps:
             - restore_cache:
                 name: Restore the packaged output for unchanged inputs
@@ -302,43 +393,72 @@ jobs:
             fi
             mkdir -p artifacts
             cp dist/statics-$arch.* artifacts/
-      - save_cache:
-          name: Save the packaged output for these inputs
-          key: statics-out-v4-<< parameters.arch >>-{{ checksum "/tmp/build-inputs" }}
-          paths:
-            - dist/statics-<< parameters.arch >>.tar.xz
-            - dist/statics-<< parameters.arch >>.tar.xz.sha256
+      - unless:
+          condition: << parameters.release >>
+          steps:
+            - save_cache:
+                name: Save the packaged output for these inputs
+                key: statics-out-v4-<< parameters.arch >>-{{ checksum "/tmp/build-inputs" }}
+                paths:
+                  - dist/statics-<< parameters.arch >>.tar.xz
+                  - dist/statics-<< parameters.arch >>.tar.xz.sha256
       - store-artifacts-if-wanted:
           path: artifacts
           destination: statics-<< parameters.arch >>
       - when:
           condition:
-            and:
-              - << pipeline.parameters.reproducibility >>
-              - equal: [x86_64, << parameters.arch >>]
+            or:
+              - << parameters.release >>
+              - and:
+                  - equal: [reproducibility, << pipeline.parameters.task >>]
+                  - equal: [x86_64, << parameters.arch >>]
           steps:
             - persist_to_workspace:
                 root: artifacts
                 paths:
-                  - statics-x86_64.tar.xz
+                  - statics-<< parameters.arch >>.*
 
   reproducibility-build:
+    parameters:
+      release:
+        description: >-
+          Also rebuild the toolchain from scratch: anyone who can push to
+          main can write the published image the matrix trusts.
+        type: boolean
+        default: false
     executor:
       name: builder
       size: << pipeline.parameters.repro_resource_class >>
     steps:
       - checkout
-      - skip-if-docs-only
+      - when:
+          condition: << parameters.release >>
+          steps:
+            - use-release-candidate
+            - run:
+                name: Ignore the published toolchain image
+                command: echo 'export TOOLCHAIN_IMAGE=' >>"$BASH_ENV"
+      - unless:
+          condition: << parameters.release >>
+          steps:
+            - skip-if-docs-only
       - setup-buildx
-      - toolchain-and-sources:
-          extra-args: --no-cache-filter sources
+      - when:
+          condition: << parameters.release >>
+          steps:
+            - toolchain-and-sources:
+                toolchain-args: --no-cache-filter zig-pin --no-cache-filter toolchain
+                extra-args: --no-cache-filter sources
+      - unless:
+          condition: << parameters.release >>
+          steps:
+            - toolchain-and-sources:
+                extra-args: --no-cache-filter sources
       - run:
           name: Compile x86-64 without cache
           no_output_timeout: 20m
           # Twice the matrix's make -j, so a dependence on build parallelism
-          # shows up as a mismatch without slowing the critical path. The
-          # toolchain comes from the published image; toolchain.yml is what
-          # rebuilds that stage from scratch.
+          # shows up as a mismatch without slowing the critical path.
           command: |
             ./scripts/retry-once.sh dist \
               ./scripts/docker-build.sh artifact \
@@ -356,18 +476,29 @@ jobs:
             - rebuilt/statics-x86_64.tar.xz
 
   reproducibility:
+    parameters:
+      release:
+        type: boolean
+        default: false
     executor: base
     steps:
       - checkout
-      - skip-if-docs-only
+      - when:
+          condition: << parameters.release >>
+          steps:
+            - use-release-candidate
+      - unless:
+          condition: << parameters.release >>
+          steps:
+            - skip-if-docs-only
       - attach_workspace:
-          at: .build
+          at: /tmp/ws
       - run:
           name: Compare the shipped archive with the rebuild
           command: >-
             ./scripts/compare-builds.sh
-            .build/statics-x86_64.tar.xz
-            .build/rebuilt/statics-x86_64.tar.xz
+            /tmp/ws/statics-x86_64.tar.xz
+            /tmp/ws/rebuilt/statics-x86_64.tar.xz
 
   ci-ok:
     # The single required status. The matrix follows architectures.tsv, so
@@ -380,13 +511,24 @@ jobs:
           command: echo "validate, all architectures, and sources passed"
 
   sources:
+    parameters:
+      release:
+        type: boolean
+        default: false
     # Network-bound: fetching gains nothing from more cores.
     executor:
       name: builder
       size: medium
     steps:
       - checkout
-      - skip-if-docs-only
+      - when:
+          condition: << parameters.release >>
+          steps:
+            - use-release-candidate
+      - unless:
+          condition: << parameters.release >>
+          steps:
+            - skip-if-docs-only
       - run:
           name: Compute the source bundle key
           # Everything the sources stage reads (Dockerfile, pins, fetch
@@ -398,9 +540,12 @@ jobs:
             tar --version | head -n 1; xz --version | head -n 1; }
             | sha256sum >/tmp/sources-inputs
       - unless:
-          # As for the arch outputs: main never trusts a shared cache entry.
+          # As for the arch outputs: main and releases never trust a shared
+          # cache entry.
           condition:
-            equal: [main, << pipeline.git.branch >>]
+            or:
+              - << parameters.release >>
+              - equal: [main, << pipeline.git.branch >>]
           steps:
             - restore_cache:
                 name: Restore the packaged sources for unchanged pins
@@ -428,22 +573,134 @@ jobs:
             if [ -z "${STATICS_CACHED:-}" ]; then ./scripts/package-sources.sh; fi
             mkdir -p artifacts
             cp dist/statics-sources.tar.xz dist/statics-sources.tar.xz.sha256 artifacts/
-      - save_cache:
-          name: Save the packaged sources for these pins
-          key: statics-sources-v2-{{ checksum "/tmp/sources-inputs" }}
-          paths:
-            - dist/statics-sources.tar.xz
-            - dist/statics-sources.tar.xz.sha256
+      - unless:
+          condition: << parameters.release >>
+          steps:
+            - save_cache:
+                name: Save the packaged sources for these pins
+                key: statics-sources-v2-{{ checksum "/tmp/sources-inputs" }}
+                paths:
+                  - dist/statics-sources.tar.xz
+                  - dist/statics-sources.tar.xz.sha256
       - store-artifacts-if-wanted:
           path: artifacts
           destination: statics-sources
+      - when:
+          condition: << parameters.release >>
+          steps:
+            - persist_to_workspace:
+                root: artifacts
+                paths:
+                  - statics-sources.*
+
+  release-candidate:
+    executor: python
+    environment:
+      GH_REPO: 0typos/statics
+      RELEASE_BRANCH: automation/monthly-release
+      REFRESH_SOURCES: << pipeline.parameters.refresh_sources >>
+      FORCE_RELEASE: << pipeline.parameters.force >>
+    steps:
+      - checkout
+      - install-release-tools
+      - run:
+          name: Choose what to release
+          command: |
+            export GH_TOKEN=$GITHUB_REPO_TOKEN
+            ./scripts/release-candidate.sh /tmp/ws/release
+      - persist_to_workspace:
+          root: /tmp/ws
+          paths:
+            - release
+
+  publish:
+    executor: base
+    environment:
+      GH_REPO: 0typos/statics
+      # Published binaries kept on the Releases page. Older releases are
+      # removed; their tags are never deleted.
+      RELEASE_KEEP: "24"
+      # Fulcio certifies CircleCI jobs as their project's pipeline definition.
+      SIGSTORE_ISSUER: https://oidc.circleci.com/org/c0406229-6c92-431c-9d62-ee307025beeb
+      SIGSTORE_IDENTITY: https://circleci.com/api/v2/projects/ff2a4ca6-e625-4190-be64-b5fcee9a68cb/pipeline-definitions/de8b6d78-390e-4809-a387-a80e241419b3
+    steps:
+      - checkout
+      - use-release-candidate
+      - install-release-tools
+      - run:
+          name: Sign and publish the release
+          command: |
+            export GH_TOKEN=$GITHUB_REPO_TOKEN
+            SIGSTORE_ID_TOKEN=$(circleci run oidc get --claims '{"aud":"sigstore"}')
+            export SIGSTORE_ID_TOKEN
+            ./scripts/publish-release.sh /tmp/ws
+
+  toolchain-image:
+    # Builds the Dockerfile's toolchain stage from scratch and publishes it,
+    # tagged with a digest of its inputs; an existing tag means nothing
+    # changed. Builds never FROM this image, so a stale or missing one only
+    # costs time.
+    executor:
+      name: builder
+      size: medium
+    environment:
+      IMAGE: ghcr.io/0typos/statics-toolchain
+    steps:
+      - checkout
+      - run:
+          name: Look for an image built from these inputs
+          command: |
+            set -euo pipefail
+            digest=$(cat docker/Dockerfile sources.lock scripts/fetch.sh scripts/docker-build.sh |
+              sha256sum | cut -c1-32)
+            echo "export INPUTS_TAG=inputs-$digest" >>"$BASH_ENV"
+            if docker manifest inspect "$IMAGE:inputs-$digest" >/dev/null 2>&1; then
+              echo "$IMAGE:inputs-$digest exists; nothing to publish"
+              circleci-agent step halt
+            fi
+      - setup-buildx
+      - run:
+          name: Build the toolchain from scratch and publish it
+          # Inline cache metadata lets consumers import these layers with
+          # --cache-from type=registry. --no-cache makes this the job that
+          # proves the toolchain still builds from its pinned inputs.
+          command: |
+            set -euo pipefail
+            printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username 0typos --password-stdin
+            TOOLCHAIN_IMAGE='' ./scripts/docker-build.sh toolchain \
+              --no-cache \
+              --cache-to type=inline \
+              --label "org.opencontainers.image.source=https://github.com/0typos/statics" \
+              --label "org.opencontainers.image.revision=$CIRCLE_SHA1" \
+              --tag "$IMAGE:main" \
+              --tag "$IMAGE:$CIRCLE_SHA1" \
+              --tag "$IMAGE:$INPUTS_TAG" \
+              --push
+
+  update-sources:
+    executor: python
+    environment:
+      GH_REPO: 0typos/statics
+      UPDATE_BRANCH: automation/update-sources
+    steps:
+      - checkout
+      - install-release-tools
+      - run:
+          name: Propose refreshed upstream pins
+          command: |
+            export GH_TOKEN=$GITHUB_REPO_TOKEN
+            ./scripts/update-sources-pr.sh
 
 workflows:
   build:
-    # The reproducibility run brings its own x86-64 build; running both would
-    # build the same uncached commit twice.
+    # The monthly candidate branch is built by the release pipeline that
+    # wrote it.
     when:
-      not: << pipeline.parameters.reproducibility >>
+      and:
+        - equal: [ci, << pipeline.parameters.task >>]
+        - not: << pipeline.git.tag >>
+        - not:
+            equal: [automation/monthly-release, << pipeline.git.branch >>]
     jobs:
       - validate
       - build:
@@ -470,10 +727,84 @@ workflows:
             - validate
             - build
             - sources
-  # Opt-in: circleci pipeline run ... --param reproducibility=true. Its x86-64
-  # build is a cache hit on branches; on main both builds are fresh.
+
+  toolchain-image:
+    when:
+      and:
+        - equal: [ci, << pipeline.parameters.task >>]
+        - equal: [main, << pipeline.git.branch >>]
+    jobs:
+      - toolchain-image:
+          context: statics-publish
+
+  # Pushing a v* tag, or the monthly schedule (task=monthly-release). The
+  # publish job runs only when every gate passed.
+  release:
+    when:
+      or:
+        - matches:
+            pattern: "^v.+$"
+            value: << pipeline.git.tag >>
+        - equal: [monthly-release, << pipeline.parameters.task >>]
+    jobs:
+      - release-candidate:
+          context: statics-publish
+          filters: &release-filters
+            tags:
+              only: /^v.+/
+      - validate:
+          release: true
+          filters: *release-filters
+          requires: [release-candidate]
+      - build:
+          name: release-<< matrix.arch >>
+          release: true
+          filters: *release-filters
+          requires: [release-candidate]
+          matrix:
+            parameters:
+              arch:
+                - x86_64
+                - i686
+                - aarch64
+                - armv6-hardfloat
+                - armv7-hardfloat
+                - armv7-softfloat
+                - mips
+                - mipsel
+                - powerpc
+                - powerpc64
+                - powerpc64le
+                - riscv64
+                - s390x
+      - reproducibility-build:
+          release: true
+          filters: *release-filters
+          requires: [release-candidate]
+      - reproducibility:
+          release: true
+          filters: *release-filters
+          requires:
+            - release-x86_64
+            - reproducibility-build
+      - sources:
+          release: true
+          filters: *release-filters
+          requires: [release-candidate]
+      - publish:
+          context: statics-publish
+          filters: *release-filters
+          requires:
+            - validate
+            - build
+            - reproducibility
+            - sources
+
+  # Weekly schedule (task=reproducibility), or by hand: rebuild x86-64
+  # without cache and compare it with the matrix's archive.
   reproducibility:
-    when: << pipeline.parameters.reproducibility >>
+    when:
+      equal: [reproducibility, << pipeline.parameters.task >>]
     jobs:
       - build:
           name: build-x86_64
@@ -483,3 +814,11 @@ workflows:
           requires:
             - build-x86_64
             - reproducibility-build
+
+  # Weekly schedule (task=update-sources).
+  update-sources:
+    when:
+      equal: [update-sources, << pipeline.parameters.task >>]
+    jobs:
+      - update-sources:
+          context: statics-publish

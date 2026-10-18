@@ -23,10 +23,11 @@ version stays buildable but is no longer distributed.
 ## Build inputs
 
 All upstream archives and both supported host toolchains are pinned by
-SHA-256 in `sources.lock`. The Docker base/frontend images and every external
-GitHub Action are also pinned to immutable digests or full commit SHAs.
+SHA-256 in `sources.lock`. The Docker base/frontend images, the CircleCI job
+images, and the release tools (`gh`, `cosign`) are also pinned to immutable
+digests or release checksums.
 A build stops before extraction when a source digest does not match.
-Dependabot maintains Docker and GitHub Actions pins.
+Dependabot maintains the Docker pins.
 
 The builder's Debian packages are installed from the snapshot.debian.org date
 that the pinned base image records, so the base digest fixes them too. They
@@ -57,7 +58,7 @@ repins to the latest upstream releases, builds them, and publishes the result
 without a maintainer reading upstream release notes or verifying upstream
 signatures first. Every mechanical gate still applies — digest pinning, static
 linking, QEMU verification, reproducibility against a rebuild without cache,
-SBOM, and attestations —
+SBOM, and Sigstore signatures —
 so an automated release is as reproducible and as attributable as a manual
 one. What it lacks is human judgement about the upstream code it pins. Those
 releases are built from a commit on `automation/monthly-release`, never from
@@ -87,13 +88,22 @@ Each build:
 Every release also rebuilds x86-64 without any cache, toolchain included, and
 requires the result to be byte-identical to the archive it ships. The weekly
 scheduled build runs the same comparison on the published toolchain stage
-(below); pull requests and pushes skip it for speed. Tagged public releases receive GitHub/Sigstore
-attestations linking each binary archive and SBOM to its workflow, repository,
-and commit. Attestations establish provenance; they are not a claim that the
-contents are vulnerability-free.
+(below); pull requests and pushes skip it for speed. Every release archive
+carries Sigstore bundles, signed keylessly by the CircleCI release job through
+its OIDC identity and logged in the public Rekor transparency log: SLSA
+provenance tying the archive to its repository, tag, and commit, and, for
+binary archives, the SBOM. They establish provenance; they are not a claim
+that the contents are vulnerability-free.
 
-Consumers should verify the portable SHA-256 files and, for public releases,
-the GitHub/Sigstore attestation before deployment. Exact commands are in the
+Publishing credentials live in the only CircleCI context in the
+organization, which only pipelines on `main` or a `v*` tag can use and SSH
+reruns never get. A `v*` tag can be created only by a repository admin, so a
+branch or pull request pipeline can neither publish nor sign as the release
+job. Adding an unrestricted context to the organization would hand that
+signing identity to every branch.
+
+Consumers should verify the portable SHA-256 files and the Sigstore bundles
+before deployment. Exact commands are in the
 [release guide](docs/RELEASING.md).
 
 QEMU tests instruction set and ABI compatibility. It does not validate
@@ -106,7 +116,7 @@ These utilities can listen on sockets, change network configuration, capture
 or generate traffic, enter or create namespaces, alter a child process's
 privilege state, start an SSH server, and execute subprocesses. Use them only
 on systems and networks where you are authorized to do so. Treat downloaded
-workflow artifacts as release candidates until their provenance and digests
+CI artifacts as release candidates until their provenance and digests
 have been reviewed for the intended environment.
 
 Do not configure automated merging for source update PRs without adding an
@@ -121,8 +131,8 @@ The project aims to guarantee that:
 - required executables, runtime data, notices, and metadata are present;
 - payload digests and the SPDX document are internally consistent;
 - representative commands start under the target QEMU ABI;
-- release artifacts can be tied to a public workflow and commit when
-  attestations are enabled.
+- release artifacts can be tied to the CircleCI release job and commit
+  through their Sigstore bundles.
 
 It does not guarantee that an upstream utility is vulnerability-free, that a
 target kernel is secure or compatible, that QEMU covers privileged behavior,

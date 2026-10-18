@@ -54,38 +54,35 @@ comm -3 \
 # architectures.tsv. A block is an `arch:` key followed by `- name` items.
 tsv_arches=$(awk -F '|' '$0 !~ /^#/ && NF { print $1 }' \
     "$repo_root/architectures.tsv" | sort)
-for ci_file in "$repo_root/.github/workflows/build.yml" \
-    "$repo_root/.circleci/config.yml"; do
-    [[ -f $ci_file ]] || continue
-    if grep -En '^[[:space:]]*arch:[[:space:]]*\[' "$ci_file"; then
-        echo "${ci_file#"$repo_root"/}: write architecture matrices as block lists" >&2
-        exit 1
-    fi
-    blocks=$(awk '
-        /^[[:space:]]*arch:[[:space:]]*$/ { block++; collecting=1; indent=-1; next }
-        collecting && /^[[:space:]]*-[[:space:]]+[^[:space:]]+[[:space:]]*$/ {
-            match($0, /^[[:space:]]*/)
-            if (indent < 0) indent = RLENGTH
-            if (RLENGTH == indent) {
-                sub(/^[[:space:]]*-[[:space:]]+/, ""); sub(/[[:space:]]+$/, "")
-                print block "|" $0; next
-            }
+ci_file="$repo_root/.circleci/config.yml"
+if grep -En '^[[:space:]]*arch:[[:space:]]*\[' "$ci_file"; then
+    echo "${ci_file#"$repo_root"/}: write architecture matrices as block lists" >&2
+    exit 1
+fi
+blocks=$(awk '
+    /^[[:space:]]*arch:[[:space:]]*$/ { block++; collecting=1; indent=-1; next }
+    collecting && /^[[:space:]]*-[[:space:]]+[^[:space:]]+[[:space:]]*$/ {
+        match($0, /^[[:space:]]*/)
+        if (indent < 0) indent = RLENGTH
+        if (RLENGTH == indent) {
+            sub(/^[[:space:]]*-[[:space:]]+/, ""); sub(/[[:space:]]+$/, "")
+            print block "|" $0; next
         }
-        { collecting=0 }
-    ' "$ci_file")
-    [[ -n $blocks ]] || {
-        echo "${ci_file#"$repo_root"/}: no architecture matrix found" >&2
+    }
+    { collecting=0 }
+' "$ci_file")
+[[ -n $blocks ]] || {
+    echo "${ci_file#"$repo_root"/}: no architecture matrix found" >&2
+    exit 1
+}
+while read -r block; do
+    listed=$(awk -F '|' -v b="$block" '$1 == b { print $2 }' <<<"$blocks" | sort)
+    [[ $listed == "$tsv_arches" ]] || {
+        echo "${ci_file#"$repo_root"/}: architecture matrix $block disagrees with architectures.tsv:" >&2
+        comm -3 <(printf '%s\n' "$tsv_arches") <(printf '%s\n' "$listed") >&2
         exit 1
     }
-    while read -r block; do
-        listed=$(awk -F '|' -v b="$block" '$1 == b { print $2 }' <<<"$blocks" | sort)
-        [[ $listed == "$tsv_arches" ]] || {
-            echo "${ci_file#"$repo_root"/}: architecture matrix $block disagrees with architectures.tsv:" >&2
-            comm -3 <(printf '%s\n' "$tsv_arches") <(printf '%s\n' "$listed") >&2
-            exit 1
-        }
-    done < <(cut -d '|' -f 1 <<<"$blocks" | sort -u)
-done
+done < <(cut -d '|' -f 1 <<<"$blocks" | sort -u)
 
 bash -n \
     "$repo_root"/scripts/*.sh \
@@ -96,16 +93,9 @@ python3 -m py_compile "$repo_root/scripts/update_sources.py"
 python3 -m py_compile "$repo_root/scripts/generate-sbom.py"
 python3 "$repo_root/scripts/check-docs.py"
 
-if grep -REn \
-    '^[[:space:]]*uses:[[:space:]]+[^[:space:]#]+@(v?[0-9]+|main|master)([[:space:]#]|$)' \
-    "$repo_root/.github/workflows"; then
-    echo "GitHub Actions must be pinned to full commit SHAs" >&2
-    exit 1
-fi
-
 # Every CircleCI image needs a digest, except machine images such as
 # ubuntu-2404:current, which cannot be pinned that way.
-if [[ -d $repo_root/.circleci ]] && grep -REn '^[[:space:]-]*image:' "$repo_root/.circleci" |
+if grep -REn '^[[:space:]-]*image:' "$repo_root/.circleci" |
     grep -Ev 'image:[[:space:]]+ubuntu-[0-9]{4}:|@sha256:[0-9a-f]{64}'; then
     echo "CircleCI images must be pinned by SHA-256 digest" >&2
     exit 1

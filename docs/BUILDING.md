@@ -154,7 +154,7 @@ terms are indexed by `COMPONENTS.tsv` and packaged under `licenses/`.
 Archives are normalized for stable ordering, ownership, and timestamps.
 Reproducibility still depends on identical repository inputs, source
 archives, builder images, and toolchain. CI checks this on releases, on the
-weekly scheduled build, and on manual dispatch by comparing the x86-64
+weekly scheduled build, and on a manual `task=reproducibility` run, by comparing the x86-64
 archive it ships, which may come from cached layers, with an independent
 rebuild without cache at twice the `make -j`; a release rebuilds the
 toolchain as well. Pull requests and pushes skip the rebuild for speed, so a
