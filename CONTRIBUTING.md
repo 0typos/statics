@@ -54,9 +54,8 @@ workflow artifacts.
 | `scripts/verify.sh` | Artifact contract, static checks, checksums, and QEMU smoke tests |
 | `scripts/check-docs.py` | Markdown structure and repository-local link checks |
 | `configs/` and `patches/` | Reviewed build configuration and minimal compatibility patches |
-| `.github/workflows/` | Validation, matrix build, release, source-update, and toolchain-image automation |
 | `scripts/docker-build.sh` | Runs one Dockerfile target with the published toolchain image as a layer cache |
-| `.circleci/config.yml` | Push and pull request CI: validation, matrix, sources, and the required `ci-ok` status |
+| `.circleci/config.yml` | All CI and releases: validation, matrix, sources, the required `ci-ok` status, signing, publishing, schedules, and the toolchain image |
 | `docs/` | User, maintainer, architecture, release, and roadmap documentation |
 
 The TSV files are deliberately simple source-of-truth manifests. Keep prose
@@ -109,8 +108,8 @@ Add one record to `architectures.tsv` only after confirming:
 - the new target's limitations are documented in
   `docs/ARCHITECTURES.md`.
 
-Update the explicit matrices in `.github/workflows/build.yml` and
-`.circleci/config.yml`; `scripts/validate.sh` fails until every one matches
+Update the explicit matrices in `.circleci/config.yml`; `scripts/validate.sh`
+fails until every one matches
 `architectures.tsv`. A local build
 being successful is not sufficient: test startup, licenses, runtime data,
 checksums, and the complete executable contract.

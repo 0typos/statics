@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/0typos/statics/actions/workflows/build.yml"><img src="https://github.com/0typos/statics/actions/workflows/build.yml/badge.svg" alt="Build"></a>
+  <a href="https://dl.circleci.com/status-badge/redirect/circleci/QjvUdBnY5ZYD2gKsJ1S1Dk/YWWugTCF7NYCmYb7LyS4aW/tree/main"><img src="https://dl.circleci.com/status-badge/img/circleci/QjvUdBnY5ZYD2gKsJ1S1Dk/YWWugTCF7NYCmYb7LyS4aW/tree/main.svg?style=svg" alt="Build"></a>
   <a href="https://github.com/0typos/statics/releases"><img src="https://img.shields.io/github/v/release/0typos/statics?include_prereleases&amp;sort=semver&amp;style=flat-square&amp;color=00CFE8" alt="Latest release"></a>
   <img src="https://img.shields.io/badge/Linux_targets-13-FFB000?style=flat-square" alt="13 Linux targets">
   <img src="https://img.shields.io/badge/libc-static_musl-FF1688?style=flat-square" alt="Statically linked with musl">
@@ -31,7 +31,7 @@
 `statics` builds a portable Linux troubleshooting kit for machines where the package
 manager, network or base userspace cannot help. The repository contains the recipes,
 source pins, CI, verification and release machinery—not generated binaries. Build
-outputs stay in local files, GitHub Actions artifacts or release assets.
+outputs stay in local files, CI artifacts or release assets.
 
 Every target is compiled against musl with a pinned
 [Zig](https://ziglang.org/) toolchain. Docker keeps the build environment clean; QEMU
@@ -187,12 +187,12 @@ than republishing the same bits.
 
 Each candidate is validated, cross-built, verified as statically linked and smoke-run
 under QEMU. CI also rebuilds x86-64 twice and compares the complete output, publishes
-checksums, SBOMs, notices and matching sources, and attaches GitHub/Sigstore provenance
-and SBOM attestations. A weekly build catches toolchain regressions; a separate updater
+checksums, SBOMs, notices and matching sources, and signs SLSA provenance and the SBOM
+with Sigstore. A weekly build catches toolchain regressions; a separate updater
 opens reviewed checksum-refresh PRs.
 
 Monthly repinning is intentionally unattended and never writes to `main`. The
-[release guide](docs/RELEASING.md) explains every gate, retention, retry and attestation
+[release guide](docs/RELEASING.md) explains every gate, retention, retry and signing
 rule, including how to disable the schedule.
 
 ## Documentation

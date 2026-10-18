@@ -12,7 +12,7 @@ repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 
 # Directories match by prefix, files exactly. package.sh is an input: CI
 # caches its archive, and a hit must repackage to the same bytes.
-NOT_INPUTS='^((docs|assets|\.github|\.circleci)/|(README\.md|CONTRIBUTING\.md|SECURITY\.md|flake\.(nix|lock)|Makefile|scripts/(verify|validate|compare-builds|package-sources|retry-once|retry-window|build-inputs-digest)\.sh|scripts/(check-docs|update_sources)\.py)$)'
+NOT_INPUTS='^((docs|assets|\.github|\.circleci)/|(README\.md|CONTRIBUTING\.md|SECURITY\.md|flake\.(nix|lock)|Makefile|scripts/(verify|validate|compare-builds|package-sources|retry-once|retry-window|build-inputs-digest|release-candidate|publish-release|update-sources-pr)\.sh|scripts/(check-docs|update_sources)\.py)$)'
 
 cd "$repo_root"
 # Mode and working-tree content of each tracked input, so the digest matches
