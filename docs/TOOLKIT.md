@@ -1,6 +1,6 @@
 # Toolkit guide
 
-The default bundle is a compact Linux troubleshooting kit: 51 physical
+The default bundle is a compact Linux troubleshooting kit: 53 physical
 executables, BusyBox applet links, Dropbear multi-call links, Nmap runtime
 data, license texts, checksums, and build metadata. Static linking removes the
 dependency on a target's installed libc; it does not replace kernel features,
@@ -26,7 +26,7 @@ Nmap data, notices, and licenses remain available.
 | Area | Executables and links | Primary use |
 | --- | --- | --- |
 | Rescue userspace | `busybox`; `ping`, `ping6`, `traceroute`, `traceroute6`, `nslookup`, `wget`, `telnet`, `arp`, `arping`, `route`, `ifconfig`, `netstat`, `nc`, `netcat` | Shell recovery, basic reachability, and legacy network inspection |
-| Relays and remote access | `socat`, `ncat`, `dropbearmulti`; `dropbear`, `dbclient`, `dropbearkey`, `dropbearconvert`, `scp` | TCP/UDP/TLS relays, port checks, emergency SSH, and file copy |
+| Relays and remote access | `socat`, `ncat`, `pppd`, `tunpipe-standalone`, `dropbearmulti`; `dropbear`, `dbclient`, `dropbearkey`, `dropbearconvert`, `scp`, `tunpipe` | TCP/UDP/TLS relays, port checks, emergency SSH, file copy, and IP tunnels over SSH |
 | Network control | `ip`, `ss`, `bridge`, `tc`, `wg`, `ethtool`, `nft` | Addresses, routes, sockets, links, traffic control, WireGuard, firewall policy, and NIC state |
 | Discovery and packet diagnosis | `nmap`, `tcpdump`, `mtr`, `mtr-packet`, `iperf3` | Host/service discovery, capture, path analysis, and throughput |
 | Protocol and data checks | `curl`, `openssl`, `drill`, `jq`, `rsync` | HTTP, TLS, DNS, structured output, and efficient file transfer |
@@ -255,6 +255,74 @@ short lifetime appropriate to the incident.
 Dropbear remains optimized and stripped. It is non-PIE on MIPS because the
 pinned Zig MIPS runtime cannot currently link this complex program as static
 PIE; other Dropbear targets retain static PIE.
+
+### Tunnels over SSH: tunpipe and pppd
+
+`tunpipe` is this repository's own program, linked into `dropbearmulti` like
+`dbclient` ([source](../tunpipe/tunpipe.c)). The same program also ships as
+`tunpipe-standalone`, a small separate binary for targets that need only the
+tunnel; it ignores its own name, so it can be copied to a target as
+`tunpipe`. It joins two hosts with an IPv4
+point-to-point TUN interface by exchanging length-prefixed packets over a
+byte stream, usually the stdin and stdout of a `dbclient` session. It is a
+replacement for OpenSSH's `ssh -w`, which Dropbear does not implement. Nothing
+new listens: the SSH server runs `tunpipe` as the session command, and either
+end tears down its interface, routes, namespace, and NAT rules when the stream
+ends.
+
+```sh
+# Client: route 192.168.10.0/24 through the server, which masquerades it.
+tunpipe -l 10.9.0.2 -p 10.9.0.1 -r 192.168.10.0/24 -- \
+    dbclient -K 15 root@server tunpipe -l 10.9.0.1 -p 10.9.0.2 -N
+```
+
+`-n NAME` puts the client's tunnel in a new network namespace,
+`/run/netns/NAME`, with a default route through it. The SSH session itself
+stays in the host namespace, so the tunnel cannot capture its own transport.
+Programs opt in with `nsenter --net=/run/netns/NAME COMMAND`. Under a
+systemd unit with its own mount namespace (`PrivateTmp=`, `ProtectSystem=`),
+the namespace file is invisible to the host unless the unit sets
+`MountFlags=shared`. Name resolution
+inside the namespace still uses the host's `/etc/resolv.conf`; a resolver on
+`127.0.0.53` is not reachable there.
+
+`-N` adds an nftables table, `tunpipe_<interface>`, that masquerades traffic
+from the peer address and drops anything arriving on the tunnel from another
+source, and it enables `net.ipv4.ip_forward`. Only the peer's own address
+is carried; routing a client-side LAN un-NATed through the server is not
+supported. It needs
+`nft` on `PATH`, and it leaves forwarding enabled on exit because other
+tunnels may depend on it. A host firewall that drops forwarded traffic still
+needs its own rule.
+
+Both ends need `/dev/net/tun` and `CAP_NET_ADMIN`. On the server, pin the
+command and its addresses to a dedicated key in `authorized_keys`, so that the
+key can open the tunnel and nothing else:
+
+```text
+command="tunpipe -l 10.9.0.1 -p 10.9.0.2 -N",restrict ssh-ed25519 AAAA...
+```
+
+Each client needs its own address pair. `tunpipe` refuses a peer that does
+not answer with its handshake, which also catches a login shell that prints a
+banner on stdout. Each end sends a keepalive every 10 seconds and
+exits after 45 seconds without hearing from the other, so a server whose
+client vanished releases its interface; a client that reconnects sooner
+should use a fresh address pair or wait. The tunnel is IPv4 only and has no
+reconnect logic; run it from a loop or a service manager. It carries TCP inside TCP, which works well
+on clean links and poorly on lossy ones, where WireGuard is the better choice.
+
+`pppd` is built without plugins, OpenSSL, PAM, or libpcap. MS-CHAP and MPPE use
+its built-in crypto; EAP-TLS, PEAP, active filters, multilink, and CBCP are
+omitted. It can run the same kind of tunnel through PPP framing, provided both
+kernels have `CONFIG_PPP` and `CONFIG_PPP_ASYNC`:
+
+```sh
+pppd noauth pty 'dbclient root@server pppd notty noauth' 10.9.0.2:10.9.0.1
+```
+
+The `chat` modem scripting tool is not included. Per-file pppd notices are
+collected into `licenses/ppp/PPPD-NOTICES`.
 
 ### Rsync
 

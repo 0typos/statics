@@ -1,7 +1,7 @@
 # source|SPDX license expression|role and outputs
 busybox|GPL-2.0-only|busybox and applet links
 socat|GPL-2.0-only|socat
-dropbear|MIT AND Unlicense|dropbearmulti and applet links; bundled libtomcrypt and libtommath
+dropbear|MIT AND Unlicense|dropbearmulti and applet links, including the repository-authored tunpipe; bundled libtomcrypt and libtommath
 iproute2|GPL-2.0-only|ip, ss, bridge, and tc
 wireguard-tools|GPL-2.0-only|wg
 openssl|Apache-2.0|openssl; statically linked into curl, iperf3, drill, nmap, ncat, and socat
@@ -29,3 +29,4 @@ e2fsprogs|GPL-2.0-only AND LGPL-2.0-only AND BSD-3-Clause AND MIT|e2fsck, dumpe2
 smartmontools|GPL-2.0-or-later|smartctl with the compiled-in drive database
 libnvme|LGPL-2.1-or-later|statically linked into nvme
 nvme-cli|GPL-2.0-only AND GPL-2.0-or-later|nvme
+ppp|BSD-4-Clause AND BSD-3-Clause AND Apache-2.0 AND RSA-MD|pppd without plugins

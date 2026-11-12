@@ -32,3 +32,4 @@ e2fsprogs|1.47.4|fd5bf388cbdbe006a3d3b318d983b2948382440acc85a87f1e7d108653e8db0
 smartmontools|7.5|690b83ca331378da9ea0d9d61008c4b22dde391387b9bbad7f29387f2595f76e|https://github.com/smartmontools/smartmontools/releases/download/RELEASE_7_5/smartmontools-7.5.tar.gz
 libnvme|1.16.2|1d850d5a871559abf641d6e6b63bb86047e4cb26f3ad144597c2c64b3cff7231|https://github.com/linux-nvme/libnvme/archive/refs/tags/v1.16.2.tar.gz
 nvme-cli|2.16|989682ed7b250a2c7a8127e362ffc5d29f5c370127abe405be09c73216da2b97|https://github.com/linux-nvme/nvme-cli/archive/refs/tags/v2.16.tar.gz
+ppp|2.5.5|0ebbcfef906d16cfbb9cbdd19c0d92aa3df2fd8fdd29731f614c58d16a279aa5|https://download.samba.org/pub/ppp/ppp-2.5.5.tar.gz

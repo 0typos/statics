@@ -98,6 +98,7 @@ sources=(
     smartmontools
     libnvme
     nvme-cli
+    ppp
 )
 
 for path in "$WORK_DIR" "$OUTPUT_DIR"; do
@@ -158,7 +159,7 @@ dag=$WORK_DIR/dag.mk
     for c in deps libnftnl nftables strace tcpdump curl iperf3 ethtool jq \
         ldns mtr can-utils i2c-tools spi-tools nmap rsync lsof util-linux \
         busybox socat dropbear iproute2 wireguard-tools \
-        e2fsprogs smartmontools libnvme nvme-cli; do
+        e2fsprogs smartmontools libnvme nvme-cli ppp tunpipe; do
         printf ' $(S)/%s' "$c"
     done
     printf '\n\n'
@@ -199,6 +200,8 @@ dag=$WORK_DIR/dag.mk
     emit smartmontools smartmontools build_smartmontools
     emit libnvme nvme build_libnvme deps
     emit nvme-cli nvme build_nvme_cli libnvme
+    emit ppp ppp build_ppp
+    emit tunpipe tunpipe build_tunpipe
 } > "$dag"
 
 if ! make -f "$dag" -j"$JOBS" --output-sync=target all; then

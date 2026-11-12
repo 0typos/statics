@@ -17,6 +17,7 @@ the [contribution checklist](../CONTRIBUTING.md).
 | Packet, path, and throughput | `tcpdump`, `mtr`, `iperf3` |
 | Application protocols and data | `curl`, `openssl`, `drill`, `jq` |
 | Discovery and transfer | `nmap`, `ncat`, `rsync` |
+| Tunnels | `tunpipe`, `pppd` |
 | Process diagnosis | `strace`, `lsof` |
 | Filesystems and storage | `e2fsck`, `dumpe2fs`, `tune2fs`, `mke2fs`, `smartctl`, `nvme` |
 | Namespaces and privilege | `nsenter`, `unshare`, `lsns`, `setpriv`, `findmnt` |

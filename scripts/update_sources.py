@@ -360,6 +360,14 @@ def latest_util_linux() -> tuple[str, str]:
     )
 
 
+def latest_ppp() -> tuple[str, str]:
+    return latest_from_index(
+        "https://download.samba.org/pub/ppp/",
+        r'ppp-(\d+\.\d+\.\d+)\.tar\.gz"',
+        "https://download.samba.org/pub/ppp/ppp-{version}.tar.gz",
+    )
+
+
 def latest_zig(host: str) -> tuple[str, str]:
     index = json.loads(text("https://ziglang.org/download/index.json"))
     stable = [key for key in index if re.fullmatch(r"\d+\.\d+\.\d+", key)]
@@ -392,6 +400,7 @@ DISCOVERERS: dict[str, Callable[[], tuple[str, str]]] = {
     "rsync": latest_rsync,
     "lsof": latest_lsof,
     "util-linux": latest_util_linux,
+    "ppp": latest_ppp,
     "zig-x86_64": lambda: latest_zig("x86_64-linux"),
     "zig-aarch64": lambda: latest_zig("aarch64-linux"),
 }

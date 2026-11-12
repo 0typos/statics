@@ -32,6 +32,10 @@ make build ARCH=x86_64
 make smoke ARCH=x86_64
 ```
 
+Changes to `tunpipe/` also need `./scripts/test-tunpipe.sh dist/x86_64` on a
+host with unprivileged user namespaces. Containers usually lack them, so CI
+only smoke-tests `tunpipe -h`.
+
 ShellCheck is also run in CI. A full local matrix is welcome but not required
 for every documentation-only change. Architecture-sensitive build changes
 should cover representative 64-bit, 32-bit, and opposite-endian targets
