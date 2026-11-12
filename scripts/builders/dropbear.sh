@@ -4,6 +4,10 @@ build_dropbear() {
     echo "==> building Dropbear"
     (
         cd "$WORK_DIR/dropbear" || exit
+        # tunpipe is repository-authored; the patch only adds it to
+        # dropbearmulti's program table.
+        cp "$REPO_ROOT/tunpipe/tunpipe.c" src/tunpipe.c
+        patch -s -p1 < "$REPO_ROOT/patches/dropbear-tunpipe.patch"
         # Zig's MIPS libc linker cannot optimize Autoconf's deliberately
         # prototype-less crypt/getpass probes. These functions are part of
         # the pinned musl sysroot, so provide the usual cross-build cache.
@@ -24,13 +28,13 @@ build_dropbear() {
                 Makefile
         fi
         run_make \
-            PROGRAMS='dropbear dbclient dropbearkey dropbearconvert scp' \
+            PROGRAMS='dropbear dbclient dropbearkey dropbearconvert scp tunpipe' \
             MULTI=1 STATIC=1
         install_binary dropbearmulti dropbearmulti
     )
 
     local program
-    for program in dropbear dbclient dropbearkey dropbearconvert scp; do
+    for program in dropbear dbclient dropbearkey dropbearconvert scp tunpipe; do
         make_link dropbearmulti "$program"
     done
 }

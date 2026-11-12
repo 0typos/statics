@@ -99,6 +99,7 @@ ARG COMPONENT_TIMEOUT
 COPY LICENSE architectures.tsv components.tsv ./
 COPY configs/ configs/
 COPY patches/ patches/
+COPY tunpipe/ tunpipe/
 COPY scripts/build.sh scripts/run-builder.sh scripts/merge-kconfig.sh \
      scripts/collect-licenses.sh scripts/generate-sbom.py scripts/
 COPY scripts/lib/ scripts/lib/

@@ -1,0 +1,50 @@
+Add statics' tunpipe (tunpipe/tunpipe.c, copied into src/ by the builder) to
+dropbearmulti as one more program, so `tunpipe` is a link like `dbclient`.
+Build glue only: no Dropbear code changes. Cross-compilation safe: it adds an
+object and a dispatch entry, and runs nothing at build time.
+
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -97,6 +97,8 @@
+ 	scpobjs=$(SCPOBJS)
+ endif
+ 
++tunpipeobjs=$(OBJ_DIR)/tunpipe.o
++
+ ifeq (@DROPBEAR_PLUGIN@, 1)
+ 	# rdynamic makes all the global symbols of dropbear available to all the loaded shared libraries
+ 	# this allow a plugin to reuse existing crypto/utilities like base64_decode/base64_encode without
+--- a/src/dbmulti.c
++++ b/src/dbmulti.c
+@@ -56,6 +56,11 @@
+ 			return scp_main(argc, argv);
+ 		}
+ #endif
++#ifdef DBMULTI_tunpipe
++		if (strcmp(progname, "tunpipe") == 0) {
++			return tunpipe_main(argc, argv);
++		}
++#endif
+ 	*match = DROPBEAR_FAILURE;
+ 	return 1;
+ }
+@@ -97,6 +102,9 @@
+ #ifdef DBMULTI_scp
+ 			"'scp' - secure copy\n"
+ #endif
++#ifdef DBMULTI_tunpipe
++			"'tunpipe' - IPv4 tunnel over a stream such as dbclient\n"
++#endif
+ 			,
+ 			DROPBEAR_VERSION);
+ 	exit(1);
+--- a/src/dbutil.h
++++ b/src/dbutil.h
+@@ -115,6 +115,7 @@
+ int dropbearkey_main(int argc, char ** argv);
+ int dropbearconvert_main(int argc, char ** argv);
+ int scp_main(int argc, char ** argv);
++int tunpipe_main(int argc, char ** argv);
+ 
+ #define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
+ 

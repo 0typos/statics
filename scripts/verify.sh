@@ -29,7 +29,7 @@ required_binaries=(
     spi-config spi-pipe
     nmap ncat rsync lsof
     nsenter unshare lsns setpriv findmnt
-    e2fsck dumpe2fs tune2fs mke2fs smartctl nvme
+    e2fsck dumpe2fs tune2fs mke2fs smartctl nvme pppd tunpipe-standalone
 )
 
 for metadata in BUILDINFO BUILD_RECIPES_LICENSE COMPONENTS.tsv SBOM.spdx.json \
@@ -141,7 +141,7 @@ done < <(
     find . -maxdepth 1 -type f -perm /111 -printf '%P\n' | LC_ALL=C sort
 )
 
-for link in nc netcat dropbear dbclient dropbearkey dropbearconvert scp \
+for link in nc netcat dropbear dbclient dropbearkey dropbearconvert scp tunpipe \
     fsck.ext2 fsck.ext3 fsck.ext4 mkfs.ext4; do
     [[ -L $output_dir/$link ]] || {
         echo "missing applet link: $output_dir/$link" >&2
@@ -185,6 +185,8 @@ if [[ ${SKIP_QEMU:-0} != 1 ]]; then
     "${runner[@]}" "$output_dir/busybox" netcat --help >/dev/null 2>&1
     check_output WITH_OPENSSL "$output_dir/socat" -V
     check_output Dropbear "$output_dir/dropbearmulti" dropbear -V
+    check_output "usage: tunpipe" "$output_dir/dropbearmulti" tunpipe -h
+    check_output "usage: tunpipe" "$output_dir/tunpipe-standalone" -h
     check_output iproute2 "$output_dir/ip" -Version
     check_output iproute2 "$output_dir/ss" -V
     check_output "bridge utility" "$output_dir/bridge" -V
@@ -217,6 +219,13 @@ if [[ ${SKIP_QEMU:-0} != 1 ]]; then
     check_output mke2fs "$output_dir/mke2fs" -V
     check_output smartctl "$output_dir/smartctl" --version
     check_output "nvme version" "$output_dir/nvme" version
+    # pppd reads /etc/ppp/options before any argument and, unless root,
+    # stops when it is missing. Either message proves it started.
+    pppd_output=$("${runner[@]}" "$output_dir/pppd" --version 2>&1) || true
+    [[ $pppd_output == *"pppd version"* || $pppd_output == *"/etc/ppp/options"* ]] || {
+        echo "unexpected output from pppd --version: $pppd_output" >&2
+        exit 1
+    }
     check_output util-linux "$output_dir/nsenter" --version
     check_output util-linux "$output_dir/unshare" --version
     check_output util-linux "$output_dir/lsns" --version

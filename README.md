@@ -41,7 +41,7 @@ user-mode emulation proves that non-native outputs can actually start.
 
 | 🧰 Carry it | 🐧 Run it | 🔐 Trust it |
 |---|---|---|
-| 51 physical executables, plus BusyBox and Dropbear links | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
+| 53 physical executables, plus BusyBox and Dropbear links | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
 | Network, process, namespace, storage and hardware diagnosis | Static musl builds avoid a dependency on the target's libc | Deterministic archives, QEMU smoke tests and release attestations |
 
 ## Get a kit
@@ -111,13 +111,13 @@ data and safe starting commands.
 
 ## Inside the case
 
-The bundle contains 51 physical executables plus BusyBox and Dropbear multi-call links,
+The bundle contains 53 physical executables plus BusyBox and Dropbear multi-call links,
 Nmap runtime data, checksums, an SPDX SBOM and upstream license texts.
 
 | Area | Outputs | What they are for |
 |---|---|---|
 | Rescue userspace | `busybox`, `nc`, `netcat` | Shell recovery, basic reachability and familiar applet links |
-| Remote access and transfer | `socat`, `ncat`, `rsync`, `dropbear`, `dbclient`, `dropbearkey`, `dropbearconvert`, `scp` | Relays, emergency SSH and file movement |
+| Remote access and transfer | `socat`, `ncat`, `rsync`, `dropbear`, `dbclient`, `dropbearkey`, `dropbearconvert`, `scp`, `tunpipe`, `tunpipe-standalone`, `pppd` | Relays, emergency SSH, IP tunnels over SSH and file movement |
 | Network state and control | `ip`, `ss`, `bridge`, `tc`, `wg`, `ethtool`, `nft` | Interfaces, routes, sockets, policy and NIC state |
 | Discovery and packet diagnosis | `nmap`, `tcpdump`, `iperf3`, `mtr`, `mtr-packet` | Services, captures, paths and throughput |
 | HTTP, TLS, DNS and data | `curl`, `openssl`, `drill`, `jq` | Protocol checks and structured output |

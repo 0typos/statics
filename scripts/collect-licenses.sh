@@ -77,6 +77,9 @@ copy_license e2fsprogs NOTICE
 copy_license smartmontools COPYING
 copy_license libnvme COPYING
 copy_license nvme-cli LICENSE
+copy_license ppp COPYING
+copy_license ppp LICENSE.BSD
+copy_license ppp PPPD-NOTICES
 
 cp "$repo_root/components.tsv" "$output_dir/COMPONENTS.tsv"
 
