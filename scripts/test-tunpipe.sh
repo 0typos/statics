@@ -49,7 +49,7 @@ wait_until() { # tries, command...
 server='ip link set lo up && ip addr add 10.99.0.1/32 dev lo && exec tunpipe -l 10.9.0.1 -p 10.9.0.2 "$@"'
 
 server_pid() { # the server is the client tunpipe's only child
-    cat "/proc/$1/task/$1/children" | tr -d ' '
+    tr -d ' ' <"/proc/$1/task/$1/children"
 }
 
 exits_within() { # seconds, pid, status: the pid must exit with status in time
