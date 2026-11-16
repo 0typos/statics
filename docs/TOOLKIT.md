@@ -1,6 +1,6 @@
 # Toolkit guide
 
-The default bundle is a compact Linux troubleshooting kit: 53 physical
+The default bundle is a compact Linux troubleshooting kit: 79 physical
 executables, BusyBox applet links, Dropbear multi-call links, Nmap runtime
 data, license texts, checksums, and build metadata. Static linking removes the
 dependency on a target's installed libc; it does not replace kernel features,
@@ -26,12 +26,16 @@ Nmap data, notices, and licenses remain available.
 | Area | Executables and links | Primary use |
 | --- | --- | --- |
 | Rescue userspace | `busybox`; `ping`, `ping6`, `traceroute`, `traceroute6`, `nslookup`, `wget`, `telnet`, `arp`, `arping`, `route`, `ifconfig`, `netstat`, `nc`, `netcat` | Shell recovery, basic reachability, and legacy network inspection |
-| Relays and remote access | `socat`, `ncat`, `pppd`, `tunpipe-standalone`, `dropbearmulti`; `dropbear`, `dbclient`, `dropbearkey`, `dropbearconvert`, `scp`, `tunpipe` | TCP/UDP/TLS relays, port checks, emergency SSH, file copy, and IP tunnels over SSH |
-| Network control | `ip`, `ss`, `bridge`, `tc`, `wg`, `ethtool`, `nft` | Addresses, routes, sockets, links, traffic control, WireGuard, firewall policy, and NIC state |
+| Relays and remote access | `socat`, `ncat`, `pppd`, `tunpipe-standalone`, `sftp-server`, `dropbearmulti`; `dropbear`, `dbclient`, `dropbearkey`, `dropbearconvert`, `scp`, `tunpipe` | TCP/UDP/TLS relays, port checks, emergency SSH, SFTP and SCP file copy, and IP tunnels over SSH |
+| Network control | `ip`, `ss`, `bridge`, `tc`, `wg`, `ethtool`, `nft`, `conntrack`, `iw` | Addresses, routes, sockets, links, traffic control, WireGuard, firewall policy, connection tracking, Wi-Fi, and NIC state |
 | Discovery and packet diagnosis | `nmap`, `tcpdump`, `mtr`, `mtr-packet`, `iperf3` | Host/service discovery, capture, path analysis, and throughput |
 | Protocol and data checks | `curl`, `openssl`, `drill`, `jq`, `rsync` | HTTP, TLS, DNS, structured output, and efficient file transfer |
-| Process diagnosis | `strace`, `lsof` | System-call tracing and process/file/socket correlation |
-| Filesystems and storage | `e2fsck`, `dumpe2fs`, `tune2fs`, `mke2fs`; `fsck.ext2`, `fsck.ext3`, `fsck.ext4`, `mkfs.ext4`; `smartctl`, `nvme` | ext filesystem inspection and repair, drive health, and NVMe diagnosis |
+| Serial console and transfer | `picocom`, `sz`, `rz` | Serial terminal sessions and XMODEM/YMODEM/ZMODEM file transfer |
+| Process diagnosis | `strace`, `lsof`, `gdbserver` | System-call tracing, process/file/socket correlation, and remote debugging with a host GDB |
+| Filesystems and storage | `lsblk`, `blkid`, `sfdisk`, `losetup`, `mount`, `umount`, `e2fsck`, `dumpe2fs`, `tune2fs`, `mke2fs`; `fsck.ext2`, `fsck.ext3`, `fsck.ext4`, `mkfs.ext4`; `smartctl`, `nvme` | Block-device and partition inventory, loop devices, mounts, ext filesystem inspection and repair, drive health, and NVMe diagnosis |
+| Kernel log | `dmesg` | Kernel ring buffer with levels, facilities, and readable timestamps |
+| Raw flash and UBI | `flash_erase`, `flashcp`, `nanddump`, `nandwrite`, `mtdinfo`, `ubiattach`, `ubidetach`, `ubinfo`, `ubimkvol`, `ubirmvol`, `ubiupdatevol` | MTD NOR/NAND inspection, backup, and reflashing; UBI attach and volume management |
+| Out-of-band management | `ipmitool` | BMC sensors, event log, power control, and serial-over-LAN through the local IPMI driver or the network |
 | Namespaces and privilege | `nsenter`, `unshare`, `lsns`, `setpriv`, `findmnt` | Enter, create, enumerate, constrain, and inspect namespace state |
 | CAN and ISO-TP | `candump`, `cansend`, `cangen`, `canplayer`, `cansniffer`, `isotpdump`, `isotprecv`, `isotpsend`, `slcand`, `canbusload` | SocketCAN and ISO-TP field diagnosis |
 | Hardware buses | `i2cdetect`, `i2cdump`, `i2cget`, `i2cset`, `i2ctransfer`, `spi-config`, `spi-pipe` | Linux I²C and spidev diagnosis |
@@ -248,7 +252,28 @@ socat OPENSSL-LISTEN:8443,reuseaddr,fork,cert=server.pem,verify=0 \
 client-side TLS checks.
 
 Dropbear disables zlib. Its links include server, client, key, conversion, and
-SCP commands. Starting an emergency SSH server expands the target's attack
+SCP commands.
+
+`sftp-server` is OpenSSH's SFTP server, built alone (no `ssh`, `sshd`,
+OpenSSL, or zlib). The `dropbear` server runs the `sftp-server` that sits
+beside `dropbearmulti`, so `sftp` and the default mode of OpenSSH 9 and later
+`scp`, which uses SFTP, work against the bundle wherever it is unpacked.
+Keep the two files together. Without one there, Dropbear falls back to its
+compile-time `/usr/libexec/sftp-server`. Dropbear passes the path to the
+login shell unquoted, so a bundle path containing characters other than
+letters, digits, and `/._+-` also falls back. The server checks for the
+file as root, so a user who cannot reach the bundle directory (for example
+`/root/statics` with mode 0700) gets a failed SFTP session, not the
+fallback; unpack the bundle somewhere every SFTP user can read.
+Legacy `scp -O` instead runs `scp` on the server through the login shell's
+`PATH`, which normally does not include the bundle.
+
+```console
+dropbear -R -p 2222
+sftp -P 2222 root@device
+```
+
+Starting an emergency SSH server expands the target's attack
 surface; use explicit host keys, authentication policy, bind addresses, and a
 short lifetime appropriate to the incident.
 
@@ -324,6 +349,51 @@ pppd noauth pty 'dbclient root@server pppd notty noauth' 10.9.0.2:10.9.0.1
 The `chat` modem scripting tool is not included. Per-file pppd notices are
 collected into `licenses/ppp/PPPD-NOTICES`.
 
+### Serial consoles: picocom and lrzsz
+
+`picocom` is a small serial terminal. Upstream's arbitrary (non-standard)
+baud-rate support relies on glibc's termios layout and is enabled only on
+x86, so it is compiled out on every target: the standard rates up to
+4000000 are available, but a rate such as 74880 is not. Ports are locked with
+`flock(2)`; UUCP lock files are not used. Exit with `C-a C-x`.
+
+```console
+picocom -b 115200 /dev/ttyUSB0
+```
+
+`sz` and `rz` are lrzsz's `lsz` and `lrz`, built without NLS. picocom's
+default send and receive commands are `sz -vv` and `rz -vv -E`, so with the
+kit on `PATH` a file moves over the console without a network: start `rz` on
+the far end, then press `C-a C-s` in picocom and name the file. In the other
+direction, run `sz FILE` on the far end and press `C-a C-r`; `-E` renames
+rather than overwrites an existing local file. Any terminal that speaks
+ZMODEM can drive them the same way.
+
+Opening a serial device usually needs membership in its group (often
+`dialout`) or root.
+
+### Remote debugging: gdbserver
+
+`gdbserver` comes from GNU GDB; GDB itself, Python, expat, debuginfod, and
+the in-process agent (fast tracepoints) are not built. Debug from a host GDB
+that understands the target architecture, such as `gdb-multiarch`, with the
+same executable and its symbols on the host.
+
+Running it over an SSH session's stdio needs no listener on the target:
+
+```console
+gdb ./app -ex 'target remote | dbclient root@device /tmp/statics/gdbserver - /usr/bin/app'
+```
+
+`gdbserver --attach - PID` attaches to a running process instead. A TCP
+listener (`gdbserver 127.0.0.1:2345 PROGRAM`) gives anyone who can reach it
+full control of the debugged process, so keep it on loopback and forward it
+over SSH. There is no `libthread_db` in a static musl build: threads are
+listed and stepped through ptrace, but GDB cannot use `libthread_db` to
+inspect thread-local variables. Debugging needs ptrace permission over the
+process, which root normally has, subject to Yama `ptrace_scope` and
+LSM policy.
+
 ### Rsync
 
 Rsync includes IPv4/IPv6, local socket-pair support, and bundled popt and
@@ -366,13 +436,101 @@ and SPI commands require the target kernel drivers and relevant network
 interfaces or device nodes. Write-oriented bus commands can alter hardware
 state—inspect the device documentation first.
 
-### Util-linux namespace profile
+### Util-linux profile
 
-The util-linux build contains only `nsenter`, `unshare`, `lsns`, `setpriv`,
-and `findmnt`, with static libblkid, libmount, libsmartcols, and libcap-ng as
-needed. NLS, udev, SELinux, systemd, libmagic, cryptsetup, ncurses, readline,
-and Python integrations are disabled. BusyBox already supplies complementary
-applets such as `chroot`, `mount`, `umount`, and `pivot_root`.
+The util-linux build contains the namespace tools `nsenter`, `unshare`,
+`lsns`, `setpriv`, and `findmnt`, and the block-device and system tools
+`lsblk`, `blkid`, `sfdisk`, `losetup`, `mount`, `umount`, and `dmesg`, with
+static libblkid, libmount, libsmartcols, libfdisk, and libcap-ng as needed.
+NLS, udev, SELinux, systemd, libmagic, cryptsetup, ncurses, readline, and
+Python integrations are disabled. Without udev, `lsblk` reads device
+properties from sysfs and probes, so udev-only columns are empty. `mount` and
+`umount` are not setuid. The interactive `fdisk` and `cfdisk` are not built;
+`sfdisk` covers scripted partitioning and `sfdisk --dump` backs up a
+partition table:
+
+```console
+lsblk --output NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS
+blkid
+sfdisk --dump /dev/DEVICE > DEVICE.sfdisk
+dmesg --level err,warn --ctime
+```
+
+### Connection tracking: conntrack
+
+`conntrack` comes from conntrack-tools with libnetfilter_conntrack,
+libnfnetlink, and the bundle's libmnl. Only the CLI is built: no
+`conntrackd`, `nfct`, or user-space helpers. It lists, filters, watches,
+and deletes kernel connection-tracking entries, for example to find NAT state
+or flush a stuck flow. It needs `CAP_NET_ADMIN` and the `nf_conntrack`
+netlink interface (`CONFIG_NF_CT_NETLINK`).
+
+```console
+conntrack -L -p tcp --dport 443
+conntrack -E -e NEW,DESTROY
+conntrack -S
+```
+
+### Wi-Fi: iw
+
+`iw` is the nl80211 configuration tool, statically linked with libnl-3 and
+libnl-genl-3. Scans, station dumps, regulatory and interface changes go
+through the kernel's cfg80211 driver; the legacy wireless extensions
+(`iwconfig`) are not used. Reading state works unprivileged on most kernels;
+scanning and changes need `CAP_NET_ADMIN`.
+
+```console
+iw dev
+iw dev wlan0 link
+iw dev wlan0 station dump
+iw reg get
+```
+
+### Out-of-band management: ipmitool
+
+`ipmitool` comes from upstream's archived GitHub repository, whose last
+release is the one pinned. It talks to a local BMC
+through the OpenIPMI driver (`/dev/ipmi0`, from `ipmi_devintf` and
+`ipmi_si`), and to a remote one over IPMI 1.5 `lan` or IPMI 2.0 `lanplus`,
+which uses the bundle's OpenSSL. The interactive `ipmitool shell`, the
+`ipmievd` daemon, and the USB and D-Bus interfaces are not built.
+ipmitool names vendors from the IANA enterprise-number list, which is not
+packaged: some commands print `IANA PEN registry open failed` and show
+numeric manufacturer IDs instead. ipmitool reads it from
+`/usr/share/misc/enterprise-numbers` or
+`~/.local/usr/share/misc/enterprise-numbers`.
+
+```console
+ipmitool sdr elist
+ipmitool sel elist
+ipmitool -I lanplus -H 192.0.2.30 -U ADMIN -E chassis status
+```
+
+`-E` reads the password from `IPMI_PASSWORD` so it stays out of the process
+list. IPMI over the network is weakly authenticated; keep BMCs on an isolated
+management network.
+
+### Raw flash and UBI: mtd-utils
+
+The selected mtd-utils programs inspect and rewrite MTD NOR and NAND flash and
+manage UBI: `flash_erase`, `flashcp`, `nanddump`, `nandwrite`, `mtdinfo`,
+`ubiattach`, `ubidetach`, `ubinfo`, `ubimkvol`, `ubirmvol`, and
+`ubiupdatevol`. Image builders such as `mkfs.ubifs`, `ubinize`, and
+`mkfs.jffs2`, and `ubiformat`, are not included, so no compression or crypto
+library is linked. Create images on a workstation.
+
+```console
+mtdinfo --all
+nanddump --bb=dumpbad --file mtd2.img /dev/mtd2
+ubinfo --all
+```
+
+Erasing or writing flash can brick a device, and NAND bad-block handling
+differs between bootloaders and kernels. Dump every partition first and
+confirm the partition map (`/proc/mtd`). The programs need root and the
+kernel's MTD character devices (`/dev/mtdN`) or UBI devices.
+`flashcp` is BSD-licensed; its notice is collected into
+`licenses/mtd-utils/MTD-UTILS-BSD-NOTICES`.
 
 ## Privilege guide
 
@@ -384,11 +542,17 @@ Exact rules vary by kernel and security policy, but these are common:
 | ICMP/raw probes, some Nmap scan modes, packet capture | root or capabilities such as `CAP_NET_RAW` |
 | Address, route, link, WireGuard, bridge, or traffic-control changes | root or `CAP_NET_ADMIN` |
 | Inspect or change nftables rules | commonly root or `CAP_NET_ADMIN` |
-| Trace or inspect another user's process | root, ptrace permission, and compatible LSM policy |
+| Trace, inspect, or debug another user's process | root, ptrace permission, and compatible LSM policy |
+| Open a serial console | the device's group (often `dialout`) or root |
 | Enter another process's namespaces | commonly root or `CAP_SYS_ADMIN` in the owning user namespace |
 | Create user/network/mount/PID namespaces | kernel namespace support plus the applicable sysctl, LSM, seccomp, and capability policy |
 | Read I²C/SPI devices or CAN interfaces | suitable device/interface permissions and drivers |
 | Inspect, repair, format, or manage block devices | usually root, device access, and the matching kernel driver |
+| Mount, unmount, or attach loop devices | root or `CAP_SYS_ADMIN` |
+| Read the kernel log | root or `CAP_SYSLOG` when `kernel.dmesg_restrict=1` |
+| List or change connection tracking; scan or configure Wi-Fi | `CAP_NET_ADMIN` and the kernel's netlink support |
+| Read, erase, or write MTD flash or UBI volumes | root and the kernel's MTD/UBI devices |
+| Query a local BMC | root and `/dev/ipmi0` (`ipmi_devintf`) |
 | Start a listener on a privileged port | root or `CAP_NET_BIND_SERVICE` |
 
 Do not add capabilities to the whole toolkit directory. If policy permits,

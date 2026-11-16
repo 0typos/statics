@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 build_util_linux() {
-    echo "==> building util-linux namespace tools"
+    echo "==> building util-linux"
     (
         cd "$WORK_DIR/util-linux" || exit
         PKG_CONFIG_PATH="$DEPS_PREFIX/lib/pkgconfig" \
@@ -38,11 +38,18 @@ build_util_linux() {
         # library, and pkg-config paths expose only the pinned static build.
         grep -q '^#define HAVE_LIBCAP_NG 1' config.h
 
-        run_make nsenter unshare lsns setpriv findmnt
-        install_binary nsenter nsenter
-        install_binary unshare unshare
-        install_binary lsns lsns
-        install_binary setpriv setpriv
-        install_binary findmnt findmnt
+        local programs=(
+            nsenter unshare lsns setpriv findmnt
+            lsblk blkid sfdisk losetup mount umount dmesg
+        )
+        run_make "${programs[@]}"
+        local program
+        for program in "${programs[@]}"; do
+            install_binary "$program" "$program"
+        done
+        # libuuid (sfdisk) and libcommon's xxhash and crc64 (libblkid) are
+        # BSD- and MIT-licensed and carry their notices in the file.
+        sed -s -n '1,/\*\//p' libuuid/src/gen_uuid.c lib/xxhash.c lib/crc64.c \
+            > UTIL-LINUX-NOTICES
     )
 }

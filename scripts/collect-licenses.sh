@@ -73,6 +73,11 @@ copy_license util-linux README.licensing
 copy_license util-linux Documentation/licenses/COPYING.GPL-2.0-only
 copy_license util-linux Documentation/licenses/COPYING.GPL-2.0-or-later
 copy_license util-linux Documentation/licenses/COPYING.LGPL-2.1-or-later
+copy_license util-linux Documentation/licenses/COPYING.BSD-3-Clause
+copy_license util-linux Documentation/licenses/COPYING.BSD-2-Clause
+copy_license util-linux Documentation/licenses/COPYING.MIT
+copy_license util-linux libuuid/COPYING
+copy_license util-linux UTIL-LINUX-NOTICES
 copy_license e2fsprogs NOTICE
 copy_license smartmontools COPYING
 copy_license libnvme COPYING
@@ -80,6 +85,23 @@ copy_license nvme-cli LICENSE
 copy_license ppp COPYING
 copy_license ppp LICENSE.BSD
 copy_license ppp PPPD-NOTICES
+copy_license picocom LICENSE.txt
+copy_license picocom linenoise-1.0/LICENSE
+copy_license lrzsz COPYING
+copy_license gdb COPYING
+copy_license gdb COPYING3
+copy_license gdb COPYING.LIB
+copy_license gdb libiberty/COPYING.LIB
+copy_license gdb LIBIBERTY-BSD-NOTICES
+copy_license openssh LICENCE
+copy_license libnfnetlink COPYING
+copy_license libnetfilter_conntrack COPYING
+copy_license conntrack-tools COPYING
+copy_license ipmitool COPYING
+copy_license mtd-utils COPYING
+copy_license mtd-utils MTD-UTILS-BSD-NOTICES
+copy_license libnl COPYING
+copy_license iw COPYING
 
 cp "$repo_root/components.tsv" "$output_dir/COMPONENTS.tsv"
 
