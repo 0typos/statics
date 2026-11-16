@@ -2,8 +2,9 @@
 
 The current bundle covers rescue userspace, relays and remote access, network
 configuration, socket and packet inspection, HTTP/TLS/DNS checks, throughput
-and path diagnosis, firewall policy, syscall tracing, filesystem and storage
-diagnosis, JSON processing, and common IoT field buses.
+and path diagnosis, firewall policy, syscall tracing, remote debugging,
+serial consoles, filesystem and storage diagnosis, JSON processing, and
+common IoT field buses.
 
 This page records candidates, not commitments. The executable contract is in
 the [toolkit guide](TOOLKIT.md), and implementation proposals should follow
@@ -18,7 +19,8 @@ the [contribution checklist](../CONTRIBUTING.md).
 | Application protocols and data | `curl`, `openssl`, `drill`, `jq` |
 | Discovery and transfer | `nmap`, `ncat`, `rsync` |
 | Tunnels | `tunpipe`, `pppd` |
-| Process diagnosis | `strace`, `lsof` |
+| Serial console and transfer | `picocom`, `sz`, `rz` |
+| Process diagnosis | `strace`, `lsof`, `gdbserver` |
 | Filesystems and storage | `e2fsck`, `dumpe2fs`, `tune2fs`, `mke2fs`, `smartctl`, `nvme` |
 | Namespaces and privilege | `nsenter`, `unshare`, `lsns`, `setpriv`, `findmnt` |
 | Embedded buses | selected `can-utils`, `i2c-tools`, and `spi-tools` programs |

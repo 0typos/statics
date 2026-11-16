@@ -80,6 +80,14 @@ copy_license nvme-cli LICENSE
 copy_license ppp COPYING
 copy_license ppp LICENSE.BSD
 copy_license ppp PPPD-NOTICES
+copy_license picocom LICENSE.txt
+copy_license picocom linenoise-1.0/LICENSE
+copy_license lrzsz COPYING
+copy_license gdb COPYING
+copy_license gdb COPYING3
+copy_license gdb COPYING.LIB
+copy_license gdb libiberty/COPYING.LIB
+copy_license gdb LIBIBERTY-BSD-NOTICES
 
 cp "$repo_root/components.tsv" "$output_dir/COMPONENTS.tsv"
 
