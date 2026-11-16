@@ -343,24 +343,30 @@ jobs:
             - restore_cache:
                 name: Restore the packaged output for unchanged inputs
                 keys:
-                  - statics-out-v4-<< parameters.arch >>-{{ checksum "/tmp/build-inputs" }}
+                  - statics-out-v5-<< parameters.arch >>-{{ checksum "/tmp/build-inputs" }}
       - run:
           name: Use the restored output when present
-          # The cache holds the packaged archive (~10 MiB xz, about half the
-          # unpacked tree's cache size). It must match its saved digest, and
-          # after unpacking it is verified and repackaged like a fresh build.
+          # The cache holds the packaged archives (~10 MiB xz, about half the
+          # unpacked tree's cache size): the main one, and the extra one when
+          # this arch has one. Each must match its saved digest, and after
+          # unpacking it is verified and repackaged like a fresh build.
           command: |
             arch=<< parameters.arch >>
-            if [ -f "dist/statics-$arch.tar.xz" ] &&
-              (cd dist && sha256sum --check "statics-$arch.tar.xz.sha256"); then
-              mv "dist/statics-$arch.tar.xz.sha256" "dist/cached-$arch.sha256"
-              tar -xJf "dist/statics-$arch.tar.xz" -C dist
+            if [ -f "artifacts/statics-$arch.tar.xz" ] &&
+              (cd artifacts && sha256sum --check statics-*.tar.xz.sha256); then
+              mkdir -p dist cached
+              for name in "statics-$arch" "statics-extra-$arch"; do
+                [ -f "artifacts/$name.tar.xz" ] || continue
+                tar -xJf "artifacts/$name.tar.xz" -C dist
+                mv "artifacts/$name.tar.xz.sha256" cached/
+              done
               echo 'export STATICS_CACHED=1' >>"$BASH_ENV"
               echo "inputs unchanged: skipping toolchain, sources, and compile"
             else
               rm -rf dist
               echo "no cached output for these inputs: building"
             fi
+            rm -rf artifacts
       - setup-buildx
       - toolchain-and-sources
       - run:
@@ -386,22 +392,26 @@ jobs:
             ./scripts/verify.sh "dist/$arch" "$arch"
             ./scripts/package.sh "$arch"
             # package.sh is deterministic, so restored output must repackage
-            # to the very archive that was cached; this also covers files
+            # to the very archives that were cached; this also covers files
             # verify.sh does not check (notices, SBOM).
             if [ -n "${STATICS_CACHED:-}" ]; then
-              cmp "dist/cached-$arch.sha256" "dist/statics-$arch.tar.xz.sha256"
+              for sum in "statics-$arch.tar.xz.sha256" "statics-extra-$arch.tar.xz.sha256"; do
+                [ ! -f "cached/$sum" ] && [ ! -f "dist/$sum" ] || cmp "cached/$sum" "dist/$sum"
+              done
             fi
+            # The extra archive and its files exist only for an arch with
+            # an extra tool; the glob then matches nothing and is dropped.
             mkdir -p artifacts
-            cp dist/statics-$arch.* artifacts/
+            shopt -s nullglob
+            cp dist/statics-$arch.* dist/statics-extra-$arch.* artifacts/
       - unless:
           condition: << parameters.release >>
           steps:
             - save_cache:
                 name: Save the packaged output for these inputs
-                key: statics-out-v4-<< parameters.arch >>-{{ checksum "/tmp/build-inputs" }}
+                key: statics-out-v5-<< parameters.arch >>-{{ checksum "/tmp/build-inputs" }}
                 paths:
-                  - dist/statics-<< parameters.arch >>.tar.xz
-                  - dist/statics-<< parameters.arch >>.tar.xz.sha256
+                  - artifacts
       - store-artifacts-if-wanted:
           path: artifacts
           destination: statics-<< parameters.arch >>
@@ -414,9 +424,11 @@ jobs:
                   - equal: [x86_64, << parameters.arch >>]
           steps:
             - persist_to_workspace:
+                # Everything in artifacts/ belongs to this arch: the main
+                # archive's files and, when there is one, the extra one's.
                 root: artifacts
                 paths:
-                  - statics-<< parameters.arch >>.*
+                  - statics-*
 
   reproducibility-build:
     parameters:
@@ -447,7 +459,7 @@ jobs:
           condition: << parameters.release >>
           steps:
             - toolchain-and-sources:
-                toolchain-args: --no-cache-filter zig-pin --no-cache-filter toolchain
+                toolchain-args: --no-cache-filter toolchain-pin --no-cache-filter toolchain
                 extra-args: --no-cache-filter sources
       - unless:
           condition: << parameters.release >>
@@ -470,10 +482,13 @@ jobs:
             ./scripts/package.sh x86_64
             mkdir -p rebuilt
             mv dist/statics-x86_64.tar.xz rebuilt/
+            if [ -f dist/statics-extra-x86_64.tar.xz ]; then
+              mv dist/statics-extra-x86_64.tar.xz rebuilt/
+            fi
       - persist_to_workspace:
           root: .
           paths:
-            - rebuilt/statics-x86_64.tar.xz
+            - rebuilt
 
   reproducibility:
     parameters:
@@ -494,11 +509,14 @@ jobs:
       - attach_workspace:
           at: /tmp/ws
       - run:
-          name: Compare the shipped archive with the rebuild
-          command: >-
-            ./scripts/compare-builds.sh
-            /tmp/ws/statics-x86_64.tar.xz
-            /tmp/ws/rebuilt/statics-x86_64.tar.xz
+          name: Compare the shipped archives with the rebuild
+          # The extra archive is compared whenever either build made one, so
+          # one appearing on only one side fails too.
+          command: |
+            for name in statics-x86_64.tar.xz statics-extra-x86_64.tar.xz; do
+              [ -f "/tmp/ws/$name" ] || [ -f "/tmp/ws/rebuilt/$name" ] || continue
+              ./scripts/compare-builds.sh "/tmp/ws/$name" "/tmp/ws/rebuilt/$name"
+            done
 
   ci-ok:
     # The single required status. The matrix follows architectures.tsv, so
@@ -531,12 +549,14 @@ jobs:
             - skip-if-docs-only
       - run:
           name: Compute the source bundle key
-          # Everything the sources stage reads (Dockerfile, pins, fetch
-          # scripts) plus the packaging script.
+          # Everything the sources stage reads (Dockerfile, pins, the
+          # manifests that choose Go modules, fetch scripts) plus the
+          # packaging script.
           # package-sources.sh runs with the host's tar and xz.
           command: >-
-            { cat docker/Dockerfile sources.lock scripts/fetch.sh
-            scripts/fetch-sources.sh scripts/package-sources.sh;
+            { cat docker/Dockerfile sources.lock architectures.tsv components.tsv
+            scripts/fetch.sh scripts/fetch-sources.sh scripts/fetch-go-modules.sh
+            scripts/package-sources.sh;
             tar --version | head -n 1; xz --version | head -n 1; }
             | sha256sum >/tmp/sources-inputs
       - unless:

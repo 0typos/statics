@@ -26,6 +26,36 @@ runtime errors after choosing a target, see
 | `riscv64` | `riscv64-linux-musl` | RV64 baseline | 64-bit little-endian |
 | `s390x` | `s390x-linux-musl` | IBM Z baseline | 64-bit big-endian |
 
+## Go tools
+
+Go tools (currently `wireguard-go`) are built by the pinned Go release with
+cgo disabled, so they do not link musl at all. Go has its own CPU and kernel
+floors, recorded as the last column of `architectures.tsv`:
+
+| Build name | Go settings | Go floor |
+| --- | --- | --- |
+| `x86_64` | `GOARCH=amd64 GOAMD64=v1` | x86-64 baseline |
+| `i686` | `GOARCH=386 GO386=softfloat` | Pentium MMX; no SSE2 needed, matching the Pentium II row |
+| `aarch64` | `GOARCH=arm64` | ARMv8.0 |
+| `armv6-hardfloat` | `GOARCH=arm GOARM=6` | ARMv6 with VFPv1 or later (ARM1176JZF-S has VFPv2) |
+| `armv7-hardfloat` | `GOARCH=arm GOARM=7` | ARMv7 with VFPv3 or later |
+| `armv7-softfloat` | `GOARCH=arm GOARM=7,softfloat` | ARMv7; floating point in software, so no VFP use |
+| `mips` | `GOARCH=mips GOMIPS=softfloat` | MIPS32r1, soft float |
+| `mipsel` | `GOARCH=mipsle GOMIPS=softfloat` | MIPS32r1, soft float |
+| `powerpc` | none | Go has no 32-bit PowerPC port |
+| `powerpc64` | none | Go needs POWER8, above this row's baseline |
+| `powerpc64le` | `GOARCH=ppc64le GOPPC64=power8` | POWER8 |
+| `riscv64` | `GOARCH=riscv64 GORISCV64=rva20u64` | RVA20U64 |
+| `s390x` | `GOARCH=s390x` | z13 |
+
+Every Go tool also needs Linux 3.2 or later. Go statically links its own
+runtime instead of calling a libc, so the CPU floor can sit above a row's C
+baseline: on a POWER7 `powerpc64le` system or a pre-z13 `s390x`, the C tools
+run and the Go tools stop at startup. `powerpc` and `powerpc64` bundles ship
+without Go tools; their `COMPONENTS.tsv` and SBOM say so. The floors are
+those of the Go release pinned in `sources.lock`, per Go's
+[minimum requirements](https://go.dev/wiki/MinimumRequirements).
+
 ## Identifying a device
 
 When a shell is available, gather at least:
@@ -93,10 +123,11 @@ similar failures.
 ## Build host versus target
 
 The Docker build host must be `amd64` or `arm64` because those are the pinned
-Zig distributions provided by the toolchain stage. This does not limit the
-target matrix: either supported host architecture can build all rows above.
+Zig and Go distributions provided by the toolchain stage. This does not limit
+the target matrix: either supported host architecture can build all rows
+above.
 
-The target device does not need Docker, Zig, musl, or QEMU. It needs a
+The target device does not need Docker, Zig, Go, musl, or QEMU. It needs a
 compatible Linux kernel, CPU/ABI, execute permission, and any kernel
 features/privileges required by the selected utility.
 
@@ -107,7 +138,7 @@ executes unprivileged smoke or version checks for BusyBox/netcat, socat,
 Dropbear, the iproute2 tools, WireGuard, OpenSSL, tcpdump, curl, iperf3,
 ethtool, strace, jq, drill, mtr, i2c-tools, Nmap/Ncat, rsync, lsof, the
 util-linux tools, sftp-server, conntrack, ipmitool, iw, and the MTD and UBI
-tools. Every physical executable, including the CAN,
+tools, and `wireguard-go`. Every physical executable, including the CAN,
 ISO-TP, and SPI utilities, is checked for static linkage and the absence of a
 dynamic program interpreter. Nmap's runtime data files are checksum-verified
 separately. QEMU is an instruction/ABI smoke test, not proof that privileged

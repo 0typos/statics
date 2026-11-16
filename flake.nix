@@ -16,23 +16,28 @@
           pkgs = import nixpkgs { inherit system; };
           lib = pkgs.lib;
 
-          # Single source of truth: the same pinned Zig the container fetches.
-          # Parse its sources.lock record (name|version|sha256|url) so the dev
-          # shell and docker/Dockerfile can never drift apart.
-          zigHost = if system == "aarch64-linux" then "zig-aarch64" else "zig-x86_64";
+          # Single source of truth: the same pinned Zig and Go the container
+          # fetches. Parse their sources.lock records (name|version|sha256|url)
+          # so the dev shell and docker/Dockerfile can never drift apart.
+          hostSuffix = if system == "aarch64-linux" then "aarch64" else "x86_64";
           lockLines = lib.splitString "\n" (builtins.readFile ./sources.lock);
-          zigLine = lib.findFirst (l: lib.hasPrefix "${zigHost}|" l) null lockLines;
-          zigFields =
-            if zigLine == null
-            then throw "no ${zigHost} record in sources.lock"
-            else lib.splitString "|" zigLine;
+          lockRecord = name:
+            let line = lib.findFirst (l: lib.hasPrefix "${name}|" l) null lockLines;
+            in if line == null
+              then throw "no ${name} record in sources.lock"
+              else lib.splitString "|" line;
+          zigFields = lockRecord "zig-${hostSuffix}";
           zigVersion = builtins.elemAt zigFields 1;
-          zigSha256 = builtins.elemAt zigFields 2;
-          zigUrl = builtins.elemAt zigFields 3;
+          goFields = lockRecord "go-${hostSuffix}";
+          goVersion = builtins.elemAt goFields 1;
 
           zigTarball = pkgs.fetchurl {
-            url = zigUrl;
-            sha256 = zigSha256;
+            url = builtins.elemAt zigFields 3;
+            sha256 = builtins.elemAt zigFields 2;
+          };
+          goTarball = pkgs.fetchurl {
+            url = builtins.elemAt goFields 3;
+            sha256 = builtins.elemAt goFields 2;
           };
 
           zig = pkgs.runCommand "zig-${zigVersion}"
@@ -43,6 +48,14 @@
               # The launcher scripts under scripts/toolchain/ invoke `zig`.
               test -x "$out/bin/zig"
             '';
+
+          go = pkgs.runCommand "go-${goVersion}"
+            { nativeBuildInputs = [ pkgs.gnutar pkgs.gzip ]; }
+            ''
+              mkdir -p "$out"
+              tar -xzf ${goTarball} -C "$out" --strip-components=1
+              test -x "$out/bin/go"
+            '';
         in
         {
           default = pkgs.mkShell {
@@ -50,6 +63,7 @@
             # matches CI; versions are pinned by flake.lock.
             packages = [
               zig
+              go
               pkgs.bashInteractive
               pkgs.gnumake
               pkgs.autoconf
@@ -82,8 +96,10 @@
 
             shellHook = ''
               export SSL_CERT_FILE="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
-              echo "statics dev shell — Zig ${zigVersion} (pinned via sources.lock)"
+              export GOTOOLCHAIN=local
+              echo "statics dev shell — Zig ${zigVersion}, Go ${goVersion} (pinned via sources.lock)"
               echo "  fetch sources : scripts/fetch-sources.sh --archives .cache --extract .src --bundle .archives"
+              echo "                  scripts/fetch-go-modules.sh .src .archives/go-modules"
               echo "  build one arch: SOURCES_DIR=.src BUILD_DIR=.build scripts/build.sh x86_64 out"
               echo "  validate      : scripts/validate.sh"
             '';

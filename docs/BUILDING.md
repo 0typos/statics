@@ -24,7 +24,7 @@ docker buildx version
 docker buildx inspect --bootstrap
 ```
 
-The Dockerfile currently packages Zig for `amd64` and `arm64` build hosts.
+The Dockerfile currently packages Zig and Go for `amd64` and `arm64` build hosts.
 That restriction applies to the machine running Docker, not to the target:
 either host can produce every architecture listed by `make list`.
 
@@ -60,7 +60,7 @@ BuildKit cache.
 | `make build ARCH=<arch>` | Builds one target and exports `dist/<arch>/` |
 | `make smoke ARCH=<arch>` | Builds one target, verifies it under QEMU in the container, and loads a local test image; it does not export `dist/<arch>/` |
 | `make verify ARCH=<arch>` | Verifies an existing `dist/<arch>/` on the host |
-| `make package ARCH=<arch>` | Rebuilds one target, then creates its archive, SBOM copy, and checksum files |
+| `make package ARCH=<arch>` | Rebuilds one target, then creates its archive, SBOM copy, and checksum files, and the same for its extra archive when it has one |
 | `make all` | Builds and exports every target sequentially |
 | `make smoke-all` | Builds and smoke-tests every target sequentially |
 | `make sources` | Exports all pinned, checksum-verified upstream archives to `dist/sources/` |
@@ -142,6 +142,11 @@ aarch64/
 └── sources.lock
 ```
 
+Go tools add `licenses/<tool>/go-modules.tsv`, the modules linked into the
+tool as read from its own build info, and each module's license and notice
+files under `licenses/<tool>/modules/<module>@<version>/`. The Go runtime's
+notices are under `licenses/go/`.
+
 `SHA256SUMS` covers all executable payloads and Nmap runtime data.
 `SBOM.spdx.json` records the same payload plus its upstream package
 relationships. License texts and build metadata remain alongside the payload
@@ -150,6 +155,16 @@ but are not entries in `SHA256SUMS`.
 `BUILD_RECIPES_LICENSE` is the MIT license for this repository's original
 build machinery. It does not apply to the bundled utilities. Their individual
 terms are indexed by `COMPONENTS.tsv` and packaged under `licenses/`.
+
+### Extra archive
+
+Large Go tools go in a second archive, `statics-extra-<arch>.tar.xz`, so the
+main kit stays small. `components.tsv` assigns each component to `main` or
+`extra`. The extra archive has the same layout and metadata as the main one,
+under a top-level `<arch>-extra/` directory, with its own `SHA256SUMS`,
+`COMPONENTS.tsv`, notices, and SBOM (`statics-extra-<arch>.spdx.json`). It
+exists only for an architecture that builds at least one extra tool; no
+component is marked `extra` yet, so no target currently produces one.
 
 Archives are normalized for stable ordering, ownership, and timestamps.
 Reproducibility still depends on identical repository inputs, source
@@ -209,10 +224,36 @@ sha256sum --check dist/statics-sources.tar.xz.sha256
 ```
 
 The resulting archive contains the exact upstream archives and `sources.lock`
-used by the recipes. It supports source review and corresponding-source
+used by the recipes, the Go source release the pinned toolchain was built
+from, and under `go-modules/` every Go module the Go tools link, in Go module
+proxy layout. It supports source review and corresponding-source
 obligations. It is not currently an offline input format for the Dockerfile;
 an offline/restricted-network build workflow would need a separately
-documented cache import mechanism.
+documented cache import mechanism. The Go part already works offline; for
+example, from wireguard-go's extracted source tree:
+
+```console
+tar -xJf dist/statics-sources.tar.xz -C /tmp
+GOPROXY=file:///tmp/sources/go-modules GOFLAGS=-mod=readonly \
+    go build -o wireguard-go .
+```
+
+## Go tools and network access
+
+Go tools are built by the Go release pinned as `go-x86_64` and `go-aarch64`
+in `sources.lock`, from go.dev rather than Debian. The sources stage is the
+only step with network access for Go: `scripts/fetch-go-modules.sh` asks the
+module proxy for exactly the modules each tool's main packages import on
+Linux, for every Go architecture, with `-mod=readonly`, so each upstream
+`go.sum` (inside its pinned source archive) must already list them and every
+download must match it.
+
+The compile step then runs with `RUN --network=none`, for the C tools as
+well, and with `CGO_ENABLED=0 GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off
+GOWORK=off GOENV=off` and `GOFLAGS="-mod=readonly -trimpath -buildvcs=false"`.
+A missing module, a `go.sum` mismatch, or a `go.mod` that asks for a newer Go
+fails the build instead of downloading anything. Binaries are linked with
+`-ldflags="-s -w -buildid="`; UPX is not used.
 
 ## Alternate container commands
 
@@ -227,8 +268,9 @@ used by the Makefile. Docker Buildx is the tested interface; other container
 CLIs are not part of the current compatibility contract.
 
 `scripts/build.sh` is the internal build orchestrator. Calling it directly
-requires the pinned Zig release, all build dependencies, and every extracted
-source tree under `/src` (or `SOURCES_DIR`). It is intentionally not the
+requires the pinned Zig and Go releases, all build dependencies, every
+extracted source tree under `/src` (or `SOURCES_DIR`), and the Go module
+cache that `scripts/fetch-go-modules.sh` writes there. It is intentionally not the
 recommended host setup.
 
 If a command fails, start with the

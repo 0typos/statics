@@ -33,7 +33,8 @@ mkdir -p "$archive_dir"
 
 while IFS='|' read -r name _version _ url; do
     [[ $name == \#* || -z $name ]] && continue
-    [[ $name == zig-* ]] && continue
+    # Toolchains are installed by the Dockerfile, not built from source.
+    [[ $name == zig-* || $name == go-* ]] && continue
 
     filename=${url##*/}
     archive="$archive_dir/$filename"
@@ -43,7 +44,9 @@ while IFS='|' read -r name _version _ url; do
         cp "$archive" "$bundle_dir/$filename"
     fi
 
-    if [[ -n $extract_dir ]]; then
+    # Go's source is bundled, not extracted: the build compiles its runtime
+    # and standard library from the installed toolchain of the same version.
+    if [[ -n $extract_dir && $name != go ]]; then
         destination="$extract_dir/$name"
         if [[ -e $destination ]]; then
             echo "refusing to replace existing source directory: $destination" >&2

@@ -18,12 +18,15 @@ record=$(awk -F '|' -v wanted="$arch" '
     exit 2
 }
 
-IFS='|' read -r _ zig_target zig_cpu _ _ <<<"$record"
+IFS='|' read -r _ zig_target zig_cpu _ _ go_env <<<"$record"
 
 export REPO_ROOT=$repo_root
 export SOURCES_DIR=${SOURCES_DIR:-/src}
 export WORK_DIR=${BUILD_DIR:-/build}/"$arch"
 export OUTPUT_DIR=$output_dir
+# Components marked `extra` in components.tsv install here and are packaged
+# as statics-extra-<arch>.tar.xz; the directory exists only when one does.
+export EXTRA_OUTPUT_DIR=$output_dir-extra
 export DEPS_PREFIX="$WORK_DIR/prefix"
 export ZIG=${ZIG:-zig}
 export ZIG_TARGET=$zig_target
@@ -50,6 +53,27 @@ if [[ -n $STATICS_COMPONENT_TIMEOUT && ! $STATICS_COMPONENT_TIMEOUT =~ ^[0-9]+$ 
     exit 2
 fi
 export STATICS_ARCH=$arch
+# Go tools build only where architectures.tsv gives a Go environment.
+# Everything that could reach the network or a host setting is pinned off:
+# modules come from the cache the sources stage filled (GOPROXY=off), go.sum
+# must already cover them (-mod=readonly), and a go.mod asking for a newer Go
+# fails instead of downloading one (GOTOOLCHAIN=local).
+if [[ $go_env != none ]]; then
+    for setting in $go_env; do
+        [[ $setting =~ ^GO[A-Z0-9]+=[a-z0-9.,]+$ ]] || {
+            echo "invalid Go setting for $arch: $setting" >&2
+            exit 2
+        }
+        export "${setting?}"
+    done
+    # Go accepts only absolute cache paths.
+    GOMODCACHE=$(realpath -m "$SOURCES_DIR/go-modules")
+    GOCACHE=$(realpath -m "$WORK_DIR/go-cache")
+    GOPATH=$(realpath -m "$WORK_DIR/go-path")
+    export GOOS=linux CGO_ENABLED=0 GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off \
+        GOWORK=off GOENV=off GOFLAGS='-mod=readonly -trimpath -buildvcs=false' \
+        GOMODCACHE GOCACHE GOPATH
+fi
 export SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH:-0}
 export KCONFIG_NOTIMESTAMP=1
 export TZ=UTC
@@ -110,9 +134,10 @@ sources=(
     mtd-utils
     libnl
     iw
+    wireguard-go
 )
 
-for path in "$WORK_DIR" "$OUTPUT_DIR"; do
+for path in "$WORK_DIR" "$OUTPUT_DIR" "$EXTRA_OUTPUT_DIR"; do
     case "$path" in
         ""|/|"$repo_root")
             echo "refusing unsafe build path: $path" >&2
@@ -128,7 +153,7 @@ for source in "${sources[@]}"; do
     fi
 done
 
-rm -rf "$WORK_DIR" "$OUTPUT_DIR"
+rm -rf "$WORK_DIR" "$OUTPUT_DIR" "$EXTRA_OUTPUT_DIR"
 mkdir -p "$WORK_DIR" "$OUTPUT_DIR" "$DEPS_PREFIX"
 
 # Autoconf decides it is cross compiling only when its test binary fails to
@@ -175,6 +200,9 @@ dag=$WORK_DIR/dag.mk
         mtd-utils libnl iw; do
         printf ' $(S)/%s' "$c"
     done
+    if [[ $go_env != none ]]; then
+        printf ' $(S)/%s' wireguard-go
+    fi
     printf '\n\n'
 
     emit() { # target, builder file, function, prerequisites...
@@ -226,6 +254,7 @@ dag=$WORK_DIR/dag.mk
     emit mtd-utils mtd-utils build_mtd_utils
     emit libnl iw build_libnl deps
     emit iw iw build_iw libnl
+    emit wireguard-go wireguard-go build_wireguard_go
 } > "$dag"
 
 if ! make -f "$dag" -j"$JOBS" --output-sync=target all; then
@@ -236,37 +265,56 @@ if ! make -f "$dag" -j"$JOBS" --output-sync=target all; then
     exit 1
 fi
 
-{
-    echo "architecture=$arch"
-    echo "zig_target=$ZIG_TARGET"
-    echo "zig_cpu=$ZIG_CPU"
-    echo "autoconf_host=$AUTOCONF_HOST"
-    echo "zig_version=$("$ZIG" version)"
-    # Inside the Docker builder, record the host toolchain too: autotools,
-    # perl, and python shape the output, so their versions are an input.
-    apt_sources=/etc/apt/sources.list.d/debian.sources
-    if grep -q '^URIs: http://snapshot\.debian\.org/' "$apt_sources" 2>/dev/null &&
-        command -v dpkg-query >/dev/null; then
-        echo "debian_snapshot=$(grep -m 1 -oE '[0-9]{8}T[0-9]{6}Z' "$apt_sources")"
-        echo "debian_packages_sha256=$(dpkg-query -W -f '${Package}=${Version}\n' |
-            LC_ALL=C sort | sha256sum | cut -d ' ' -f 1)"
-    fi
-    echo "libc=musl"
-    echo "source_date_epoch=$SOURCE_DATE_EPOCH"
-    echo
-    awk -F '|' '$0 !~ /^#/ { printf "%s=%s\n", $1, $2 }' "$repo_root/sources.lock"
-} > "$OUTPUT_DIR/BUILDINFO"
+# Write the metadata of one archive: BUILDINFO, SHA256SUMS, sources.lock,
+# licenses and notices for exactly its components, and its SBOM.
+finish_archive() { # directory archive
+    local dir=$1 archive=$2
+    {
+        echo "architecture=$arch"
+        echo "archive=$archive"
+        echo "zig_target=$ZIG_TARGET"
+        echo "zig_cpu=$ZIG_CPU"
+        echo "autoconf_host=$AUTOCONF_HOST"
+        echo "zig_version=$("$ZIG" version)"
+        if [[ $go_env != none ]]; then
+            echo "go_version=$(go env GOVERSION)"
+            echo "go_env=$go_env"
+        fi
+        # Inside the Docker builder, record the host toolchain too: autotools,
+        # perl, and python shape the output, so their versions are an input.
+        apt_sources=/etc/apt/sources.list.d/debian.sources
+        if grep -q '^URIs: http://snapshot\.debian\.org/' "$apt_sources" 2>/dev/null &&
+            command -v dpkg-query >/dev/null; then
+            echo "debian_snapshot=$(grep -m 1 -oE '[0-9]{8}T[0-9]{6}Z' "$apt_sources")"
+            echo "debian_packages_sha256=$(dpkg-query -W -f '${Package}=${Version}\n' |
+                LC_ALL=C sort | sha256sum | cut -d ' ' -f 1)"
+        fi
+        echo "libc=musl"
+        echo "source_date_epoch=$SOURCE_DATE_EPOCH"
+        echo
+        awk -F '|' '$0 !~ /^#/ { printf "%s=%s\n", $1, $2 }' "$repo_root/sources.lock"
+    } > "$dir/BUILDINFO"
 
-(
-    cd "$OUTPUT_DIR"
-    find . -type f \
-        \( -perm /111 -o -path './share/nmap/*' \) \
-        -printf '%P\n' |
-        LC_ALL=C sort |
-        xargs -r sha256sum > SHA256SUMS
-)
+    (
+        cd "$dir"
+        find . -type f \
+            \( -perm /111 -o -path './share/nmap/*' \) \
+            -printf '%P\n' |
+            LC_ALL=C sort |
+            xargs -r sha256sum > SHA256SUMS
+    )
 
-cp "$repo_root/sources.lock" "$OUTPUT_DIR/sources.lock"
-"$repo_root/scripts/collect-licenses.sh" "$WORK_DIR" "$OUTPUT_DIR"
-python3 "$repo_root/scripts/generate-sbom.py" "$OUTPUT_DIR" "$arch"
-echo "==> built $arch in $OUTPUT_DIR"
+    cp "$repo_root/sources.lock" "$dir/sources.lock"
+    "$repo_root/scripts/collect-licenses.sh" "$WORK_DIR" "$dir" "$arch" "$archive"
+    python3 "$repo_root/scripts/generate-sbom.py" "$dir" "$arch" "$archive"
+    echo "==> built $arch $archive archive in $dir"
+}
+
+finish_archive "$OUTPUT_DIR" main
+# An extra archive exists only when this architecture builds an extra tool.
+if [[ -n $("$repo_root/scripts/components.sh" "$arch" extra) ]]; then
+    finish_archive "$EXTRA_OUTPUT_DIR" extra
+elif [[ -e $EXTRA_OUTPUT_DIR ]]; then
+    echo "$EXTRA_OUTPUT_DIR exists, but components.tsv puts nothing in $arch's extra archive" >&2
+    exit 1
+fi

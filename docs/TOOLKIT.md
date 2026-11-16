@@ -1,7 +1,8 @@
 # Toolkit guide
 
-The default bundle is a compact Linux troubleshooting kit: 79 physical
-executables, BusyBox applet links, Dropbear multi-call links, Nmap runtime
+The default bundle is a compact Linux troubleshooting kit: 80 physical
+executables (79 on `powerpc` and `powerpc64`, which have no Go tools),
+BusyBox applet links, Dropbear multi-call links, Nmap runtime
 data, license texts, checksums, and build metadata. Static linking removes the
 dependency on a target's installed libc; it does not replace kernel features,
 drivers, device nodes, certificate stores, permissions, or runtime databases.
@@ -27,7 +28,7 @@ Nmap data, notices, and licenses remain available.
 | --- | --- | --- |
 | Rescue userspace | `busybox`; `ping`, `ping6`, `traceroute`, `traceroute6`, `nslookup`, `wget`, `telnet`, `arp`, `arping`, `route`, `ifconfig`, `netstat`, `nc`, `netcat` | Shell recovery, basic reachability, and legacy network inspection |
 | Relays and remote access | `socat`, `ncat`, `pppd`, `tunpipe-standalone`, `sftp-server`, `dropbearmulti`; `dropbear`, `dbclient`, `dropbearkey`, `dropbearconvert`, `scp`, `tunpipe` | TCP/UDP/TLS relays, port checks, emergency SSH, SFTP and SCP file copy, and IP tunnels over SSH |
-| Network control | `ip`, `ss`, `bridge`, `tc`, `wg`, `ethtool`, `nft`, `conntrack`, `iw` | Addresses, routes, sockets, links, traffic control, WireGuard, firewall policy, connection tracking, Wi-Fi, and NIC state |
+| Network control | `ip`, `ss`, `bridge`, `tc`, `wg`, `wireguard-go`, `ethtool`, `nft`, `conntrack`, `iw` | Addresses, routes, sockets, links, traffic control, WireGuard (with or without the kernel module), firewall policy, connection tracking, Wi-Fi, and NIC state |
 | Discovery and packet diagnosis | `nmap`, `tcpdump`, `mtr`, `mtr-packet`, `iperf3` | Host/service discovery, capture, path analysis, and throughput |
 | Protocol and data checks | `curl`, `openssl`, `drill`, `jq`, `rsync` | HTTP, TLS, DNS, structured output, and efficient file transfer |
 | Serial console and transfer | `picocom`, `sz`, `rz` | Serial terminal sessions and XMODEM/YMODEM/ZMODEM file transfer |
@@ -348,6 +349,41 @@ pppd noauth pty 'dbclient root@server pppd notty noauth' 10.9.0.2:10.9.0.1
 
 The `chat` modem scripting tool is not included. Per-file pppd notices are
 collected into `licenses/ppp/PPPD-NOTICES`.
+
+### WireGuard without the kernel module: wireguard-go
+
+`wireguard-go` is the userspace WireGuard implementation, for kernels older
+than 5.6 or built without `CONFIG_WIREGUARD`, which covers most of the
+embedded and vendor kernels this kit is carried to. It only runs the
+interface; the bundled `wg` configures it exactly as it would the kernel
+module, through the control socket `wireguard-go` creates at
+`/var/run/wireguard/<interface>.sock`. `wg-quick` is not included, so set
+the addresses and routes with `ip`:
+
+```sh
+umask 077
+wg genkey > wg0.key
+wireguard-go wg0
+wg set wg0 private-key ./wg0.key listen-port 51820 \
+    peer PEER_PUBLIC_KEY endpoint 192.0.2.40:51820 allowed-ips 10.8.0.0/24
+ip address add 10.8.0.2/24 dev wg0
+ip link set wg0 up
+wg show wg0
+```
+
+`wireguard-go wg0` detaches. On Linux it always prints a notice recommending
+the kernel module, whether or not the kernel has one, unless
+`WG_PROCESS_FOREGROUND=1` is set; on a kernel that has it, prefer the module.
+`-f` keeps it in the foreground, `LOG_LEVEL=verbose` logs handshakes, and stopping the process
+removes the interface. It needs `/dev/net/tun`, `CAP_NET_ADMIN`, and a
+writable `/var/run/wireguard`. As a Go program it needs Linux 3.2 or later
+and is not built for `powerpc` or `powerpc64`; see the
+[architecture guide](ARCHITECTURES.md#go-tools).
+
+The modules it links are listed with their versions and `go.sum` hashes in
+`licenses/wireguard-go/go-modules.tsv`, with each module's license and
+patent notices under `licenses/wireguard-go/modules/`; Go's own runtime
+notices are under `licenses/go/`.
 
 ### Serial consoles: picocom and lrzsz
 

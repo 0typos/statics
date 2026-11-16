@@ -1,43 +1,45 @@
-# source|SPDX license expression|role and outputs
-busybox|GPL-2.0-only|busybox and applet links
-socat|GPL-2.0-only|socat
-dropbear|MIT AND Unlicense|dropbearmulti and applet links, including the repository-authored tunpipe; bundled libtomcrypt and libtommath
-iproute2|GPL-2.0-only|ip, ss, bridge, and tc
-wireguard-tools|GPL-2.0-only|wg
-openssl|Apache-2.0|openssl; statically linked into curl, iperf3, drill, nmap, ncat, socat, and ipmitool
-libpcap|BSD-3-Clause|statically linked into tcpdump, nmap, and ncat
-libmnl|LGPL-2.1-or-later|statically linked into iproute2, ethtool, libnftnl, nft, and conntrack
-libcap-ng|LGPL-2.1-or-later|statically linked into util-linux setpriv
-libnftnl|GPL-2.0-or-later|statically linked into nft
-nftables|GPL-2.0-only AND GPL-2.0-or-later|nft
-tcpdump|BSD-3-Clause|tcpdump
-curl|curl|curl
-iperf3|BSD-3-Clause|iperf3
-ethtool|GPL-2.0-only|ethtool
-strace|LGPL-2.1-or-later AND (GPL-2.0-only WITH Linux-syscall-note)|strace and bundled Linux UAPI
-jq|MIT AND BSD-2-Clause|jq and bundled oniguruma
-ldns|BSD-3-Clause|drill
-mtr|GPL-2.0-only|mtr and mtr-packet
-can-utils|GPL-2.0-only OR BSD-3-Clause|selected SocketCAN and ISO-TP tools
-i2c-tools|GPL-2.0-or-later AND LGPL-2.1-or-later|selected I2C tools and statically linked libi2c code
-spi-tools|GPL-2.0-only|spi-config and spi-pipe
-nmap|LicenseRef-NPSL-0.95 AND BSD-3-Clause AND MIT AND Zlib|nmap, ncat, core data files, and selected bundled libraries
-rsync|GPL-3.0-or-later AND MIT AND Zlib|rsync with bundled popt and zlib
-lsof|lsof|lsof
-util-linux|GPL-2.0-only AND GPL-2.0-or-later AND LGPL-2.1-or-later AND BSD-3-Clause AND BSD-2-Clause AND MIT|nsenter, unshare, lsns, setpriv, findmnt, lsblk, blkid, sfdisk, losetup, mount, umount, dmesg, and their static util-linux libraries
-e2fsprogs|GPL-2.0-only AND LGPL-2.0-only AND BSD-3-Clause AND MIT|e2fsck, dumpe2fs, tune2fs, mke2fs, and fsck/mkfs links; bundled libext2fs, libe2p, libuuid, libet, libss
-smartmontools|GPL-2.0-or-later|smartctl with the compiled-in drive database
-libnvme|LGPL-2.1-or-later|statically linked into nvme
-nvme-cli|GPL-2.0-only AND GPL-2.0-or-later|nvme
-ppp|BSD-4-Clause AND BSD-3-Clause AND Apache-2.0 AND RSA-MD|pppd without plugins
-picocom|GPL-2.0-or-later AND BSD-2-Clause|picocom with bundled linenoise
-lrzsz|GPL-2.0-or-later|sz and rz (lsz and lrz)
-gdb|GPL-3.0-or-later AND GPL-2.0-or-later AND LGPL-2.1-or-later AND LGPL-2.0-or-later AND BSD-3-Clause|gdbserver only, with bundled gdbsupport, gnulib, and libiberty
-openssh|SSH-OpenSSH|sftp-server only, for Dropbear's SFTP subsystem
-libnfnetlink|GPL-2.0-only AND GPL-2.0-or-later|statically linked into conntrack
-libnetfilter_conntrack|GPL-2.0-or-later|statically linked into conntrack
-conntrack-tools|GPL-2.0-or-later|conntrack only
-ipmitool|BSD-3-Clause|ipmitool
-mtd-utils|GPL-2.0-only AND GPL-2.0-or-later AND BSD-3-Clause|selected MTD and UBI tools
-libnl|LGPL-2.1-only|libnl-3 and libnl-genl-3, statically linked into iw
-iw|ISC|iw
+# source|SPDX license expression|role and outputs|archive: main, extra, or any|Go main packages, - for none, runtime for Go itself
+busybox|GPL-2.0-only|busybox and applet links|main|-
+socat|GPL-2.0-only|socat|main|-
+dropbear|MIT AND Unlicense|dropbearmulti and applet links, including the repository-authored tunpipe; bundled libtomcrypt and libtommath|main|-
+iproute2|GPL-2.0-only|ip, ss, bridge, and tc|main|-
+wireguard-tools|GPL-2.0-only|wg|main|-
+wireguard-go|MIT|wireguard-go, the userspace WireGuard daemon, with the Go modules listed in licenses/wireguard-go/go-modules.tsv|main|.
+openssl|Apache-2.0|openssl; statically linked into curl, iperf3, drill, nmap, ncat, socat, and ipmitool|main|-
+libpcap|BSD-3-Clause|statically linked into tcpdump, nmap, and ncat|main|-
+libmnl|LGPL-2.1-or-later|statically linked into iproute2, ethtool, libnftnl, nft, and conntrack|main|-
+libcap-ng|LGPL-2.1-or-later|statically linked into util-linux setpriv|main|-
+libnftnl|GPL-2.0-or-later|statically linked into nft|main|-
+nftables|GPL-2.0-only AND GPL-2.0-or-later|nft|main|-
+tcpdump|BSD-3-Clause|tcpdump|main|-
+curl|curl|curl|main|-
+iperf3|BSD-3-Clause|iperf3|main|-
+ethtool|GPL-2.0-only|ethtool|main|-
+strace|LGPL-2.1-or-later AND (GPL-2.0-only WITH Linux-syscall-note)|strace and bundled Linux UAPI|main|-
+jq|MIT AND BSD-2-Clause|jq and bundled oniguruma|main|-
+ldns|BSD-3-Clause|drill|main|-
+mtr|GPL-2.0-only|mtr and mtr-packet|main|-
+can-utils|GPL-2.0-only OR BSD-3-Clause|selected SocketCAN and ISO-TP tools|main|-
+i2c-tools|GPL-2.0-or-later AND LGPL-2.1-or-later|selected I2C tools and statically linked libi2c code|main|-
+spi-tools|GPL-2.0-only|spi-config and spi-pipe|main|-
+nmap|LicenseRef-NPSL-0.95 AND BSD-3-Clause AND MIT AND Zlib|nmap, ncat, core data files, and selected bundled libraries|main|-
+rsync|GPL-3.0-or-later AND MIT AND Zlib|rsync with bundled popt and zlib|main|-
+lsof|lsof|lsof|main|-
+util-linux|GPL-2.0-only AND GPL-2.0-or-later AND LGPL-2.1-or-later AND BSD-3-Clause AND BSD-2-Clause AND MIT|nsenter, unshare, lsns, setpriv, findmnt, lsblk, blkid, sfdisk, losetup, mount, umount, dmesg, and their static util-linux libraries|main|-
+e2fsprogs|GPL-2.0-only AND LGPL-2.0-only AND BSD-3-Clause AND MIT|e2fsck, dumpe2fs, tune2fs, mke2fs, and fsck/mkfs links; bundled libext2fs, libe2p, libuuid, libet, libss|main|-
+smartmontools|GPL-2.0-or-later|smartctl with the compiled-in drive database|main|-
+libnvme|LGPL-2.1-or-later|statically linked into nvme|main|-
+nvme-cli|GPL-2.0-only AND GPL-2.0-or-later|nvme|main|-
+ppp|BSD-4-Clause AND BSD-3-Clause AND Apache-2.0 AND RSA-MD|pppd without plugins|main|-
+picocom|GPL-2.0-or-later AND BSD-2-Clause|picocom with bundled linenoise|main|-
+lrzsz|GPL-2.0-or-later|sz and rz (lsz and lrz)|main|-
+gdb|GPL-3.0-or-later AND GPL-2.0-or-later AND LGPL-2.1-or-later AND LGPL-2.0-or-later AND BSD-3-Clause|gdbserver only, with bundled gdbsupport, gnulib, and libiberty|main|-
+openssh|SSH-OpenSSH|sftp-server only, for Dropbear's SFTP subsystem|main|-
+libnfnetlink|GPL-2.0-only AND GPL-2.0-or-later|statically linked into conntrack|main|-
+libnetfilter_conntrack|GPL-2.0-or-later|statically linked into conntrack|main|-
+conntrack-tools|GPL-2.0-or-later|conntrack only|main|-
+ipmitool|BSD-3-Clause|ipmitool|main|-
+mtd-utils|GPL-2.0-only AND GPL-2.0-or-later AND BSD-3-Clause|selected MTD and UBI tools|main|-
+libnl|LGPL-2.1-only|libnl-3 and libnl-genl-3, statically linked into iw|main|-
+iw|ISC|iw|main|-
+go|BSD-3-Clause|the Go runtime and standard library, statically linked into every Go tool in the same archive|any|runtime

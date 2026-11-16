@@ -28,20 +28,27 @@ awk -F '|' '
 
 awk -F '|' '
     /^#/ || NF == 0 { next }
-    NF != 5 { print FNR ": malformed architecture record"; bad=1; next }
+    NF != 6 { print FNR ": malformed architecture record"; bad=1; next }
     seen[$1]++ { print FNR ": duplicate architecture " $1; bad=1 }
+    $6 != "none" && $6 !~ /^GOARCH=[a-z0-9]+( GO[A-Z0-9]+=[a-z0-9.,]+)*$/ {
+        print FNR ": Go environment must be none or GOARCH=... first"; bad=1
+    }
     END { exit bad }
 ' "$repo_root/architectures.tsv"
 
 awk -F '|' '
     /^#/ || NF == 0 { next }
-    NF != 3 { print FNR ": malformed component record"; bad=1; next }
+    NF != 5 { print FNR ": malformed component record"; bad=1; next }
     seen[$1]++ { print FNR ": duplicate component " $1; bad=1 }
+    ($5 == "runtime") != ($4 == "any") || $4 !~ /^(main|extra|any)$/ {
+        print FNR ": archive must be main or extra, or any for the Go runtime"; bad=1
+    }
+    $5 == "" { print FNR ": Go packages must be -, runtime, or a list"; bad=1 }
     END { exit bad }
 ' "$repo_root/components.tsv"
 
 comm -3 \
-    <(awk -F '|' '$0 !~ /^#/ && $1 !~ /^zig-/ { print $1 }' \
+    <(awk -F '|' '$0 !~ /^#/ && $1 !~ /^(zig|go)-/ { print $1 }' \
         "$repo_root/sources.lock" | sort) \
     <(awk -F '|' '$0 !~ /^#/ { print $1 }' \
         "$repo_root/components.tsv" | sort) |
@@ -49,6 +56,14 @@ comm -3 \
         echo "sources.lock and components.tsv disagree" >&2
         exit 1
     }
+
+# The Go source in the bundle must be the release the toolchain builds with.
+go_versions=$(awk -F '|' '$1 ~ /^go(-|$)/ { print $2 }' "$repo_root/sources.lock" |
+    sort -u)
+[[ $(wc -l <<<"$go_versions") -eq 1 ]] || {
+    echo "sources.lock pins different versions of go, go-x86_64, and go-aarch64" >&2
+    exit 1
+}
 
 # Every hand-written CI matrix must list exactly the architectures in
 # architectures.tsv. A block is an `arch:` key followed by `- name` items.

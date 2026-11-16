@@ -480,6 +480,38 @@ def latest_zig(host: str) -> tuple[str, str]:
     return version, index[version][host]["tarball"]
 
 
+def latest_go(arch: str | None) -> tuple[str, str]:
+    """The newest stable Go: a host toolchain for ARCH, or the source."""
+    releases = json.loads(text("https://go.dev/dl/?mode=json"))
+    release = max(
+        (r for r in releases if r["stable"]),
+        key=lambda r: numeric_version(r["version"].removeprefix("go")),
+    )
+    wanted = (
+        {"kind": "archive", "os": "linux", "arch": arch}
+        if arch
+        else {"kind": "source"}
+    )
+    for item in release["files"]:
+        if all(item[key] == value for key, value in wanted.items()):
+            return (
+                release["version"].removeprefix("go"),
+                f"https://dl.google.com/go/{item['filename']}",
+            )
+    raise RuntimeError(f"no Go {arch or 'source'} archive in {release['version']}")
+
+
+def latest_wireguard_go() -> tuple[str, str]:
+    return latest_from_github_tags(
+        "WireGuard/wireguard-go",
+        r"(\d+\.\d+\.\d+)",
+        (
+            "https://github.com/WireGuard/wireguard-go/archive/refs/tags/"
+            "{version}.tar.gz"
+        ),
+    )
+
+
 DISCOVERERS: dict[str, Callable[[], tuple[str, str]]] = {
     "busybox": latest_busybox,
     "socat": latest_socat,
@@ -521,6 +553,10 @@ DISCOVERERS: dict[str, Callable[[], tuple[str, str]]] = {
     "iw": latest_iw,
     "zig-x86_64": lambda: latest_zig("x86_64-linux"),
     "zig-aarch64": lambda: latest_zig("aarch64-linux"),
+    "go-x86_64": lambda: latest_go("amd64"),
+    "go-aarch64": lambda: latest_go("arm64"),
+    "go": lambda: latest_go(None),
+    "wireguard-go": latest_wireguard_go,
 }
 
 
