@@ -1,0 +1,52 @@
+Serve the SFTP subsystem with the sftp-server installed beside dropbearmulti
+(the bundle's OpenSSH sftp-server), falling back to upstream's compile-time
+SFTPSERVER_PATH (/usr/libexec/sftp-server) when there is none. Dropbear
+otherwise only knows a fixed path, and the bundle is unpacked wherever there
+is room. Runtime lookup only: nothing executes at build time, so it is
+cross-compilation safe.
+
+--- a/src/svr-chansession.c
++++ b/src/svr-chansession.c
+@@ -40,6 +40,33 @@
+ 
+ /* Handles sessions (either shells or programs) requested by the client */
+ 
++#if DROPBEAR_SFTPSERVER
++/* statics: serve SFTP with the sftp-server beside this executable, so an
++ * unpacked bundle works from any directory. The path reaches the user's
++ * shell unquoted, so only plain path characters qualify; anything else, or
++ * no such program, falls back to SFTPSERVER_PATH. */
++static char *sftp_server_path(void) {
++	static const char name[] = "/sftp-server";
++	char path[PATH_MAX];
++	ssize_t len = readlink("/proc/self/exe", path, sizeof(path));
++	char *slash;
++
++	if (len > 0 && (size_t)len < sizeof(path)) {
++		path[len] = '\0';
++		slash = strrchr(path, '/');
++		if (slash && (size_t)(slash - path) + sizeof(name) <= sizeof(path)) {
++			memcpy(slash, name, sizeof(name));
++			if (path[strspn(path, "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
++					"abcdefghijklmnopqrstuvwxyz0123456789/._+-")] == '\0'
++					&& access(path, X_OK) == 0) {
++				return m_strdup(path);
++			}
++		}
++	}
++	return expand_homedir_path(SFTPSERVER_PATH);
++}
++#endif
++
+ static int sessioncommand(struct Channel *channel, struct ChanSess *chansess,
+ 		int iscmd, int issubsys);
+ static int sessionpty(struct ChanSess * chansess);
+@@ -696,7 +723,7 @@
+ 		if (issubsys) {
+ #if DROPBEAR_SFTPSERVER
+ 			if ((cmdlen == 4) && strncmp(chansess->cmd, "sftp", 4) == 0) {
+-				char *expand_path = expand_homedir_path(SFTPSERVER_PATH);
++				char *expand_path = sftp_server_path();
+ 				m_free(chansess->cmd);
+ 				chansess->cmd = m_strdup(expand_path);
+ 				m_free(expand_path);

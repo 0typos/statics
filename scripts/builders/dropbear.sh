@@ -8,6 +8,9 @@ build_dropbear() {
         # dropbearmulti's program table.
         cp "$REPO_ROOT/tunpipe/tunpipe.c" src/tunpipe.c
         patch -s -p1 < "$REPO_ROOT/patches/dropbear-tunpipe.patch"
+        # The SFTP subsystem runs the bundle's sftp-server from beside
+        # dropbearmulti, wherever the bundle is unpacked.
+        patch -s -p1 < "$REPO_ROOT/patches/dropbear-sftp-server.patch"
         # Zig's MIPS libc linker cannot optimize Autoconf's deliberately
         # prototype-less crypt/getpass probes. These functions are part of
         # the pinned musl sysroot, so provide the usual cross-build cache.

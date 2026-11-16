@@ -31,6 +31,10 @@ required_binaries=(
     nsenter unshare lsns setpriv findmnt
     e2fsck dumpe2fs tune2fs mke2fs smartctl nvme pppd tunpipe-standalone
     picocom sz rz gdbserver
+    sftp-server lsblk blkid sfdisk losetup mount umount dmesg
+    conntrack ipmitool iw
+    flash_erase flashcp nanddump nandwrite mtdinfo
+    ubiattach ubidetach ubinfo ubimkvol ubirmvol ubiupdatevol
 )
 
 for metadata in BUILDINFO BUILD_RECIPES_LICENSE COMPONENTS.tsv SBOM.spdx.json \
@@ -236,6 +240,36 @@ if [[ ${SKIP_QEMU:-0} != 1 ]]; then
     check_output util-linux "$output_dir/lsns" --version
     check_output util-linux "$output_dir/setpriv" --version
     check_output util-linux "$output_dir/findmnt" --version
+    for program in lsblk blkid sfdisk losetup mount umount dmesg; do
+        check_output util-linux "$output_dir/$program" --version
+    done
+    # sftp-server has no version flag; -Q lists the requests it serves. It
+    # looks up the calling user first, so a uid without a passwd entry (a
+    # container's --user) stops it with "No user found"; that also proves it
+    # started.
+    sftp_output=$("${runner[@]}" "$output_dir/sftp-server" -Q requests 2>&1) || true
+    [[ $sftp_output == *posix-rename* || $sftp_output == *"No user found for uid"* ]] || {
+        echo "unexpected output from sftp-server -Q requests: $sftp_output" >&2
+        exit 1
+    }
+    # Like nft, conntrack opens a NETLINK_NETFILTER socket before it parses
+    # any argument, which qemu-user cannot emulate. Under emulation its
+    # "Can't open handler" error proves it started; natively, --version runs.
+    if [[ ${#runner[@]} -eq 0 ]]; then
+        check_output conntrack-tools "$output_dir/conntrack" --version
+    else
+        conntrack_output=$("${runner[@]}" "$output_dir/conntrack" --version 2>&1) || true
+        [[ $conntrack_output == *"(conntrack-tools): Can't open handler"* ]] || {
+            echo "unexpected output from conntrack --version: $conntrack_output" >&2
+            exit 1
+        }
+    fi
+    check_output "ipmitool version" "$output_dir/ipmitool" -V
+    check_output "iw version" "$output_dir/iw" --version
+    for program in flash_erase flashcp nanddump nandwrite mtdinfo \
+        ubiattach ubidetach ubinfo ubimkvol ubirmvol ubiupdatevol; do
+        check_output mtd-utils "$output_dir/$program" --version
+    done
 fi
 
 echo "verified $arch"

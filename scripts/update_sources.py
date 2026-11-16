@@ -392,6 +392,87 @@ def latest_gdb() -> tuple[str, str]:
     )
 
 
+def latest_openssh() -> tuple[str, str]:
+    # Portable releases are versioned like 10.6p2, which numeric_version
+    # cannot order; compare every number in the version instead.
+    index = "https://cdn.openbsd.org/pub/OpenBSD/OpenSSH/portable/"
+    versions = set(
+        re.findall(r'openssh-(\d+\.\d+p\d+)\.tar\.gz"', text(index))
+    )
+    if not versions:
+        raise RuntimeError(f"no releases found at {index}")
+    version = max(
+        versions, key=lambda v: tuple(int(n) for n in re.findall(r"\d+", v))
+    )
+    return version, f"{index}openssh-{version}.tar.gz"
+
+
+def latest_netfilter(project: str, extension: str) -> tuple[str, str]:
+    return latest_from_index(
+        f"https://www.netfilter.org/projects/{project}/downloads.html",
+        rf"{re.escape(project)}-(\d+\.\d+\.\d+)\.tar\.{extension}",
+        (
+            f"https://www.netfilter.org/pub/{project}/"
+            f"{project}-{{version}}.tar.{extension}"
+        ),
+    )
+
+
+def latest_ipmitool() -> tuple[str, str]:
+    # Tags look like IPMITOOL_1_8_19; int() would accept "1_8_19" whole.
+    tags = json.loads(
+        text("https://api.github.com/repos/ipmitool/ipmitool/tags?per_page=100")
+    )
+    versions = [
+        ".".join(match.groups())
+        for tag in tags
+        if (match := re.fullmatch(r"IPMITOOL_(\d+)_(\d+)_(\d+)", tag["name"]))
+    ]
+    if not versions:
+        raise RuntimeError("no matching tags found for ipmitool/ipmitool")
+    version = max(versions, key=numeric_version)
+    tag = "IPMITOOL_" + version.replace(".", "_")
+    return (
+        version,
+        f"https://github.com/ipmitool/ipmitool/archive/refs/tags/{tag}.tar.gz",
+    )
+
+
+def latest_mtd_utils() -> tuple[str, str]:
+    return latest_from_index(
+        "https://infraroot.at/pub/mtd/",
+        r"mtd-utils-(\d+\.\d+\.\d+)\.tar\.bz2",
+        "https://infraroot.at/pub/mtd/mtd-utils-{version}.tar.bz2",
+    )
+
+
+def latest_libnl() -> tuple[str, str]:
+    release = json.loads(
+        text("https://api.github.com/repos/thom311/libnl/releases/latest")
+    )
+    match = re.fullmatch(r"libnl(\d+)_(\d+)_(\d+)", release["tag_name"])
+    if match is None:
+        raise RuntimeError(f"unexpected libnl tag: {release['tag_name']}")
+    version = ".".join(match.groups())
+    url = (
+        "https://github.com/thom311/libnl/releases/download/"
+        f"{release['tag_name']}/libnl-{version}.tar.gz"
+    )
+    if url not in {
+        asset["browser_download_url"] for asset in release.get("assets", [])
+    }:
+        raise RuntimeError(f"release asset not found for libnl: {url}")
+    return version, url
+
+
+def latest_iw() -> tuple[str, str]:
+    return latest_from_index(
+        "https://mirrors.edge.kernel.org/pub/software/network/iw/",
+        r"iw-(\d+\.\d+)\.tar\.xz",
+        "https://cdn.kernel.org/pub/software/network/iw/iw-{version}.tar.xz",
+    )
+
+
 def latest_zig(host: str) -> tuple[str, str]:
     index = json.loads(text("https://ziglang.org/download/index.json"))
     stable = [key for key in index if re.fullmatch(r"\d+\.\d+\.\d+", key)]
@@ -428,6 +509,16 @@ DISCOVERERS: dict[str, Callable[[], tuple[str, str]]] = {
     "picocom": latest_picocom,
     "lrzsz": latest_lrzsz,
     "gdb": latest_gdb,
+    "openssh": latest_openssh,
+    "libnfnetlink": lambda: latest_netfilter("libnfnetlink", "bz2"),
+    "libnetfilter_conntrack": lambda: latest_netfilter(
+        "libnetfilter_conntrack", "xz"
+    ),
+    "conntrack-tools": lambda: latest_netfilter("conntrack-tools", "xz"),
+    "ipmitool": latest_ipmitool,
+    "mtd-utils": latest_mtd_utils,
+    "libnl": latest_libnl,
+    "iw": latest_iw,
     "zig-x86_64": lambda: latest_zig("x86_64-linux"),
     "zig-aarch64": lambda: latest_zig("aarch64-linux"),
 }
