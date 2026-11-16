@@ -48,7 +48,7 @@ scratch, so planted layers produce a mismatch and block the release. The
 Dockerfile is the only definition of the toolchain, and any tag rebuilds from
 the repository without the image.
 
-The weekly source updater discovers stable releases and computes new digests,
+The source updater (`make update-sources`) discovers stable releases and computes new digests,
 but only opens a pull request. It does not merge into the default branch.
 Reviewers should inspect upstream release notes, compare published checksums,
 and verify upstream signatures where available.
@@ -86,9 +86,8 @@ Each build:
 - exports the exact source archives as a companion artifact.
 
 Every release also rebuilds x86-64 without any cache, toolchain included, and
-requires the result to be byte-identical to the archive it ships. The weekly
-scheduled build runs the same comparison on the published toolchain stage
-(below); pull requests and pushes skip it for speed. Every release archive
+requires the result to be byte-identical to the archive it ships. `make repro`
+runs the same comparison locally, toolchain included; pull requests and pushes skip it for speed. Every release archive
 carries Sigstore bundles, signed keylessly by the CircleCI release job through
 its OIDC identity and logged in the public Rekor transparency log: SLSA
 provenance tying the archive to its repository, tag, and commit, and, for

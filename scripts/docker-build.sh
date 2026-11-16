@@ -10,6 +10,7 @@
 #
 # Usage: docker-build.sh TARGET [BUILDX_ARG...]
 # TOOLCHAIN_IMAGE overrides the cache reference; set it empty to skip it.
+# DOCKER overrides the container command.
 set -euo pipefail
 
 if [[ $# -lt 1 ]]; then
@@ -27,7 +28,7 @@ if [[ -n $image ]]; then
     cache=(--cache-from "type=registry,ref=$image")
 fi
 
-exec docker buildx build \
+exec "${DOCKER:-docker}" buildx build \
     --progress=plain \
     --file "$repo_root/docker/Dockerfile" \
     --target "$target" \
