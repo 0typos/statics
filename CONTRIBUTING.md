@@ -26,15 +26,14 @@ documenting their applicable terms.
 Create a focused branch, make the smallest coherent change, and run:
 
 ```console
-./scripts/validate.sh
-shellcheck scripts/*.sh scripts/builders/*.sh scripts/lib/*.sh scripts/toolchain/*
+make check
 make build ARCH=x86_64
 make smoke ARCH=x86_64
 ```
 
 Changes to `tunpipe/` also need `./scripts/test-tunpipe.sh dist/x86_64` on a
-host with unprivileged user namespaces. Containers usually lack them, so CI
-only smoke-tests `tunpipe -h`.
+host with unprivileged user namespaces. Containers usually lack them; CI runs
+it on the x86-64 build's VM.
 
 ShellCheck is also run in CI. A full local matrix is welcome but not required
 for every documentation-only change. Architecture-sensitive build changes
@@ -153,7 +152,7 @@ upstream release notes, published checksums, signatures when available,
 license changes, and archive provenance. Then run the relevant builds and
 verification. A new digest is not evidence by itself that an update is safe.
 
-The weekly automation follows this same pattern and opens a pull request. It
+`make update-sources` follows this same pattern and opens a pull request. It
 must not be auto-merged.
 
 ## Change a build profile
@@ -187,7 +186,7 @@ clone.
 - Inputs are pinned and checksum-verified.
 - New repository-authored material is compatible with the MIT license.
 - License notices and SBOM relationships remain complete.
-- `./scripts/validate.sh` and ShellCheck pass.
+- `make check` passes.
 - Relevant targets build and smoke-test.
 - Runtime and architecture limitations are documented.
 - The PR explains any check that could not be run locally.

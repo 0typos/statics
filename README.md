@@ -194,8 +194,8 @@ than republishing the same bits.
 Each candidate is validated, cross-built, verified as statically linked and smoke-run
 under QEMU. CI also rebuilds x86-64 twice and compares the complete output, publishes
 checksums, SBOMs, notices and matching sources, and signs SLSA provenance and the SBOM
-with Sigstore. A weekly build catches toolchain regressions; a separate updater
-opens reviewed checksum-refresh PRs.
+with Sigstore. `make repro` runs the same rebuild comparison locally, and
+`make update-sources` opens reviewed checksum-refresh PRs.
 
 Monthly repinning is intentionally unattended and never writes to `main`. The
 [release guide](docs/RELEASING.md) explains every gate, retention, retry and signing

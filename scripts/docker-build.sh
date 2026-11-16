@@ -9,7 +9,9 @@
 # unreachable image only costs time.
 #
 # Usage: docker-build.sh TARGET [BUILDX_ARG...]
-# TOOLCHAIN_IMAGE overrides the cache reference; set it empty to skip it.
+# TOOLCHAIN_IMAGE overrides the cache reference; set it empty to skip it and
+# the per-arch deps-ARCH images beside it.
+# DOCKER overrides the container command.
 set -euo pipefail
 
 if [[ $# -lt 1 ]]; then
@@ -25,9 +27,17 @@ cache=()
 image=${TOOLCHAIN_IMAGE-ghcr.io/0typos/statics-toolchain:main}
 if [[ -n $image ]]; then
     cache=(--cache-from "type=registry,ref=$image")
+    # The same package carries each arch's deps stage as deps-ARCH.
+    prev=""
+    for arg in "$@"; do
+        if [[ $prev == --build-arg && $arg == ARCH=* ]]; then
+            cache+=(--cache-from "type=registry,ref=${image%:*}:deps-${arg#ARCH=}")
+        fi
+        prev=$arg
+    done
 fi
 
-exec docker buildx build \
+exec "${DOCKER:-docker}" buildx build \
     --progress=plain \
     --file "$repo_root/docker/Dockerfile" \
     --target "$target" \

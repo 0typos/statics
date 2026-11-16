@@ -4,8 +4,7 @@ Describe the problem and the approach taken.
 
 ## Validation
 
-- [ ] `./scripts/validate.sh`
-- [ ] ShellCheck passes for modified shell scripts
+- [ ] `make check`
 - [ ] Relevant architecture builds or smoke tests pass
 - [ ] Generated artifacts under `dist/` and `.build/` are not committed
 
