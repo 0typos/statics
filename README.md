@@ -41,7 +41,7 @@ user-mode emulation proves that non-native outputs can actually start.
 
 | 🧰 Carry it | 🐧 Run it | 🔐 Trust it |
 |---|---|---|
-| 53 physical executables, plus BusyBox and Dropbear links | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
+| 79 physical executables, plus BusyBox and Dropbear links | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
 | Network, process, namespace, storage and hardware diagnosis | Static musl builds avoid a dependency on the target's libc | Deterministic archives, QEMU smoke tests and release attestations |
 
 ## Get a kit
@@ -111,17 +111,20 @@ data and safe starting commands.
 
 ## Inside the case
 
-The bundle contains 53 physical executables plus BusyBox and Dropbear multi-call links,
+The bundle contains 79 physical executables plus BusyBox and Dropbear multi-call links,
 Nmap runtime data, checksums, an SPDX SBOM and upstream license texts.
 
 | Area | Outputs | What they are for |
 |---|---|---|
 | Rescue userspace | `busybox`, `nc`, `netcat` | Shell recovery, basic reachability and familiar applet links |
-| Remote access and transfer | `socat`, `ncat`, `rsync`, `dropbear`, `dbclient`, `dropbearkey`, `dropbearconvert`, `scp`, `tunpipe`, `tunpipe-standalone`, `pppd` | Relays, emergency SSH, IP tunnels over SSH and file movement |
-| Network state and control | `ip`, `ss`, `bridge`, `tc`, `wg`, `ethtool`, `nft` | Interfaces, routes, sockets, policy and NIC state |
+| Remote access and transfer | `socat`, `ncat`, `rsync`, `dropbear`, `dbclient`, `dropbearkey`, `dropbearconvert`, `scp`, `sftp-server`, `tunpipe`, `tunpipe-standalone`, `pppd` | Relays, emergency SSH with SFTP, IP tunnels over SSH and file movement |
+| Network state and control | `ip`, `ss`, `bridge`, `tc`, `wg`, `ethtool`, `nft`, `conntrack`, `iw` | Interfaces, routes, sockets, policy, connection tracking, Wi-Fi and NIC state |
 | Discovery and packet diagnosis | `nmap`, `tcpdump`, `iperf3`, `mtr`, `mtr-packet` | Services, captures, paths and throughput |
 | HTTP, TLS, DNS and data | `curl`, `openssl`, `drill`, `jq` | Protocol checks and structured output |
-| Process and storage diagnosis | `strace`, `lsof`, `e2fsck`, `dumpe2fs`, `tune2fs`, `mke2fs`, `smartctl`, `nvme` | Syscalls, open files, filesystems and device health |
+| Serial console and transfer | `picocom`, `sz`, `rz` | Serial consoles and ZMODEM file transfer over a serial or terminal session |
+| Process and storage diagnosis | `strace`, `lsof`, `gdbserver`, `e2fsck`, `dumpe2fs`, `tune2fs`, `mke2fs`, `smartctl`, `nvme` | Syscalls, open files, remote debugging, filesystems and device health |
+| Disks, mounts and kernel log | `lsblk`, `blkid`, `sfdisk`, `losetup`, `mount`, `umount`, `dmesg` | Block devices, partition tables, loop devices, mounts and kernel messages |
+| Flash and out-of-band management | `flash_erase`, `flashcp`, `nanddump`, `nandwrite`, `mtdinfo`, `ubi*`, `ipmitool` | Raw NOR/NAND flash, UBI volumes and BMCs over IPMI |
 | Namespaces and privilege | `nsenter`, `unshare`, `lsns`, `setpriv`, `findmnt` | Enter, create, inspect and constrain Linux execution contexts |
 | CAN and ISO-TP | `candump`, `cansend`, `cangen`, `canplayer`, `cansniffer`, `isotp*`, `slcand`, `canbusload` | Field and vehicle networks |
 | Hardware buses | `i2cdetect`, `i2cdump`, `i2cget`, `i2cset`, `i2ctransfer`, `spi-config`, `spi-pipe` | Linux I²C and spidev diagnosis |

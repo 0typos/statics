@@ -99,6 +99,17 @@ sources=(
     libnvme
     nvme-cli
     ppp
+    picocom
+    lrzsz
+    gdb
+    openssh
+    libnfnetlink
+    libnetfilter_conntrack
+    conntrack-tools
+    ipmitool
+    mtd-utils
+    libnl
+    iw
 )
 
 # STATICS_ONLY_DEPS builds just the shared libraries (the Dockerfile's deps
@@ -177,7 +188,9 @@ dag=$WORK_DIR/dag.mk
     for c in deps libnftnl nftables strace tcpdump curl iperf3 ethtool jq \
         ldns mtr can-utils i2c-tools spi-tools nmap rsync lsof util-linux \
         busybox socat dropbear iproute2 wireguard-tools \
-        e2fsprogs smartmontools libnvme nvme-cli ppp tunpipe; do
+        e2fsprogs smartmontools libnvme nvme-cli ppp tunpipe picocom lrzsz gdb \
+        sftp-server libnfnetlink libnetfilter_conntrack conntrack ipmitool \
+        mtd-utils libnl iw; do
         printf ' $(S)/%s' "$c"
     done
     printf '\n\n'
@@ -220,6 +233,17 @@ dag=$WORK_DIR/dag.mk
     emit nvme-cli nvme build_nvme_cli libnvme
     emit ppp ppp build_ppp
     emit tunpipe tunpipe build_tunpipe
+    emit picocom picocom build_picocom
+    emit lrzsz lrzsz build_lrzsz
+    emit gdb gdb build_gdbserver
+    emit sftp-server openssh build_sftp_server
+    emit libnfnetlink conntrack build_libnfnetlink deps
+    emit libnetfilter_conntrack conntrack build_libnetfilter_conntrack deps libnfnetlink
+    emit conntrack conntrack build_conntrack libnetfilter_conntrack
+    emit ipmitool ipmitool build_ipmitool deps
+    emit mtd-utils mtd-utils build_mtd_utils
+    emit libnl iw build_libnl deps
+    emit iw iw build_iw libnl
 } > "$dag"
 
 if ! make -f "$dag" -j"$JOBS" --output-sync=target "$goal"; then
