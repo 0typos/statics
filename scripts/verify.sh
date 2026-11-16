@@ -30,6 +30,7 @@ required_binaries=(
     nmap ncat rsync lsof
     nsenter unshare lsns setpriv findmnt
     e2fsck dumpe2fs tune2fs mke2fs smartctl nvme pppd tunpipe-standalone
+    picocom sz rz gdbserver
 )
 
 for metadata in BUILDINFO BUILD_RECIPES_LICENSE COMPONENTS.tsv SBOM.spdx.json \
@@ -226,6 +227,10 @@ if [[ ${SKIP_QEMU:-0} != 1 ]]; then
         echo "unexpected output from pppd --version: $pppd_output" >&2
         exit 1
     }
+    check_output picocom "$output_dir/picocom" --help
+    check_output lrzsz "$output_dir/sz" --version
+    check_output lrzsz "$output_dir/rz" --version
+    check_output gdbserver "$output_dir/gdbserver" --version
     check_output util-linux "$output_dir/nsenter" --version
     check_output util-linux "$output_dir/unshare" --version
     check_output util-linux "$output_dir/lsns" --version

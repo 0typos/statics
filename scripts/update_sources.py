@@ -368,6 +368,30 @@ def latest_ppp() -> tuple[str, str]:
     )
 
 
+def latest_picocom() -> tuple[str, str]:
+    return latest_from_github_tags(
+        "npat-efault/picocom",
+        r"(\d+\.\d+)",
+        "https://github.com/npat-efault/picocom/archive/refs/tags/{version}.tar.gz",
+    )
+
+
+def latest_lrzsz() -> tuple[str, str]:
+    return latest_from_index(
+        "https://ohse.de/uwe/software/lrzsz.html",
+        r"lrzsz-(\d+\.\d+\.\d+)\.tar\.gz",
+        "https://ohse.de/uwe/releases/lrzsz-{version}.tar.gz",
+    )
+
+
+def latest_gdb() -> tuple[str, str]:
+    return latest_from_index(
+        "https://ftp.gnu.org/gnu/gdb/",
+        r'gdb-(\d+\.\d+(?:\.\d+)?)\.tar\.xz"',
+        "https://ftp.gnu.org/gnu/gdb/gdb-{version}.tar.xz",
+    )
+
+
 def latest_zig(host: str) -> tuple[str, str]:
     index = json.loads(text("https://ziglang.org/download/index.json"))
     stable = [key for key in index if re.fullmatch(r"\d+\.\d+\.\d+", key)]
@@ -401,6 +425,9 @@ DISCOVERERS: dict[str, Callable[[], tuple[str, str]]] = {
     "lsof": latest_lsof,
     "util-linux": latest_util_linux,
     "ppp": latest_ppp,
+    "picocom": latest_picocom,
+    "lrzsz": latest_lrzsz,
+    "gdb": latest_gdb,
     "zig-x86_64": lambda: latest_zig("x86_64-linux"),
     "zig-aarch64": lambda: latest_zig("aarch64-linux"),
 }

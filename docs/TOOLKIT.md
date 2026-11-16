@@ -1,6 +1,6 @@
 # Toolkit guide
 
-The default bundle is a compact Linux troubleshooting kit: 53 physical
+The default bundle is a compact Linux troubleshooting kit: 57 physical
 executables, BusyBox applet links, Dropbear multi-call links, Nmap runtime
 data, license texts, checksums, and build metadata. Static linking removes the
 dependency on a target's installed libc; it does not replace kernel features,
@@ -30,7 +30,8 @@ Nmap data, notices, and licenses remain available.
 | Network control | `ip`, `ss`, `bridge`, `tc`, `wg`, `ethtool`, `nft` | Addresses, routes, sockets, links, traffic control, WireGuard, firewall policy, and NIC state |
 | Discovery and packet diagnosis | `nmap`, `tcpdump`, `mtr`, `mtr-packet`, `iperf3` | Host/service discovery, capture, path analysis, and throughput |
 | Protocol and data checks | `curl`, `openssl`, `drill`, `jq`, `rsync` | HTTP, TLS, DNS, structured output, and efficient file transfer |
-| Process diagnosis | `strace`, `lsof` | System-call tracing and process/file/socket correlation |
+| Serial console and transfer | `picocom`, `sz`, `rz` | Serial terminal sessions and XMODEM/YMODEM/ZMODEM file transfer |
+| Process diagnosis | `strace`, `lsof`, `gdbserver` | System-call tracing, process/file/socket correlation, and remote debugging with a host GDB |
 | Filesystems and storage | `e2fsck`, `dumpe2fs`, `tune2fs`, `mke2fs`; `fsck.ext2`, `fsck.ext3`, `fsck.ext4`, `mkfs.ext4`; `smartctl`, `nvme` | ext filesystem inspection and repair, drive health, and NVMe diagnosis |
 | Namespaces and privilege | `nsenter`, `unshare`, `lsns`, `setpriv`, `findmnt` | Enter, create, enumerate, constrain, and inspect namespace state |
 | CAN and ISO-TP | `candump`, `cansend`, `cangen`, `canplayer`, `cansniffer`, `isotpdump`, `isotprecv`, `isotpsend`, `slcand`, `canbusload` | SocketCAN and ISO-TP field diagnosis |
@@ -324,6 +325,51 @@ pppd noauth pty 'dbclient root@server pppd notty noauth' 10.9.0.2:10.9.0.1
 The `chat` modem scripting tool is not included. Per-file pppd notices are
 collected into `licenses/ppp/PPPD-NOTICES`.
 
+### Serial consoles: picocom and lrzsz
+
+`picocom` is a small serial terminal. Upstream's arbitrary (non-standard)
+baud-rate support relies on glibc's termios layout and is enabled only on
+x86, so it is compiled out on every target: the standard rates up to
+4000000 are available, but a rate such as 74880 is not. Ports are locked with
+`flock(2)`; UUCP lock files are not used. Exit with `C-a C-x`.
+
+```console
+picocom -b 115200 /dev/ttyUSB0
+```
+
+`sz` and `rz` are lrzsz's `lsz` and `lrz`, built without NLS. picocom's
+default send and receive commands are `sz -vv` and `rz -vv -E`, so with the
+kit on `PATH` a file moves over the console without a network: start `rz` on
+the far end, then press `C-a C-s` in picocom and name the file. In the other
+direction, run `sz FILE` on the far end and press `C-a C-r`; `-E` renames
+rather than overwrites an existing local file. Any terminal that speaks
+ZMODEM can drive them the same way.
+
+Opening a serial device usually needs membership in its group (often
+`dialout`) or root.
+
+### Remote debugging: gdbserver
+
+`gdbserver` comes from GNU GDB; GDB itself, Python, expat, debuginfod, and
+the in-process agent (fast tracepoints) are not built. Debug from a host GDB
+that understands the target architecture, such as `gdb-multiarch`, with the
+same executable and its symbols on the host.
+
+Running it over an SSH session's stdio needs no listener on the target:
+
+```console
+gdb ./app -ex 'target remote | dbclient root@device /tmp/statics/gdbserver - /usr/bin/app'
+```
+
+`gdbserver --attach - PID` attaches to a running process instead. A TCP
+listener (`gdbserver 127.0.0.1:2345 PROGRAM`) gives anyone who can reach it
+full control of the debugged process, so keep it on loopback and forward it
+over SSH. There is no `libthread_db` in a static musl build: threads are
+listed and stepped through ptrace, but GDB cannot use `libthread_db` to
+inspect thread-local variables. Debugging needs ptrace permission over the
+process, which root normally has, subject to Yama `ptrace_scope` and
+LSM policy.
+
 ### Rsync
 
 Rsync includes IPv4/IPv6, local socket-pair support, and bundled popt and
@@ -384,7 +430,8 @@ Exact rules vary by kernel and security policy, but these are common:
 | ICMP/raw probes, some Nmap scan modes, packet capture | root or capabilities such as `CAP_NET_RAW` |
 | Address, route, link, WireGuard, bridge, or traffic-control changes | root or `CAP_NET_ADMIN` |
 | Inspect or change nftables rules | commonly root or `CAP_NET_ADMIN` |
-| Trace or inspect another user's process | root, ptrace permission, and compatible LSM policy |
+| Trace, inspect, or debug another user's process | root, ptrace permission, and compatible LSM policy |
+| Open a serial console | the device's group (often `dialout`) or root |
 | Enter another process's namespaces | commonly root or `CAP_SYS_ADMIN` in the owning user namespace |
 | Create user/network/mount/PID namespaces | kernel namespace support plus the applicable sysctl, LSM, seccomp, and capability policy |
 | Read I²C/SPI devices or CAN interfaces | suitable device/interface permissions and drivers |
