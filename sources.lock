@@ -36,3 +36,11 @@ ppp|2.5.5|0ebbcfef906d16cfbb9cbdd19c0d92aa3df2fd8fdd29731f614c58d16a279aa5|https
 picocom|3.1|e6761ca932ffc6d09bd6b11ff018bdaf70b287ce518b3282d29e0270e88420bb|https://github.com/npat-efault/picocom/archive/refs/tags/3.1.tar.gz
 lrzsz|0.13.1|112f91059fbd118e016d800c1a5c5a1702e965d8b9bfbda6015e44e20bfb93c9|https://ohse.de/uwe/releases/lrzsz-0.13.1.tar.gz
 gdb|18.1|cd9fc3fe2b47743840e42c1592d3d87f8302eb18639c0b8b4ba0898002e2348f|https://ftp.gnu.org/gnu/gdb/gdb-18.1.tar.xz
+openssh|10.6p2|9ae44872090cf2f06b3cf9ff147e7f16f309671340763ed2f99248398ae29d5b|https://cdn.openbsd.org/pub/OpenBSD/OpenSSH/portable/openssh-10.6p2.tar.gz
+libnfnetlink|1.0.2|b064c7c3d426efb4786e60a8e6859b82ee2f2c5e49ffeea640cfe4fe33cbc376|https://www.netfilter.org/pub/libnfnetlink/libnfnetlink-1.0.2.tar.bz2
+libnetfilter_conntrack|1.1.1|769d3eaf57fa4fbdb05dd12873b6cb9a5be7844d8937e222b647381d44284820|https://www.netfilter.org/pub/libnetfilter_conntrack/libnetfilter_conntrack-1.1.1.tar.xz
+conntrack-tools|1.4.9|c15afe488a8d408c9d6d61e97dbd19f3c591942f62c13df6453a961ca4231cae|https://www.netfilter.org/pub/conntrack-tools/conntrack-tools-1.4.9.tar.xz
+ipmitool|1.8.19|48b010e7bcdf93e4e4b6e43c53c7f60aa6873d574cbd45a8d86fa7aaeebaff9c|https://github.com/ipmitool/ipmitool/archive/refs/tags/IPMITOOL_1_8_19.tar.gz
+mtd-utils|2.3.1|03d9dc58ad10ea3549d9528f6b17a44d8944e18e96c0f31474f9f977078b83dc|https://infraroot.at/pub/mtd/mtd-utils-2.3.1.tar.bz2
+libnl|3.12.0|fc51ca7196f1a3f5fdf6ffd3864b50f4f9c02333be28be4eeca057e103c0dd18|https://github.com/thom311/libnl/releases/download/libnl3_12_0/libnl-3.12.0.tar.gz
+iw|6.17|7d182e498289ab39b257da6780d562e415377107f50358ee5b55b8cfe40b1e33|https://cdn.kernel.org/pub/software/network/iw/iw-6.17.tar.xz

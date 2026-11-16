@@ -102,6 +102,14 @@ sources=(
     picocom
     lrzsz
     gdb
+    openssh
+    libnfnetlink
+    libnetfilter_conntrack
+    conntrack-tools
+    ipmitool
+    mtd-utils
+    libnl
+    iw
 )
 
 for path in "$WORK_DIR" "$OUTPUT_DIR"; do
@@ -162,7 +170,9 @@ dag=$WORK_DIR/dag.mk
     for c in deps libnftnl nftables strace tcpdump curl iperf3 ethtool jq \
         ldns mtr can-utils i2c-tools spi-tools nmap rsync lsof util-linux \
         busybox socat dropbear iproute2 wireguard-tools \
-        e2fsprogs smartmontools libnvme nvme-cli ppp tunpipe picocom lrzsz gdb; do
+        e2fsprogs smartmontools libnvme nvme-cli ppp tunpipe picocom lrzsz gdb \
+        sftp-server libnfnetlink libnetfilter_conntrack conntrack ipmitool \
+        mtd-utils libnl iw; do
         printf ' $(S)/%s' "$c"
     done
     printf '\n\n'
@@ -208,6 +218,14 @@ dag=$WORK_DIR/dag.mk
     emit picocom picocom build_picocom
     emit lrzsz lrzsz build_lrzsz
     emit gdb gdb build_gdbserver
+    emit sftp-server openssh build_sftp_server
+    emit libnfnetlink conntrack build_libnfnetlink deps
+    emit libnetfilter_conntrack conntrack build_libnetfilter_conntrack deps libnfnetlink
+    emit conntrack conntrack build_conntrack libnetfilter_conntrack
+    emit ipmitool ipmitool build_ipmitool deps
+    emit mtd-utils mtd-utils build_mtd_utils
+    emit libnl iw build_libnl deps
+    emit iw iw build_iw libnl
 } > "$dag"
 
 if ! make -f "$dag" -j"$JOBS" --output-sync=target all; then
