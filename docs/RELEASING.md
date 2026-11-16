@@ -37,8 +37,7 @@ Release from a reviewed commit on `main`, with no uncommitted release changes:
 
 ```console
 git status --short
-./scripts/validate.sh
-shellcheck scripts/*.sh scripts/builders/*.sh scripts/lib/*.sh scripts/toolchain/*
+make check
 make smoke ARCH=x86_64
 make package ARCH=x86_64
 ```
@@ -131,8 +130,8 @@ date is already taken the tag becomes `vYYYY.MM.DD.1`, `.2`, and so on.
 This path trades maintainer review of upstream releases for unattended
 delivery. It repins and publishes without a human reading upstream release
 notes or checking upstream signatures, which the reviewed
-`update-sources` pull request into `main` (weekly schedule,
-`task=update-sources`, `scripts/update-sources-pr.sh`) still exists to do. Two
+`update-sources` pull request into `main` (`make update-sources`, or a
+manual `task=update-sources` pipeline) still exists to do. Two
 supported ways to keep review in the loop:
 
 - release only what `main` already pins, by setting the schedule's
@@ -193,8 +192,9 @@ Confirm that the repository owner and URL in local Git configuration are the
 intended public destination before setting `origin`.
 
 The CircleCI pipeline definition needs an all-pushes trigger, a tags-only
-trigger, and three schedules (weekly `task=reproducibility`, monthly
-`task=monthly-release`, weekly `task=update-sources`, all on `main`).
+trigger, and a monthly `task=monthly-release` schedule on `main`.
+Reproducibility and source updates run by hand: `make repro`,
+`make update-sources`.
 
 The `statics-toolchain` GHCR package must stay public, so every job can
 pull it anonymously. A missing image only costs time: builds rebuild the
