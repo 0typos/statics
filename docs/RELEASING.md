@@ -215,7 +215,7 @@ project and to pipelines on `main` or a `v*` tag:
   Because it is not GitHub's workflow token, its pushes start CircleCI
   pipelines like any other push.
 - `GHCR_TOKEN`: a classic token with only `write:packages`, for the
-  toolchain image.
+  toolchain and `deps-<arch>` images.
 
 Rotate both before they expire. Signing needs no secret: the job's OIDC token
 is minted per run. The context is also withheld from SSH reruns.

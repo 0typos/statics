@@ -173,7 +173,11 @@ workflow builds it from scratch on `main` and publishes it as
 layer cache through `scripts/docker-build.sh`. It is never a `FROM`: the
 Dockerfile remains the only definition, BuildKit reuses the image's layers
 only when they match what the Dockerfile would build, and a missing image
-just means the stage is built locally. `TOOLCHAIN_IMAGE=''` disables it.
+just means the stage is built locally. The same workflow publishes each
+architecture's shared libraries (OpenSSL, libpcap, libmnl, libcap-ng: the
+`deps` stage) as `statics-toolchain:deps-<arch>`, which CI's matching builds
+also pull; local builds pass no `COMPONENT_TIMEOUT` and so build them.
+Releases never use these images. `TOOLCHAIN_IMAGE=''` disables both.
 
 ## Deploy a bundle
 

@@ -84,6 +84,25 @@ RUN --mount=type=cache,id=statics-source-archives,target=/var/cache/statics \
          --extract /src \
          --bundle /archives
 
+# The shared libraries (OpenSSL above all) are about half of every compile and
+# change only with their pins or the build scripts, so they get their own
+# stage. CI publishes it per arch from main as a layer cache, like the
+# toolchain; a miss only costs time. No JOBS argument: it would key the cache
+# on the machine size.
+FROM sources AS deps
+ARG ARCH=x86_64
+ARG COMPONENT_TIMEOUT
+COPY architectures.tsv ./
+COPY scripts/build.sh scripts/run-builder.sh scripts/
+COPY scripts/lib/ scripts/lib/
+COPY scripts/builders/dependencies.sh scripts/builders/
+COPY scripts/toolchain/ scripts/toolchain/
+RUN chmod +x scripts/*.sh scripts/toolchain/* \
+    && STATICS_ONLY_DEPS=1 STATICS_COMPONENT_TIMEOUT="$COMPONENT_TIMEOUT" \
+        scripts/build.sh "$ARCH" "/deps/$ARCH/out" \
+    && mv "/build/$ARCH/prefix" "/deps/$ARCH/prefix" \
+    && rm -rf /build
+
 FROM sources AS builder
 ARG ARCH=x86_64
 # Per-component `make -j` budget. Empty ⇒ build.sh defaults to nproc (correct
@@ -105,13 +124,14 @@ COPY scripts/build.sh scripts/run-builder.sh scripts/merge-kconfig.sh \
 COPY scripts/lib/ scripts/lib/
 COPY scripts/builders/ scripts/builders/
 COPY scripts/toolchain/ scripts/toolchain/
+COPY --from=deps /deps/ /deps/
 # The work tree (a copy of every source plus objects, ~0.9 GB per arch) is
 # removed in the same layer: it is never read again, and keeping it made each
 # arch's exported layer cache about a gigabyte, enough for the 13 arches to
 # evict one another from GitHub's 10 GB cache.
 RUN chmod +x scripts/*.sh scripts/toolchain/* \
     && JOBS="$JOBS" STATICS_COMPONENT_TIMEOUT="$COMPONENT_TIMEOUT" \
-        scripts/build.sh "$ARCH" "/out/$ARCH" \
+        STATICS_DEPS_FROM="/deps/$ARCH" scripts/build.sh "$ARCH" "/out/$ARCH" \
     && rm -rf /build
 
 FROM builder AS test

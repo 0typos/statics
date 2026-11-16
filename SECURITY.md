@@ -37,14 +37,18 @@ that freshness check is disabled: an on-path attacker could replay an older
 signed Release, though not alter a package. `BUILDINFO` records the snapshot
 and a digest of the installed package list, which exposes such a rollback.
 
-CI pulls the toolchain stage from `ghcr.io/0typos/statics-toolchain:main` as a
-layer cache. The `Toolchain image` workflow publishes it only from `main`, but
+CI pulls the toolchain stage from `ghcr.io/0typos/statics-toolchain:main`, and
+each architecture's shared libraries from its `deps-<arch>` tag, as a layer
+cache. The `Toolchain image` workflow publishes both only from `main`, but
 the package itself is writable by any workflow in this repository and by any
 token with package write access, so it is not a trust boundary. BuildKit
 reuses its layers wherever their cache keys match, so a planted toolchain
 would reach the matrix build. Release builds therefore do not depend on it:
 their reproducibility rebuild ignores the image and builds the toolchain from
-scratch, so planted layers produce a mismatch and block the release. The
+scratch, so planted layers produce a mismatch and block the release. That
+comparison covers x86-64 only, so release builds never use the per-arch
+`deps-<arch>` images at all: every release archive compiles its shared
+libraries and components from the pinned sources. The
 Dockerfile is the only definition of the toolchain, and any tag rebuilds from
 the repository without the image.
 
