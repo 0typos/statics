@@ -245,8 +245,9 @@ GOPROXY=file:///tmp/sources/go-modules GOFLAGS=-mod=readonly \
 ## Go tools and network access
 
 Go tools are built by the Go release pinned as `go-x86_64` and `go-aarch64`
-in `sources.lock`, from go.dev rather than Debian. The sources stage is the
-only step with network access for Go: `scripts/fetch-go-modules.sh` asks the
+in `sources.lock`, from go.dev rather than Debian. The Dockerfile's
+`go-modules` stage, built on the sources stage, is the only step with network
+access for Go: `scripts/fetch-go-modules.sh` asks the
 module proxy for exactly the modules each tool's main packages import on
 Linux, for every Go architecture, with `-mod=readonly`, so each upstream
 `go.sum` (inside its pinned source archive) must already list them and every

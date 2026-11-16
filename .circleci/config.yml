@@ -740,11 +740,8 @@ jobs:
           name: Look for an image built from these inputs
           command: |
             set -euo pipefail
-            # The deps stage builds FROM sources, so the inputs that choose
-            # Go modules count too.
-            digest=$(cat docker/Dockerfile sources.lock architectures.tsv components.tsv \
-              scripts/fetch.sh scripts/fetch-sources.sh scripts/fetch-go-modules.sh \
-              scripts/docker-build.sh \
+            digest=$(cat docker/Dockerfile sources.lock architectures.tsv \
+              scripts/fetch.sh scripts/fetch-sources.sh scripts/docker-build.sh \
               scripts/build.sh scripts/run-builder.sh scripts/lib/* \
               scripts/builders/dependencies.sh scripts/toolchain/* |
               sha256sum | cut -c1-32)

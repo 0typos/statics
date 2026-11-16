@@ -89,18 +89,24 @@ ENV PATH=/opt/go/bin:/opt/zig:${PATH} \
     GOTOOLCHAIN=local
 
 FROM toolchain AS sources
-COPY sources.lock architectures.tsv components.tsv ./
-COPY scripts/fetch.sh scripts/fetch-sources.sh scripts/fetch-go-modules.sh ./scripts/
+COPY sources.lock ./
+COPY scripts/fetch.sh scripts/fetch-sources.sh ./scripts/
 RUN --mount=type=cache,id=statics-source-archives,target=/var/cache/statics \
-    chmod +x scripts/fetch.sh scripts/fetch-sources.sh scripts/fetch-go-modules.sh \
+    chmod +x scripts/fetch.sh scripts/fetch-sources.sh \
     && scripts/fetch-sources.sh \
          --archives /var/cache/statics \
          --extract /src \
          --bundle /archives
+
 # The only network access Go gets: the modules the Go tools import, checked
-# against each upstream go.sum, into /src/go-modules for the offline build and
-# into the source bundle.
-RUN scripts/fetch-go-modules.sh /src /archives/go-modules
+# against each upstream go.sum, for the offline build and the source bundle.
+# Its own stage, so the manifests that choose the modules do not invalidate
+# the deps stage below.
+FROM sources AS go-modules
+COPY architectures.tsv components.tsv ./
+COPY scripts/fetch-go-modules.sh ./scripts/
+RUN chmod +x scripts/fetch-go-modules.sh \
+    && scripts/fetch-go-modules.sh /src /go-bundle
 
 # The shared libraries (OpenSSL above all) are about half of every compile and
 # change only with their pins or the build scripts, so they get their own
@@ -134,6 +140,7 @@ ARG JOBS
 ARG COMPONENT_TIMEOUT
 # Only what the build reads. Anything else in the context (CI config, docs,
 # verify.sh, dev tooling) must not invalidate every architecture's compile.
+COPY --from=go-modules /src/go-modules/ /src/go-modules/
 COPY LICENSE architectures.tsv components.tsv ./
 COPY configs/ configs/
 COPY patches/ patches/
@@ -177,3 +184,4 @@ COPY --from=builder /out/ /
 
 FROM scratch AS source-artifact
 COPY --from=sources /archives/ /
+COPY --from=go-modules /go-bundle/ /go-modules/

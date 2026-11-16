@@ -55,7 +55,7 @@ fi
 export STATICS_ARCH=$arch
 # Go tools build only where architectures.tsv gives a Go environment.
 # Everything that could reach the network or a host setting is pinned off:
-# modules come from the cache the sources stage filled (GOPROXY=off), go.sum
+# modules come from the cache the go-modules stage filled (GOPROXY=off), go.sum
 # must already cover them (-mod=readonly), and a go.mod asking for a newer Go
 # fails instead of downloading one (GOTOOLCHAIN=local).
 if [[ $go_env != none ]]; then

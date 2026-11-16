@@ -24,6 +24,8 @@ sources_dir=$(realpath -m "$1")
 bundle_dir=$2
 
 export GOMODCACHE="$sources_dir/go-modules"
+# Both exist even without a Go tool, so the Dockerfile can always copy them.
+mkdir -p "$GOMODCACHE" "$bundle_dir"
 GOCACHE=$(mktemp -d)
 export GOCACHE
 trap 'rm -rf "$GOCACHE"' EXIT
@@ -47,7 +49,6 @@ while IFS='|' read -r name _ _ _ packages; do
 done < "$repo_root/components.tsv"
 
 [[ $found ]] || exit 0
-mkdir -p "$bundle_dir"
 cp -R "$GOMODCACHE/cache/download/." "$bundle_dir/"
 # Lock files are empty download coordination, not module content.
 find "$bundle_dir" -name '*.lock' -delete

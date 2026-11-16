@@ -97,7 +97,7 @@ Use this checklist:
 
 A Go tool's builder calls `go_build COMPONENT PACKAGE BINARY` from
 `scripts/lib/build-common.sh`, and `scripts/build.sh` adds it to the DAG only
-where `architectures.tsv` gives a Go environment. The sources stage fetches
+where `architectures.tsv` gives a Go environment. The go-modules stage fetches
 its modules from the main packages listed in `components.tsv`; the build is
 offline. `go_build` installs into the archive `components.tsv` names and
 collects every linked module's license files, failing if a module has none.
