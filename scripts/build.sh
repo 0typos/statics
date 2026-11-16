@@ -101,6 +101,14 @@ sources=(
     ppp
 )
 
+# STATICS_ONLY_DEPS builds just the shared libraries (the Dockerfile's deps
+# stage, cached per arch); STATICS_DEPS_FROM points the full build at that
+# result instead of rebuilding them. Paths and toolchain are the same either
+# way, so the artifact is too.
+if [[ -n ${STATICS_ONLY_DEPS:-} ]]; then
+    sources=(openssl libpcap libmnl libcap-ng)
+fi
+
 for path in "$WORK_DIR" "$OUTPUT_DIR"; do
     case "$path" in
         ""|/|"$repo_root")
@@ -148,6 +156,16 @@ done
 # into the shared prefix first; everything else parallelizes against the DAG.
 stamps=$WORK_DIR/.stamps
 mkdir -p "$stamps"
+
+if [[ -n ${STATICS_DEPS_FROM:-} ]]; then
+    cp -a "$STATICS_DEPS_FROM/prefix/." "$DEPS_PREFIX/"
+    cp -a "$STATICS_DEPS_FROM/out/." "$OUTPUT_DIR/"
+    touch "$stamps/deps"
+fi
+goal=all
+if [[ -n ${STATICS_ONLY_DEPS:-} ]]; then
+    goal=$stamps/deps
+fi
 
 dag=$WORK_DIR/dag.mk
 # shellcheck disable=SC2016  # $(S)/$(RB) are make variables, not shell
@@ -204,12 +222,17 @@ dag=$WORK_DIR/dag.mk
     emit tunpipe tunpipe build_tunpipe
 } > "$dag"
 
-if ! make -f "$dag" -j"$JOBS" --output-sync=target all; then
+if ! make -f "$dag" -j"$JOBS" --output-sync=target "$goal"; then
     if [[ -f $WORK_DIR/.hung && -z ${STATICS_RESTARTED:-} ]]; then
         echo "==> a component hung; rebuilding $arch once from a clean tree" >&2
         STATICS_RESTARTED=1 exec "$repo_root/scripts/build.sh" "$arch" "$output_dir"
     fi
     exit 1
+fi
+
+if [[ -n ${STATICS_ONLY_DEPS:-} ]]; then
+    echo "==> built $arch shared libraries in $DEPS_PREFIX"
+    exit 0
 fi
 
 {

@@ -9,7 +9,9 @@
 #     Release (scripts/release-candidate.sh, scripts/publish-release.sh).
 #   - Manual pipelines set `task`: `reproducibility` and `update-sources`
 #     (locally: `make repro`, `make update-sources`), and `monthly-release`.
-#   - Main also republishes the GHCR toolchain image when its inputs change.
+#   - Main also republishes the GHCR toolchain image, and each arch's shared
+#     libraries (the Dockerfile's deps stage, tag deps-ARCH), when their
+#     inputs change.
 #
 # GitHub credentials live in the `statics-publish` context, which CircleCI
 # only hands to pipelines on main or a v* tag, never to an SSH rerun. Only
@@ -25,6 +27,9 @@
 #     pulls it as a layer cache (scripts/docker-build.sh). Releases trust it
 #     for speed only: their reproducibility rebuild rebuilds the toolchain
 #     from scratch, so a planted image cannot reproduce the shipped archive.
+#   - OpenSSL and the other shared libraries are about half of each compile.
+#     The deps-ARCH images carry them the same way; every reproducibility
+#     rebuild builds them from scratch.
 #   - Toolchain, sources, and compile are separate steps with plain BuildKit
 #     output, so each one's time and log are visible on its own.
 #   - On branches, each arch's verified output is cached under a digest of
@@ -298,6 +303,10 @@ jobs:
           the publish job.
         type: boolean
         default: false
+      release_filters:
+        description: Set with release; keeps published images out of the compile.
+        type: string
+        default: ""
     executor:
       name: builder
       size: << pipeline.parameters.arch_resource_class >>
@@ -362,6 +371,9 @@ jobs:
       - toolchain-and-sources
       - run:
           name: Compile << parameters.arch >>
+          # A release compiles its shared libraries and components itself:
+          # the reproducibility rebuild only checks x86-64, so a planted
+          # deps-ARCH image for any other arch would go unnoticed.
           # COMPONENT_TIMEOUT=600: a whole arch builds in about 7.5 minutes on
           # large, so no single component nears 600 s unless the host is ~1.4x
           # slower than measured. Output is live, so 20 silent minutes means
@@ -371,6 +383,7 @@ jobs:
             if [ -n "${STATICS_CACHED:-}" ]; then echo "output restored from cache"; exit 0; fi;
             ./scripts/retry-once.sh dist
             ./scripts/docker-build.sh artifact
+            << parameters.release_filters >>
             --build-arg ARCH=<< parameters.arch >>
             --build-arg JOBS="$(nproc)"
             --build-arg COMPONENT_TIMEOUT=600
@@ -473,6 +486,7 @@ jobs:
           command: |
             ./scripts/retry-once.sh dist \
               ./scripts/docker-build.sh artifact \
+                --no-cache-filter deps \
                 --no-cache-filter builder \
                 --build-arg ARCH=x86_64 \
                 --build-arg JOBS="$(( $(nproc) * 2 ))" \
@@ -688,6 +702,59 @@ jobs:
               --tag "$IMAGE:$INPUTS_TAG" \
               --push
 
+  deps-image:
+    # Builds one arch's deps stage and publishes it as a layer cache, tagged
+    # with a digest of its inputs; an existing tag means nothing changed.
+    # COMPONENT_TIMEOUT must match the arch builds or their cache keys differ.
+    parameters:
+      arch:
+        type: string
+    executor:
+      name: builder
+      size: << pipeline.parameters.arch_resource_class >>
+    environment:
+      IMAGE: ghcr.io/0typos/statics-toolchain
+    steps:
+      - checkout
+      - run:
+          name: Look for an image built from these inputs
+          command: |
+            set -euo pipefail
+            digest=$(cat docker/Dockerfile sources.lock architectures.tsv \
+              scripts/fetch.sh scripts/fetch-sources.sh scripts/docker-build.sh \
+              scripts/build.sh scripts/run-builder.sh scripts/lib/* \
+              scripts/builders/dependencies.sh scripts/toolchain/* |
+              sha256sum | cut -c1-32)
+            tag=deps-<< parameters.arch >>-inputs-$digest
+            echo "export INPUTS_TAG=$tag" >>"$BASH_ENV"
+            if docker manifest inspect "$IMAGE:$tag" >/dev/null 2>&1; then
+              # Point the moving tag back at it: a revert or an out-of-order
+              # main pipeline would otherwise leave it on other inputs.
+              printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username 0typos --password-stdin
+              docker buildx imagetools create --tag "$IMAGE:deps-<< parameters.arch >>" "$IMAGE:$tag"
+              echo "$IMAGE:$tag exists; retagged, nothing to build"
+              circleci-agent step halt
+            fi
+      - setup-buildx
+      - run:
+          name: Build the << parameters.arch >> shared libraries and publish them
+          no_output_timeout: 20m
+          command: |
+            set -euo pipefail
+            printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username 0typos --password-stdin
+            # --no-cache-filter deps: build from the pinned inputs, never
+            # from the image this job is replacing.
+            ./scripts/docker-build.sh deps \
+              --no-cache-filter deps \
+              --build-arg ARCH=<< parameters.arch >> \
+              --build-arg COMPONENT_TIMEOUT=600 \
+              --cache-to type=inline \
+              --label "org.opencontainers.image.source=https://github.com/0typos/statics" \
+              --label "org.opencontainers.image.revision=$CIRCLE_SHA1" \
+              --tag "$IMAGE:deps-<< parameters.arch >>" \
+              --tag "$IMAGE:$INPUTS_TAG" \
+              --push
+
   update-sources:
     executor: python
     environment:
@@ -747,6 +814,26 @@ workflows:
     jobs:
       - toolchain-image:
           context: statics-publish
+      - deps-image:
+          name: deps-image-<< matrix.arch >>
+          context: statics-publish
+          requires: [toolchain-image]
+          matrix:
+            parameters:
+              arch:
+                - x86_64
+                - i686
+                - aarch64
+                - armv6-hardfloat
+                - armv7-hardfloat
+                - armv7-softfloat
+                - mips
+                - mipsel
+                - powerpc
+                - powerpc64
+                - powerpc64le
+                - riscv64
+                - s390x
 
   # Pushing a v* tag, or the monthly schedule (task=monthly-release). The
   # publish job runs only when every gate passed.
@@ -770,6 +857,7 @@ workflows:
       - build:
           name: release-<< matrix.arch >>
           release: true
+          release_filters: --no-cache-filter deps --no-cache-filter builder
           filters: *release-filters
           requires: [release-candidate]
           matrix:
