@@ -49,7 +49,7 @@ workflow artifacts.
 | --- | --- |
 | `architectures.tsv` | Target name, Zig triple/CPU, QEMU runner, description, and Go environment (or `none`) |
 | `sources.lock` | Pinned upstream/toolchain version, SHA-256, and URL |
-| `components.tsv` | Component license expression, role, archive (`main` or `extra`), and Go main packages |
+| `components.tsv` | Component license expression, role, archive (`main` or `extra`), and Go main packages with any build flags |
 | `docker/Dockerfile` | Clean toolchain, source, build, test, and export stages |
 | `scripts/build.sh` | Target environment, including the hermetic Go settings, and build orchestration |
 | `scripts/components.sh` | The components that belong in one archive of one target |
@@ -58,7 +58,7 @@ workflow artifacts.
 | `scripts/lib/build-common.sh` | Shared cross-build, install, and link helpers |
 | `scripts/verify.sh` | Artifact contract, static checks, checksums, and QEMU smoke tests |
 | `scripts/check-docs.py` | Markdown structure and repository-local link checks |
-| `configs/` and `patches/` | Reviewed build configuration and minimal compatibility patches |
+| `configs/` and `patches/` | Reviewed build configuration and minimal compatibility patches; `patches/go-mains/` holds Go main packages added to an upstream tree |
 | `scripts/docker-build.sh` | Runs one Dockerfile target with the published toolchain image as a layer cache |
 | `.circleci/config.yml` | All CI and releases: validation, matrix, sources, the required `ci-ok` status, signing, publishing, schedules, and the toolchain image |
 | `docs/` | User, maintainer, architecture, release, and roadmap documentation |
@@ -102,6 +102,11 @@ its modules from the main packages listed in `components.tsv`; the build is
 offline. `go_build` installs into the archive `components.tsv` names and
 collects every linked module's license files, failing if a module has none.
 Do not commit `vendor/` directories, and build with the upstream `go.sum`.
+Build flags such as `-tags=...` go before the packages in `components.tsv`,
+so the module fetch sees the same import graph as the build. To trim a large
+tool, prefer upstream's own build tags; failing that, add a smaller main
+package under `patches/go-mains/<source>/`, as for rclone, rather than
+patching upstream code.
 
 Prefer disabling an optional integration to silently depending on a target
 shared library. If the utility cannot be useful without data files or plugins,
@@ -147,7 +152,11 @@ Write a reviewed candidate update:
 git diff -- sources.lock
 ```
 
-The updater downloads the proposed archive to compute its SHA-256. Review
+The updater downloads the proposed archive to compute its SHA-256, and for
+rclone and croc rejects it unless the release's own checksum file lists that
+digest. Check rclone's PGP-signed `SHA256SUMS` with
+`gpg --verify SHA256SUMS` against the key published at
+<https://rclone.org/KEYS>, and the signed tags of rclone and containerd. Review
 upstream release notes, published checksums, signatures when available,
 license changes, and archive provenance. Then run the relevant builds and
 verification. A new digest is not evidence by itself that an update is safe.

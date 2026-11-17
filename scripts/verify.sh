@@ -43,7 +43,15 @@ fi
 # Smoke checks for the extra archive, as "expected output|arguments" per
 # executable. Every executable in it must have one, so an extra tool cannot
 # ship without being started.
-declare -A extra_smoke=()
+# The pinned version is expected, so a version that upstream sets at link time
+# cannot silently fall back to a development string.
+pinned_version() { awk -F '|' -v n="$1" '$1 == n { print $2 }' "$repo_root/sources.lock"; }
+declare -A extra_smoke=(
+    [rclone]="rclone v$(pinned_version rclone)|version"
+    [croc]="croc version $(pinned_version croc)|--version"
+    [crictl]="crictl version v$(pinned_version cri-tools)|--version"
+    [ctr]="ctr github.com/containerd/containerd/v2 v$(pinned_version containerd)|--version"
+)
 
 # Checks every archive must pass: metadata, licenses for exactly the
 # components it should hold, its SBOM, static linkage, and SHA256SUMS.
@@ -181,6 +189,15 @@ for binary in "${required_binaries[@]}"; do
         exit 1
     }
 done
+# Every extra tool is a Go tool, so an extra archive holds all of them.
+if [[ -d $output_dir-extra ]]; then
+    for binary in "${!extra_smoke[@]}"; do
+        [[ -x $output_dir-extra/$binary ]] || {
+            echo "missing executable: $output_dir-extra/$binary" >&2
+            exit 1
+        }
+    done
+fi
 
 for nmap_data in \
     nmap-mac-prefixes \

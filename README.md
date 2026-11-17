@@ -42,7 +42,7 @@ user-mode emulation proves that non-native outputs can actually start.
 
 | 🧰 Carry it | 🐧 Run it | 🔐 Trust it |
 |---|---|---|
-| 80 physical executables, plus BusyBox and Dropbear links | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
+| 80 physical executables, plus BusyBox and Dropbear links, and four larger Go tools in an optional extra archive | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
 | Network, process, namespace, storage and hardware diagnosis | Static musl builds avoid a dependency on the target's libc | Deterministic archives, QEMU smoke tests and release attestations |
 
 ## Get a kit
@@ -62,6 +62,39 @@ tar -xJf "statics-$arch.tar.xz"
 Not sure which archive fits the device? Start with the
 [architecture and ABI guide](docs/ARCHITECTURES.md).
 
+### Main and extra archives
+
+Each architecture has two archives. **`statics-<arch>.tar.xz` is the kit**:
+every tool below, about 13 to 17 MiB, and it is all most sessions need.
+**`statics-extra-<arch>.tar.xz` is optional** and holds four Go tools that
+together weigh about as much as the whole main kit: `rclone`, `croc`, `crictl`
+and `ctr`. Splitting them out keeps the main kit small enough for routers and
+other cramped devices; take the extra archive only when you need to sync with
+object storage, hand files across machines, or inspect a container runtime.
+It extracts beside the main kit as `<arch>-extra/`, with its own checksums,
+SBOM and notices, and exists for every target except `powerpc` and
+`powerpc64`, where Go does not run (see the
+[architecture guide](docs/ARCHITECTURES.md#go-tools)).
+
+Extra archive sizes for the current pins (the `x86_64` main kit is 15.4 MiB):
+
+| target | extra archive |
+|---|---|
+| `x86_64` | 16.7 MiB |
+| `i686` | 15.5 MiB |
+| `aarch64` | 14.4 MiB |
+| `armv6-hardfloat`, `armv7-hardfloat` | 14.4 MiB |
+| `armv7-softfloat` | 14.5 MiB |
+| `mips` | 13.0 MiB |
+| `mipsel` | 13.3 MiB |
+| `powerpc64le` | 14.1 MiB |
+| `riscv64` | 15.9 MiB |
+| `s390x` | 15.1 MiB |
+| `powerpc`, `powerpc64` | none |
+
+The extra archive is compressed with `xz -9` and needs about 65 MiB of memory
+to unpack; on a smaller device, unpack it elsewhere and copy the directory.
+
 ### Build one
 
 Requirements: Git, GNU Make, Docker with Buildx, roughly 8 GB of free disk space for
@@ -80,7 +113,7 @@ make build ARCH=x86_64
 ```console
 make list                     # show the complete target matrix
 make build ARCH=mipsel        # build one target
-make package ARCH=mipsel      # create dist/statics-mipsel.tar.xz
+make package ARCH=mipsel      # create dist/statics-mipsel.tar.xz and the extra archive
 make verify ARCH=mipsel       # verify an exported build
 make all                      # build every target
 make sources                  # export checksum-verified source archives
@@ -130,6 +163,18 @@ Nmap runtime data, checksums, an SPDX SBOM and upstream license texts.
 | Namespaces and privilege | `nsenter`, `unshare`, `lsns`, `setpriv`, `findmnt` | Enter, create, inspect and constrain Linux execution contexts |
 | CAN and ISO-TP | `candump`, `cansend`, `cangen`, `canplayer`, `cansniffer`, `isotp*`, `slcand`, `canbusload` | Field and vehicle networks |
 | Hardware buses | `i2cdetect`, `i2cdump`, `i2cget`, `i2cset`, `i2ctransfer`, `spi-config`, `spi-pipe` | Linux I²C and spidev diagnosis |
+
+The extra archive adds:
+
+| Area | Outputs | What they are for |
+|---|---|---|
+| File transfer and sync | `rclone`, `croc` | Copy, sync and check against local disks, S3-compatible storage, SFTP, WebDAV and HTTP; send a file to another machine with a one-time code |
+| Container runtimes | `crictl`, `ctr` | Pods, containers, logs, images and snapshots through the CRI and containerd sockets |
+
+`rclone` is trimmed to the backends and commands a field session needs, and
+`croc` uses a public relay run by its author unless you point it at your own;
+the [toolkit guide](docs/TOOLKIT.md#extra-archive-rclone-croc-crictl-and-ctr)
+lists what is included and shows how to self-host the relay.
 
 Convenience links expose BusyBox applets such as `ping`, `traceroute`, `nslookup`,
 `arping`, `wget`, `ifconfig` and `netstat` without adding extra binary payload.

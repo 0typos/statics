@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Download the Go modules each Go tool's main packages import, for every
+# Download the Go modules each Go tool's main packages import, with the build
+# flags (such as -tags=...) listed before them in components.tsv, for every
 # GOARCH in architectures.tsv, into SOURCES_DIR/go-modules (a GOMODCACHE),
 # and copy the downloaded archives to BUNDLE_DIR in GOPROXY layout.
 #
@@ -41,9 +42,14 @@ found=
 while IFS='|' read -r name _ _ _ packages; do
     [[ $name == \#* || -z $name || $packages == - || $packages == runtime ]] && continue
     found=1
+    # Go main packages this repository adds to an upstream tree (build.sh
+    # adds them to its copy the same way).
+    if [[ -d $repo_root/patches/go-mains/$name ]]; then
+        cp -R "$repo_root/patches/go-mains/$name/." "$sources_dir/$name/"
+    fi
     for goarch in $goarches; do
         echo "==> Go modules for $name ($goarch)"
-        # shellcheck disable=SC2086  # packages is a space-separated list
+        # shellcheck disable=SC2086  # packages is a space-separated list of flags and packages
         (cd "$sources_dir/$name" && GOARCH=$goarch go list -deps $packages >/dev/null)
     done
 done < "$repo_root/components.tsv"

@@ -575,13 +575,14 @@ jobs:
       - run:
           name: Compute the source bundle key
           # Everything the sources stage reads (Dockerfile, pins, the
-          # manifests that choose Go modules, fetch scripts) plus the
-          # packaging script.
+          # manifests and added Go main packages that choose Go modules,
+          # fetch scripts) plus the packaging script.
           # package-sources.sh runs with the host's tar and xz.
           command: >-
             { cat docker/Dockerfile sources.lock architectures.tsv components.tsv
             scripts/fetch.sh scripts/fetch-sources.sh scripts/fetch-go-modules.sh
             scripts/package-sources.sh;
+            find patches/go-mains -type f | LC_ALL=C sort | xargs cat;
             tar --version | head -n 1; xz --version | head -n 1; }
             | sha256sum >/tmp/sources-inputs
       - unless:

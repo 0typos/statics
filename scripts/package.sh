@@ -10,15 +10,16 @@ fi
 
 arch=$1
 
-# Package one exported tree as NAME.tar.xz, with its SBOM and checksums.
-package() { # directory name
-    local directory=$1 name=$2
+# Package one exported tree as NAME.tar.xz at an xz level, with its SBOM and
+# checksums.
+package() { # directory name xz-level
+    local directory=$1 name=$2 level=$3
     local archive="$repo_root/dist/$name.tar.xz"
     local sbom="$repo_root/dist/$name.spdx.json"
     tar --sort=name \
         --mtime="@${SOURCE_DATE_EPOCH:-0}" \
         --owner=0 --group=0 --numeric-owner \
-        --create --xz --file "$archive" \
+        --create --use-compress-program="xz $level -T1" --file "$archive" \
         --directory "$repo_root/dist" "$directory"
     cp "$repo_root/dist/$directory/SBOM.spdx.json" "$sbom"
     (
@@ -33,9 +34,12 @@ package() { # directory name
     echo "build output not found: $repo_root/dist/$arch" >&2
     exit 1
 }
-package "$arch" "statics-$arch"
+package "$arch" "statics-$arch" -6
 # The extra archive exists only for an architecture that builds an extra tool.
 rm -f "$repo_root/dist/statics-extra-$arch".*
 if [[ -d $repo_root/dist/$arch-extra ]]; then
-    package "$arch-extra" "statics-extra-$arch"
+    # xz -9's 64 MiB window spans all the Go tools, which share most of
+    # their runtime and modules: about 30% smaller than -6 for the extra
+    # archive, at 65 MiB of memory to decompress.
+    package "$arch-extra" "statics-extra-$arch" -9
 fi

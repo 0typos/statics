@@ -512,6 +512,62 @@ def latest_wireguard_go() -> tuple[str, str]:
     )
 
 
+def latest_rclone() -> tuple[str, str]:
+    return latest_from_github_release(
+        "rclone/rclone",
+        r"v(\d+\.\d+\.\d+)",
+        (
+            "https://github.com/rclone/rclone/releases/download/"
+            "v{version}/rclone-v{version}.tar.gz"
+        ),
+    )
+
+
+def latest_croc() -> tuple[str, str]:
+    return latest_from_github_release(
+        "schollz/croc",
+        r"v(\d+\.\d+\.\d+)",
+        (
+            "https://github.com/schollz/croc/releases/download/"
+            "v{version}/croc_v{version}_src.tar.gz"
+        ),
+    )
+
+
+def latest_cri_tools() -> tuple[str, str]:
+    return latest_from_github_tags(
+        "kubernetes-sigs/cri-tools",
+        r"v(\d+\.\d+\.\d+)",
+        (
+            "https://github.com/kubernetes-sigs/cri-tools/archive/refs/tags/"
+            "v{version}.tar.gz"
+        ),
+    )
+
+
+def latest_containerd() -> tuple[str, str]:
+    return latest_from_github_tags(
+        "containerd/containerd",
+        r"v(\d+\.\d+\.\d+)",
+        (
+            "https://github.com/containerd/containerd/archive/refs/tags/"
+            "v{version}.tar.gz"
+        ),
+    )
+
+
+# Checksum files published beside a release: a candidate archive whose
+# SHA-256 is not listed there is rejected. rclone's file is also PGP-signed;
+# reviewers check that signature (CONTRIBUTING.md).
+PUBLISHED_SHA256: dict[str, str] = {
+    "rclone": "https://github.com/rclone/rclone/releases/download/v{version}/SHA256SUMS",
+    "croc": (
+        "https://github.com/schollz/croc/releases/download/"
+        "v{version}/croc_v{version}_checksums.txt"
+    ),
+}
+
+
 DISCOVERERS: dict[str, Callable[[], tuple[str, str]]] = {
     "busybox": latest_busybox,
     "socat": latest_socat,
@@ -557,6 +613,10 @@ DISCOVERERS: dict[str, Callable[[], tuple[str, str]]] = {
     "go-aarch64": lambda: latest_go("arm64"),
     "go": lambda: latest_go(None),
     "wireguard-go": latest_wireguard_go,
+    "rclone": latest_rclone,
+    "croc": latest_croc,
+    "cri-tools": latest_cri_tools,
+    "containerd": latest_containerd,
 }
 
 
@@ -638,7 +698,12 @@ def main() -> int:
             continue
 
         print(f"{name}: {current.version} -> {version}; downloading for SHA-256")
-        replacements[name] = Source(name, version, sha256_url(url), url)
+        digest = sha256_url(url)
+        if name in PUBLISHED_SHA256:
+            sums_url = PUBLISHED_SHA256[name].format(version=version)
+            if f"{digest}  {url.rsplit('/', 1)[1]}" not in text(sums_url).splitlines():
+                raise RuntimeError(f"{url} is not listed with SHA-256 {digest} in {sums_url}")
+        replacements[name] = Source(name, version, digest, url)
 
     if not replacements:
         print("all selected sources are current")

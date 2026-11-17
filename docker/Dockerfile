@@ -104,6 +104,7 @@ RUN --mount=type=cache,id=statics-source-archives,target=/var/cache/statics \
 # the deps stage below.
 FROM sources AS go-modules
 COPY architectures.tsv components.tsv ./
+COPY patches/go-mains/ patches/go-mains/
 COPY scripts/fetch-go-modules.sh ./scripts/
 RUN chmod +x scripts/fetch-go-modules.sh \
     && scripts/fetch-go-modules.sh /src /go-bundle

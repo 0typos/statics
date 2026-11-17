@@ -44,6 +44,16 @@ Nmap data, notices, and licenses remain available.
 The BusyBox and Dropbear entries after the semicolon are symbolic links to
 their multi-call binary; they do not add separate binary payloads.
 
+Four larger Go tools ship separately in `statics-extra-<arch>.tar.xz`, for
+every architecture with Go (not `powerpc` or `powerpc64`). It extracts to
+`<arch>-extra/` with its own notices, SBOM, and checksums; see
+[the extra archive](#extra-archive-rclone-croc-crictl-and-ctr).
+
+| Area | Executables | Primary use |
+| --- | --- | --- |
+| File transfer and sync | `rclone`, `croc` | Copy and sync with S3, SFTP, WebDAV, and HTTP; hand a file to another machine with a one-time code |
+| Container runtimes | `crictl`, `ctr` | Inspect pods, containers, images, logs, and snapshots through the CRI and containerd sockets |
+
 ## License boundary
 
 `BUILD_RECIPES_LICENSE` contains the MIT license for this repository's
@@ -568,6 +578,135 @@ kernel's MTD character devices (`/dev/mtdN`) or UBI devices.
 `flashcp` is BSD-licensed; its notice is collected into
 `licenses/mtd-utils/MTD-UTILS-BSD-NOTICES`.
 
+## Extra archive: rclone, croc, crictl, and ctr
+
+These tools are several times the size of anything in the main archive, so
+they are packaged apart. Each is a static Go binary built with cgo disabled,
+`-trimpath`, and `-ldflags="-s -w -buildid="` (plus upstream's `-X` version
+stamp where it has one), without UPX; the archive is
+compressed with `xz -9`, whose 64 MiB window lets the tools share their common
+Go runtime and modules, so decompressing it needs about 65 MiB of memory.
+Unpack it on a staging machine for a target with less. Extract it beside the
+main archive and add both directories to `PATH`:
+
+```sh
+tar -xJf statics-extra-aarch64.tar.xz
+export PATH="/tmp/statics/aarch64:/tmp/statics/aarch64-extra:$PATH"
+```
+
+Every module each tool links is listed in
+`licenses/<source>/go-modules.tsv` (`rclone`, `croc`, `cri-tools`,
+`containerd`), with its license files beside it.
+
+### rclone, trimmed
+
+The bundled `rclone` is not upstream's full build, which links about 70
+backends and 80 commands into 20 MB (xz) per architecture. It is built from a
+smaller main package,
+[`patches/go-mains/rclone/cmd/statics/main.go`](../patches/go-mains/rclone/cmd/statics/main.go),
+compiled inside rclone's source tree against rclone's own `go.mod` and
+`go.sum`. It is about 7.5 MiB (xz) on x86-64 and links:
+
+| | Included |
+| --- | --- |
+| Backends | `local`, `s3` (AWS and every S3-compatible provider rclone knows), `sftp`, `http` (read-only), `webdav`; `crypt` also comes with rclone's core |
+| Commands | `copy`, `copyto`, `sync`, `ls`, `lsf`, `lsd`, `cat`, `rcat`, `check`, `size`, `config`, `version`, plus cobra's `help` and `completion` |
+
+Everything else is left out: other backends (Google Drive, OneDrive, Azure
+Blob, B2, Swift, FTP, SMB, ...), `mount` and `serve`, `move`, `delete`,
+`purge`, `mkdir`, `lsjson`, `hashsum`, `bisync`, `ncdu`, `rc` and `rcd`, and
+`selfupdate`. Flags of included commands work as upstream documents. Remotes
+can come from `rclone config`, which writes `~/.config/rclone/rclone.conf`,
+from `RCLONE_CONFIG_<NAME>_<OPTION>` variables, or inline, which leaves
+nothing on the target:
+
+```sh
+rclone lsf :sftp,host=192.0.2.10,user=admin,key_file=/tmp/id_ed25519:/var/log
+rclone copy /var/log/app ":s3,provider=Minio,endpoint='http://192.0.2.20:9000',env_auth=true:backup/app"
+rclone check /srv/data ":webdav,url='https://dav.example.net/remote.php/dav/files/me':data" --one-way
+```
+
+Quote an option value that contains a colon or comma, as the URLs above do.
+
+To ask for another backend or command, open an issue naming it and why it
+helps on a broken host; each one adds size to every architecture. To build
+it yourself, add its import (`github.com/rclone/rclone/backend/<name>` or
+`github.com/rclone/rclone/cmd/<name>`) to that `main.go`: the module fetch
+runs `go list -deps` on it, so the new modules are fetched, checked against
+rclone's `go.sum`, and given license notices without any other change.
+
+### croc: uses its author's public relay by default
+
+> [!WARNING]
+> Out of the box, `croc send` and `croc receive` connect to a **public relay
+> run by croc's author** (`croc.schollz.com:9009`, `croc6.schollz.com` for
+> IPv6, and the `*.getcroc.com` pool). Files are end-to-end encrypted with a
+> key derived from the code phrase (PAKE), but that third party sees both
+> endpoints' addresses, the transfer's timing and size, and its availability
+> decides whether a transfer works. Each send and receive also asks
+> `api.github.com` whether a newer croc exists. For anything sensitive, or a
+> network without the internet, run your own relay.
+
+The bundled `croc` is built with upstream's `croc_no_tailcat` tag, which
+leaves out the Tailscale-based DERP transport and so cuts its size by more
+than half: transfers go through a croc relay (or directly on a LAN), and
+`croc ssh` is not available. The relay defaults are unchanged from upstream.
+
+Run a relay on any host both ends can reach (it listens on TCP 9009 to 9013)
+and point both sides at it, with a relay password other than the default
+`pass123`:
+
+```sh
+# Relay host
+CROC_PASS='long-random-relay-password' croc relay
+
+# Sender and receiver
+export CROC_RELAY=192.0.2.10:9009 CROC_PASS='long-random-relay-password'
+croc --no-update-check send ./capture.pcap       # prints a code phrase
+CROC_SECRET='CODE-PHRASE' croc --no-update-check  # on the receiver
+```
+
+`croc --relay 192.0.2.10:9009 --pass ...` does the same as the variables,
+but arguments, like a code phrase given as one, are visible in `ps`; that is
+why croc takes the receiver's code from `CROC_SECRET` on Linux. Setting
+`CROC_NO_UPDATE_CHECK=1` also stops the update check. Do not run
+`croc update`: it replaces the binary with upstream's release build. Upstream
+documents the relay and its options in its
+[README](https://github.com/schollz/croc#self-host-relay).
+
+### Container runtimes: crictl and ctr
+
+`crictl` speaks the Kubernetes Container Runtime Interface to containerd or
+CRI-O; `ctr` speaks containerd's own API, which also shows what the kubelet
+cannot (snapshots, leases, content, and non-Kubernetes namespaces). Both need
+root, or access to the runtime's socket, and neither needs anything else from
+the host:
+
+```sh
+export CONTAINER_RUNTIME_ENDPOINT=unix:///run/containerd/containerd.sock
+# CRI-O: unix:///var/run/crio/crio.sock
+crictl pods
+crictl ps -a
+crictl logs --tail 100 CONTAINER_ID
+crictl inspect CONTAINER_ID | jq '.info.pid'
+crictl images
+
+ctr namespaces ls
+ctr -n k8s.io containers ls
+ctr -n k8s.io tasks ls
+ctr -n k8s.io images ls
+ctr -n k8s.io snapshots ls
+ctr -n k8s.io snapshots usage
+```
+
+`ctr -a PATH` selects another socket (k3s uses
+`/run/k3s/containerd/containerd.sock`). Commands that create containers
+(`ctr run`, `ctr tasks start`) still need the host's runc and shims, which
+are not bundled. containerd's build tags (`no_btrfs`, `no_devmapper`,
+`no_zfs`, `no_cri`, `no_rdt`, `no_systemd`, `no_tracing`) only remove
+daemon plugins that `ctr` does not link, so building with them leaves its
+size unchanged and none is used; `no_grpc` does not build.
+
 ## Privilege guide
 
 Exact rules vary by kernel and security policy, but these are common:
@@ -589,6 +728,7 @@ Exact rules vary by kernel and security policy, but these are common:
 | List or change connection tracking; scan or configure Wi-Fi | `CAP_NET_ADMIN` and the kernel's netlink support |
 | Read, erase, or write MTD flash or UBI volumes | root and the kernel's MTD/UBI devices |
 | Query a local BMC | root and `/dev/ipmi0` (`ipmi_devintf`) |
+| Inspect containers, images, and snapshots with `crictl` or `ctr` | root or access to the runtime's socket |
 | Start a listener on a privileged port | root or `CAP_NET_BIND_SERVICE` |
 
 Do not add capabilities to the whole toolkit directory. If policy permits,

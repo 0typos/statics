@@ -40,15 +40,30 @@ make_link() {
     ln -s "$target" "$OUTPUT_DIR/$link_name"
 }
 
+# The pinned version of one sources.lock entry, for version strings that
+# upstream sets at link time.
+source_version() { # name
+    awk -F '|' -v wanted="$1" '$0 !~ /^#/ && $1 == wanted { print $2 }' \
+        "$REPO_ROOT/sources.lock"
+}
+
 # Build one Go main package of COMPONENT into the archive components.tsv
 # names for it, as a stripped static binary (the hermetic Go environment is
-# set by scripts/build.sh). Then stage, for collect-licenses.sh, the module
-# list from the binary's own build info and every module's license files.
-go_build() { # component package binary
+# set by scripts/build.sh), with the build flags (such as -tags=...) listed
+# before its packages in components.tsv, which the module fetch uses too, and
+# any extra linker flags (such as -X for a version). Then stage, for
+# collect-licenses.sh, the module list from the binary's own build info and
+# every module's license files.
+go_build() { # component package binary [ldflag...]
     local component=$1 package=$2 binary=$3
-    local archive destination
-    archive=$(awk -F '|' -v wanted="$component" \
-        '$0 !~ /^#/ && $1 == wanted { print $4 }' "$REPO_ROOT/components.tsv")
+    shift 3
+    local record archive destination word flags=()
+    record=$(awk -F '|' -v wanted="$component" \
+        '$0 !~ /^#/ && $1 == wanted { print $4 "|" $5 }' "$REPO_ROOT/components.tsv")
+    archive=${record%%|*}
+    for word in ${record#*|}; do
+        [[ $word == -* ]] && flags+=("$word")
+    done
     case $archive in
         main) destination=$OUTPUT_DIR ;;
         extra) destination=$EXTRA_OUTPUT_DIR ;;
@@ -60,7 +75,8 @@ go_build() { # component package binary
     mkdir -p "$destination"
     (
         cd "$WORK_DIR/$component" &&
-            go build -ldflags='-s -w -buildid=' -o "$destination/$binary" "$package"
+            go build "${flags[@]}" -ldflags="-s -w -buildid= $*" \
+                -o "$destination/$binary" "$package"
     ) || return 1
 
     local staged="$WORK_DIR/go-licenses/$component"
