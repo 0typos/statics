@@ -5,6 +5,8 @@ build_nmap() {
     (
         cd "$WORK_DIR/nmap" || exit
         patch -s -p1 < "$REPO_ROOT/patches/nmap-build-fixes.patch"
+        # --disable-crcvx reaches the bundled zlib (1.3.2): its s390x CRC32-VX
+        # code fails under zig cc without -fzvector and targets z13 anyway.
         CC="$CC" CXX="$CXX" AR="$AR" RANLIB="$RANLIB" \
             PKG_CONFIG=false \
             CONFIG_SITE="$REPO_ROOT/configs/nmap-config.site" \
@@ -22,6 +24,7 @@ build_nmap() {
             --with-libpcap="$DEPS_PREFIX" \
             --with-libpcre=included \
             --with-libz=included \
+            --disable-crcvx \
             --with-libdnet=included \
             --with-liblinear=included \
             CPPFLAGS="-I$DEPS_PREFIX/include" \
