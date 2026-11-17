@@ -14,6 +14,7 @@ build_rsync() {
             --disable-xxhash \
             --disable-zstd \
             --disable-lz4 \
+            --disable-idn \
             --disable-iconv \
             --disable-acl-support \
             --disable-xattr-support \

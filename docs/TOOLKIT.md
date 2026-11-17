@@ -433,7 +433,7 @@ LSM policy.
 ### Rsync
 
 Rsync includes IPv4/IPv6, local socket-pair support, and bundled popt and
-zlib. ACL, xattr, iconv, OpenSSL, xxHash, zstd, and LZ4 integrations are
+zlib. ACL, xattr, iconv, IDN, OpenSSL, xxHash, zstd, and LZ4 integrations are
 disabled. Preserve those limitations when designing backup or migration
 workflows: a successful copy does not imply ACL or extended-attribute
 preservation.
