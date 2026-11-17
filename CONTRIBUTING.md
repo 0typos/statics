@@ -153,8 +153,8 @@ git diff -- sources.lock
 ```
 
 The updater downloads the proposed archive to compute its SHA-256, and for
-rclone and croc rejects it unless the release's own checksum file lists that
-digest. Check rclone's PGP-signed `SHA256SUMS` with
+rclone, croc, and zstd rejects it unless the release's own checksum file lists
+that digest. Check rclone's PGP-signed `SHA256SUMS` with
 `gpg --verify SHA256SUMS` against the key published at
 <https://rclone.org/KEYS>, and the signed tags of rclone and containerd. Review
 upstream release notes, published checksums, signatures when available,

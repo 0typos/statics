@@ -42,7 +42,7 @@ user-mode emulation proves that non-native outputs can actually start.
 
 | 🧰 Carry it | 🐧 Run it | 🔐 Trust it |
 |---|---|---|
-| 80 physical executables, plus BusyBox and Dropbear links, and four larger Go tools in an optional extra archive | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
+| 88 physical executables, plus BusyBox, Dropbear and decompressor links, and four larger Go tools in an optional extra archive | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
 | Network, process, namespace, storage and hardware diagnosis | Static musl builds avoid a dependency on the target's libc | Deterministic archives, QEMU smoke tests and release attestations |
 
 ## Get a kit
@@ -65,7 +65,7 @@ Not sure which archive fits the device? Start with the
 ### Main and extra archives
 
 Each architecture has two archives. **`statics-<arch>.tar.xz` is the kit**:
-every tool below, about 13 to 17 MiB, and it is all most sessions need.
+every tool below, about 14 to 18 MiB, and it is all most sessions need.
 **`statics-extra-<arch>.tar.xz` is optional** and holds four Go tools that
 together weigh about as much as the whole main kit: `rclone`, `croc`, `crictl`
 and `ctr`. Splitting them out keeps the main kit small enough for routers and
@@ -76,7 +76,7 @@ SBOM and notices, and exists for every target except `powerpc` and
 `powerpc64`, where Go does not run (see the
 [architecture guide](docs/ARCHITECTURES.md#go-tools)).
 
-Extra archive sizes for the current pins (the `x86_64` main kit is 15.4 MiB):
+Extra archive sizes for the current pins (the `x86_64` main kit is 16.3 MiB):
 
 | target | extra archive |
 |---|---|
@@ -145,8 +145,8 @@ data and safe starting commands.
 
 ## Inside the case
 
-The bundle contains 80 physical executables (79 on `powerpc` and `powerpc64`, which get no
-Go tools) plus BusyBox and Dropbear multi-call links,
+The bundle contains 88 physical executables (87 on `powerpc` and `powerpc64`, which get no
+Go tools) plus BusyBox and Dropbear multi-call links, decompressor links such as `unxz`,
 Nmap runtime data, checksums, an SPDX SBOM and upstream license texts.
 
 | Area | Outputs | What they are for |
@@ -156,6 +156,8 @@ Nmap runtime data, checksums, an SPDX SBOM and upstream license texts.
 | Network state and control | `ip`, `ss`, `bridge`, `tc`, `wg`, `wireguard-go`, `ethtool`, `nft`, `conntrack`, `iw` | Interfaces, routes, sockets, policy, WireGuard without the kernel module, connection tracking, Wi-Fi and NIC state |
 | Discovery and packet diagnosis | `nmap`, `tcpdump`, `iperf3`, `mtr`, `mtr-packet` | Services, captures, paths and throughput |
 | HTTP, TLS, DNS and data | `curl`, `openssl`, `drill`, `jq` | Protocol checks and structured output |
+| Compression and archives | `zstd`, `xz`, `bzip2`, `pigz`, `bsdtar`, `bsdcpio`, plus `unzstd`, `zstdcat`, `unxz`, `xzcat`, `bunzip2`, `bzcat`, `unpigz` | Compress and unpack streams; create and extract tar, cpio, zip, 7z and ISO images, and read RAR |
+| Pipe transfer | `pv`, `mbuffer` | Progress, rate limits and buffering for data piped over SSH or a socket |
 | Serial console and transfer | `picocom`, `sz`, `rz` | Serial consoles and ZMODEM file transfer over a serial or terminal session |
 | Process and storage diagnosis | `strace`, `lsof`, `gdbserver`, `e2fsck`, `dumpe2fs`, `tune2fs`, `mke2fs`, `smartctl`, `nvme` | Syscalls, open files, remote debugging, filesystems and device health |
 | Disks, mounts and kernel log | `lsblk`, `blkid`, `sfdisk`, `losetup`, `mount`, `umount`, `dmesg` | Block devices, partition tables, loop devices, mounts and kernel messages |
@@ -181,7 +183,8 @@ Convenience links expose BusyBox applets such as `ping`, `traceroute`, `nslookup
 
 The portable default deliberately leaves some integrations out. Keep Nmap's packaged
 `share/nmap/` beside the executable, provide curl a trusted CA bundle when the target
-lacks one, and do not expect rsync to preserve ACLs or extended attributes. Nmap and
+lacks one, and do not expect rsync to preserve ACLs or extended attributes, or bsdtar
+to open AES-encrypted zip archives. Nmap and
 Ncat use the Nmap Public Source License; review their packaged terms before deployment
 or redistribution.
 

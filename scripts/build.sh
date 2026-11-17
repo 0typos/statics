@@ -28,6 +28,10 @@ export OUTPUT_DIR=$output_dir
 # as statics-extra-<arch>.tar.xz; the directory exists only when one does.
 export EXTRA_OUTPUT_DIR=$output_dir-extra
 export DEPS_PREFIX="$WORK_DIR/prefix"
+# zlib, bzip2, liblzma, and libzstd install here, apart from DEPS_PREFIX:
+# several builders search DEPS_PREFIX and would otherwise link them or not
+# depending on which component the DAG happened to finish first.
+export COMPRESSION_PREFIX="$WORK_DIR/compression-prefix"
 export ZIG=${ZIG:-zig}
 export ZIG_TARGET=$zig_target
 export ZIG_CPU=$zig_cpu
@@ -139,6 +143,14 @@ sources=(
     croc
     cri-tools
     containerd
+    zlib
+    bzip2
+    xz
+    zstd
+    pigz
+    pv
+    mbuffer
+    libarchive
 )
 
 # STATICS_ONLY_DEPS builds just the shared libraries (the Dockerfile's deps
@@ -166,7 +178,7 @@ for source in "${sources[@]}"; do
 done
 
 rm -rf "$WORK_DIR" "$OUTPUT_DIR" "$EXTRA_OUTPUT_DIR"
-mkdir -p "$WORK_DIR" "$OUTPUT_DIR" "$DEPS_PREFIX"
+mkdir -p "$WORK_DIR" "$OUTPUT_DIR" "$DEPS_PREFIX" "$COMPRESSION_PREFIX"
 
 # Autoconf decides it is cross compiling only when its test binary fails to
 # run. With QEMU registered in binfmt_misc, which CI does to verify and many
@@ -224,7 +236,7 @@ dag=$WORK_DIR/dag.mk
         busybox socat dropbear iproute2 wireguard-tools \
         e2fsprogs smartmontools libnvme nvme-cli ppp tunpipe picocom lrzsz gdb \
         sftp-server libnfnetlink libnetfilter_conntrack conntrack ipmitool \
-        mtd-utils libnl iw; do
+        mtd-utils libnl iw zlib bzip2 xz zstd pigz pv mbuffer libarchive; do
         printf ' $(S)/%s' "$c"
     done
     if [[ $go_env != none ]]; then
@@ -281,6 +293,14 @@ dag=$WORK_DIR/dag.mk
     emit mtd-utils mtd-utils build_mtd_utils
     emit libnl iw build_libnl deps
     emit iw iw build_iw libnl
+    emit zlib zlib build_zlib
+    emit bzip2 bzip2 build_bzip2
+    emit xz xz build_xz
+    emit zstd zstd build_zstd
+    emit pigz pigz build_pigz zlib
+    emit pv pv build_pv
+    emit mbuffer mbuffer build_mbuffer
+    emit libarchive libarchive build_libarchive zlib bzip2 xz zstd
     emit wireguard-go wireguard-go build_wireguard_go
     emit rclone rclone build_rclone
     emit croc croc build_croc

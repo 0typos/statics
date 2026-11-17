@@ -46,6 +46,14 @@ ipmitool|1.8.19|48b010e7bcdf93e4e4b6e43c53c7f60aa6873d574cbd45a8d86fa7aaeebaff9c
 mtd-utils|2.3.1|03d9dc58ad10ea3549d9528f6b17a44d8944e18e96c0f31474f9f977078b83dc|https://infraroot.at/pub/mtd/mtd-utils-2.3.1.tar.bz2
 libnl|3.12.0|fc51ca7196f1a3f5fdf6ffd3864b50f4f9c02333be28be4eeca057e103c0dd18|https://github.com/thom311/libnl/releases/download/libnl3_12_0/libnl-3.12.0.tar.gz
 iw|6.17|7d182e498289ab39b257da6780d562e415377107f50358ee5b55b8cfe40b1e33|https://cdn.kernel.org/pub/software/network/iw/iw-6.17.tar.xz
+zlib|1.4|4f11c512053d7bab8d9e9b89bde3575add3e4c50a383b42ef6cb837035fc5a7c|https://github.com/madler/zlib/releases/download/v1.4/zlib-1.4.tar.xz
+bzip2|1.0.8|ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269|https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz
+xz|5.8.4|4ce24038fd4221e0d13bc1a2de7a4db56e90b92b3bf75321f6c14be73f65de4b|https://github.com/tukaani-project/xz/releases/download/v5.8.4/xz-5.8.4.tar.xz
+zstd|1.5.7|eb33e51f49a15e023950cd7825ca74a4a2b43db8354825ac24fc1b7ee09e6fa3|https://github.com/meta/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz
+pigz|2.8|eb872b4f0e1f0ebe59c9f7bd8c506c4204893ba6a8492de31df416f0d5170fd0|https://zlib.net/pigz/fossils/pigz-2.8.tar.gz
+pv|1.12.7|5326ed7ee95ef18039390c0b17891ac28985ac7c7a4235070fab767c1fe37bd8|https://codeberg.org/ivarch/pv/releases/download/v1.12.7/pv-1.12.7.tar.gz
+mbuffer|20261024|ed9b717f9517b0ad0a0c1fb42c809dfb615db442833b7b5c8442e224b45d86bf|https://www.maier-komor.de/software/mbuffer/mbuffer-20261024.tgz
+libarchive|3.8.11|a3dc0872b1b39da34dc18ef1b944f0f11ffd37425d70ae04be679279f1cf43d2|https://github.com/libarchive/libarchive/releases/download/v3.8.11/libarchive-3.8.11.tar.xz
 go|1.27.4|73cfb8571aec0c01177687db87163d46aa20e9779672772891aa17654d9a6099|https://dl.google.com/go/go1.27.4.src.tar.gz
 wireguard-go|0.0.20250522|70d0448d289a691978920f615c687864c3d7b0379d6f974e4f3590487dff35f7|https://github.com/WireGuard/wireguard-go/archive/refs/tags/0.0.20250522.tar.gz
 rclone|1.76.0|fa2b2e4ae56c4f1b91102285b736596e2a028be77cb2aaa5a0df53f3a7fc5902|https://github.com/rclone/rclone/releases/download/v1.76.0/rclone-v1.76.0.tar.gz

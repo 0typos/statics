@@ -42,6 +42,14 @@ ipmitool|BSD-3-Clause|ipmitool|main|-
 mtd-utils|GPL-2.0-only AND GPL-2.0-or-later AND BSD-3-Clause|selected MTD and UBI tools|main|-
 libnl|LGPL-2.1-only|libnl-3 and libnl-genl-3, statically linked into iw|main|-
 iw|ISC|iw|main|-
+zlib|Zlib|statically linked into pigz, bsdtar, and bsdcpio|main|-
+bzip2|bzip2-1.0.6|bzip2 with bunzip2 and bzcat links; libbz2 statically linked into bsdtar and bsdcpio|main|-
+xz|0BSD|xz with unxz and xzcat links; liblzma statically linked into bsdtar and bsdcpio|main|-
+zstd|BSD-3-Clause OR GPL-2.0-only|zstd with unzstd and zstdcat links; libzstd statically linked into bsdtar and bsdcpio|main|-
+pigz|Zlib|pigz and unpigz, without Zopfli|main|-
+pv|GPL-3.0-or-later|pv|main|-
+mbuffer|GPL-3.0-or-later|mbuffer|main|-
+libarchive|BSD-2-Clause AND BSD-3-Clause AND (CC0-1.0 OR OpenSSL OR Apache-2.0)|bsdtar and bsdcpio with bundled BLAKE2|main|-
 rclone|MIT|rclone, trimmed to the local, s3, sftp, http, and webdav backends and 12 commands, with the Go modules listed in licenses/rclone/go-modules.tsv|extra|./cmd/statics
 croc|MIT|croc, relay-only (upstream's croc_no_tailcat tag), with the Go modules listed in licenses/croc/go-modules.tsv|extra|-tags=croc_no_tailcat .
 cri-tools|Apache-2.0|crictl only, with the Go modules listed in licenses/cri-tools/go-modules.tsv|extra|./cmd/crictl

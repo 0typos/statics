@@ -473,6 +473,83 @@ def latest_iw() -> tuple[str, str]:
     )
 
 
+def latest_zlib() -> tuple[str, str]:
+    return latest_from_github_release(
+        "madler/zlib",
+        r"v(\d+\.\d+(?:\.\d+)*)",
+        "https://github.com/madler/zlib/releases/download/v{version}/zlib-{version}.tar.xz",
+    )
+
+
+def latest_bzip2() -> tuple[str, str]:
+    return latest_from_index(
+        "https://sourceware.org/pub/bzip2/",
+        r'bzip2-(\d+\.\d+\.\d+)\.tar\.gz"',
+        "https://sourceware.org/pub/bzip2/bzip2-{version}.tar.gz",
+    )
+
+
+def latest_xz() -> tuple[str, str]:
+    return latest_from_github_release(
+        "tukaani-project/xz",
+        r"v(\d+\.\d+\.\d+)",
+        (
+            "https://github.com/tukaani-project/xz/releases/download/"
+            "v{version}/xz-{version}.tar.xz"
+        ),
+    )
+
+
+def latest_zstd() -> tuple[str, str]:
+    return latest_from_github_release(
+        "meta/zstd",
+        r"v(\d+\.\d+\.\d+)",
+        "https://github.com/meta/zstd/releases/download/v{version}/zstd-{version}.tar.gz",
+    )
+
+
+def latest_pigz() -> tuple[str, str]:
+    # zlib.net/pigz/ links only the current release, which fossils/ keeps
+    # with all the others (and a misnamed 2008 pigz-2.11 to avoid).
+    return latest_from_index(
+        "https://zlib.net/pigz/",
+        r'pigz-(\d+\.\d+(?:\.\d+)?)\.tar\.gz"',
+        "https://zlib.net/pigz/fossils/pigz-{version}.tar.gz",
+    )
+
+
+def latest_pv() -> tuple[str, str]:
+    # ivarch.com announces releases but keeps only the current archive;
+    # Codeberg's release assets are the same files and stay.
+    return latest_from_index(
+        "https://www.ivarch.com/programs/pv.shtml",
+        r"pv-(\d+\.\d+\.\d+)\.tar\.gz",
+        (
+            "https://codeberg.org/ivarch/pv/releases/download/"
+            "v{version}/pv-{version}.tar.gz"
+        ),
+    )
+
+
+def latest_mbuffer() -> tuple[str, str]:
+    return latest_from_index(
+        "https://www.maier-komor.de/mbuffer.html",
+        r"mbuffer-(\d{8})\.tgz",
+        "https://www.maier-komor.de/software/mbuffer/mbuffer-{version}.tgz",
+    )
+
+
+def latest_libarchive() -> tuple[str, str]:
+    return latest_from_github_release(
+        "libarchive/libarchive",
+        r"v(\d+\.\d+\.\d+)",
+        (
+            "https://github.com/libarchive/libarchive/releases/download/"
+            "v{version}/libarchive-{version}.tar.xz"
+        ),
+    )
+
+
 def latest_zig(host: str) -> tuple[str, str]:
     index = json.loads(text("https://ziglang.org/download/index.json"))
     stable = [key for key in index if re.fullmatch(r"\d+\.\d+\.\d+", key)]
@@ -560,6 +637,10 @@ def latest_containerd() -> tuple[str, str]:
 # SHA-256 is not listed there is rejected. rclone's file is also PGP-signed;
 # reviewers check that signature (CONTRIBUTING.md).
 PUBLISHED_SHA256: dict[str, str] = {
+    "zstd": (
+        "https://github.com/meta/zstd/releases/download/"
+        "v{version}/zstd-{version}.tar.gz.sha256"
+    ),
     "rclone": "https://github.com/rclone/rclone/releases/download/v{version}/SHA256SUMS",
     "croc": (
         "https://github.com/schollz/croc/releases/download/"
@@ -607,6 +688,14 @@ DISCOVERERS: dict[str, Callable[[], tuple[str, str]]] = {
     "mtd-utils": latest_mtd_utils,
     "libnl": latest_libnl,
     "iw": latest_iw,
+    "zlib": latest_zlib,
+    "bzip2": latest_bzip2,
+    "xz": latest_xz,
+    "zstd": latest_zstd,
+    "pigz": latest_pigz,
+    "pv": latest_pv,
+    "mbuffer": latest_mbuffer,
+    "libarchive": latest_libarchive,
     "zig-x86_64": lambda: latest_zig("x86_64-linux"),
     "zig-aarch64": lambda: latest_zig("aarch64-linux"),
     "go-x86_64": lambda: latest_go("amd64"),

@@ -1,8 +1,8 @@
 # Toolkit guide
 
-The default bundle is a compact Linux troubleshooting kit: 80 physical
-executables (79 on `powerpc` and `powerpc64`, which have no Go tools),
-BusyBox applet links, Dropbear multi-call links, Nmap runtime
+The default bundle is a compact Linux troubleshooting kit: 88 physical
+executables (87 on `powerpc` and `powerpc64`, which have no Go tools),
+BusyBox applet links, Dropbear multi-call links, decompressor links, Nmap runtime
 data, license texts, checksums, and build metadata. Static linking removes the
 dependency on a target's installed libc; it does not replace kernel features,
 drivers, device nodes, certificate stores, permissions, or runtime databases.
@@ -31,6 +31,8 @@ Nmap data, notices, and licenses remain available.
 | Network control | `ip`, `ss`, `bridge`, `tc`, `wg`, `wireguard-go`, `ethtool`, `nft`, `conntrack`, `iw` | Addresses, routes, sockets, links, traffic control, WireGuard (with or without the kernel module), firewall policy, connection tracking, Wi-Fi, and NIC state |
 | Discovery and packet diagnosis | `nmap`, `tcpdump`, `mtr`, `mtr-packet`, `iperf3` | Host/service discovery, capture, path analysis, and throughput |
 | Protocol and data checks | `curl`, `openssl`, `drill`, `jq`, `rsync` | HTTP, TLS, DNS, structured output, and efficient file transfer |
+| Compression and archives | `zstd`, `xz`, `bzip2`, `pigz`, `bsdtar`, `bsdcpio`; `unzstd`, `zstdcat`, `unxz`, `xzcat`, `bunzip2`, `bzcat`, `unpigz` | Stream compression, and tar, cpio, zip, 7z, ISO 9660, and ar archives; RAR read-only |
+| Pipe transfer | `pv`, `mbuffer` | Progress and rate limits on a pipe, and a large buffer that keeps a stream moving across stalls |
 | Serial console and transfer | `picocom`, `sz`, `rz` | Serial terminal sessions and XMODEM/YMODEM/ZMODEM file transfer |
 | Process diagnosis | `strace`, `lsof`, `gdbserver` | System-call tracing, process/file/socket correlation, and remote debugging with a host GDB |
 | Filesystems and storage | `lsblk`, `blkid`, `sfdisk`, `losetup`, `mount`, `umount`, `e2fsck`, `dumpe2fs`, `tune2fs`, `mke2fs`; `fsck.ext2`, `fsck.ext3`, `fsck.ext4`, `mkfs.ext4`; `smartctl`, `nvme` | Block-device and partition inventory, loop devices, mounts, ext filesystem inspection and repair, drive health, and NVMe diagnosis |
@@ -41,8 +43,9 @@ Nmap data, notices, and licenses remain available.
 | CAN and ISO-TP | `candump`, `cansend`, `cangen`, `canplayer`, `cansniffer`, `isotpdump`, `isotprecv`, `isotpsend`, `slcand`, `canbusload` | SocketCAN and ISO-TP field diagnosis |
 | Hardware buses | `i2cdetect`, `i2cdump`, `i2cget`, `i2cset`, `i2ctransfer`, `spi-config`, `spi-pipe` | Linux I²C and spidev diagnosis |
 
-The BusyBox and Dropbear entries after the semicolon are symbolic links to
-their multi-call binary; they do not add separate binary payloads.
+Entries after a semicolon are symbolic links to a multi-call binary (BusyBox,
+Dropbear, e2fsck, mke2fs) or to a compressor that picks its mode from its
+name; they do not add separate binary payloads.
 
 Four larger Go tools ship separately in `statics-extra-<arch>.tar.xz`, for
 every architecture with Go (not `powerpc` or `powerpc64`). It extracts to
@@ -209,6 +212,39 @@ installed on the minimal target.
 These are starting points, not permission bypasses. Raw sockets, packet
 capture, interface changes, another process's state, and device access often
 need root or narrowly assigned Linux capabilities.
+
+## Moving data
+
+Stream a directory to another host over SSH, compressed, with a progress
+meter; `zstd` and `bsdtar` (or a `tar` with zstd support) must be on the far
+end's `PATH`:
+
+```console
+bsdtar -cf - -C /var log | zstd -T0 -3 | pv |
+    dbclient operator@192.0.2.20 'zstd -d | bsdtar -xf - -C /srv/incident'
+```
+
+Pull a disk image the other way, compressing on the device so the slow link
+carries less (reading the device needs root on it):
+
+```console
+dbclient root@192.0.2.30 'zstd -T0 -3 </dev/mmcblk0' | pv | zstd -d >device.img
+```
+
+On a trusted network without SSH, `mbuffer` on both ends keeps the pipe
+full while the disk or the network briefly stalls. Start the receiver first;
+nothing here is encrypted or authenticated:
+
+```console
+# Receiver, 192.0.2.20
+ncat --listen --recv-only 9000 | mbuffer -q -m 256M | zstd -d | bsdtar -xf - -C /srv/restore
+# Sender
+bsdtar -cf - -C /srv data | zstd -T0 | mbuffer -q -m 256M | ncat --send-only 192.0.2.20 9000
+```
+
+`mbuffer -I 9000` and `mbuffer -O 192.0.2.20:9000` do the same without
+`ncat`. Use `pv -L 5m` to cap a transfer at 5 MiB/s on a shared link, and
+`pv -s SIZE` for a percentage and ETA when the size is known.
 
 ## Default profile and intentional omissions
 
@@ -439,6 +475,42 @@ listed and stepped through ptrace, but GDB cannot use `libthread_db` to
 inspect thread-local variables. Debugging needs ptrace permission over the
 process, which root normally has, subject to Yama `ptrace_scope` and
 LSM policy.
+
+### Compression and archives
+
+`zstd` has no pre-1.0 (v0.1 to v0.7) format support, no gzip, xz, or
+lz4 modes (use `pigz` and `xz`), and, like upstream's `zstd-frugal`, no
+benchmark (`-b`), dictionary training (`--train`), or tracing. `-T0` uses
+every core. `xz` is built with liblzma's `--enable-small`, a little slower
+for a 15% smaller binary; `xzdec`, `lzmadec`, the `lzma`/`unlzma` links, and
+the `xzgrep`-style scripts are not built. `bzip2` has the `bunzip2` and
+`bzcat` links but not `bzip2recover`. `pigz` is built without Zopfli: `-11`
+is accepted but compresses only at the default level, so use `-9`. `unpigz`
+decompresses.
+
+zlib, libbz2, liblzma, and libzstd are each built once and linked statically
+into the tools above and into libarchive. rsync and Nmap keep their own
+bundled zlib copies.
+
+`bsdtar` and `bsdcpio` come from libarchive. They read and write tar (ustar,
+pax, GNU), cpio, zip, 7z, ISO 9660, ar, mtree, and WARC, write shar, and read
+RAR (v4 and v5), CAB, and LHA, through gzip, bzip2, xz, lzma, lzip, zstd, and
+`compress` (.Z) filters. Encrypted 7z archives cannot be read by any
+libarchive build. Left out to save size: any crypto library, so AES-encrypted
+zip archives cannot be read (traditional zip encryption works, with
+`--passphrase`) and mtree digests are left out; libxml2 and
+expat, so no xar; lz4 and lzo; iconv, so there is no `hdrcharset` option and
+names in legacy character sets are not converted; and libacl, so ACLs are
+neither stored nor restored. Extended attributes work. `bsdcat`
+and `bsdunzip` are not built: decompress a bare stream with `zstdcat`, `xzcat`,
+`bzcat`, or `unpigz -c` (a bare `.Z` stream has no decompressor in the kit),
+and extract a zip with `bsdtar -xf FILE.zip`.
+
+### Pipe transfer: pv and mbuffer
+
+`pv` is built without ncurses or NLS. `mbuffer` is built without `--md5`,
+which would need a crypto library. Under QEMU user-mode emulation `mbuffer`
+warns that it cannot advise memory handling; the transfer is unaffected.
 
 ### Rsync
 
