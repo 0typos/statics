@@ -2,11 +2,13 @@
 
 FROM docker.io/library/debian:bookworm-slim@sha256:abd67ffcfa541b485a3dff59865ab629aa048a6c613e639d36e7456b0b229241 AS base
 
-# Only the Zig records reach the toolchain stage, so repinning any other
-# upstream source leaves the toolchain layers cached.
-FROM base AS zig-pin
+# Only the Zig and Go toolchain records reach the toolchain stage, so
+# repinning any other upstream source leaves the toolchain layers cached.
+# Each toolchain gets its own file, so repinning Go keeps Zig's layer.
+FROM base AS toolchain-pin
 COPY sources.lock /tmp/sources.lock
-RUN grep '^zig-' /tmp/sources.lock >/zig.lock
+RUN grep '^zig-' /tmp/sources.lock >/zig.lock \
+    && grep '^go-' /tmp/sources.lock >/go.lock
 
 FROM base AS toolchain
 
@@ -60,7 +62,7 @@ RUN printf 'meson==1.12.0 --hash=sha256:71f133147fa0fcfe8f4df49fa104577106494783
     && meson --version
 
 WORKDIR /workspace
-COPY --from=zig-pin /zig.lock /tmp/zig.lock
+COPY --from=toolchain-pin /zig.lock /tmp/zig.lock
 COPY scripts/fetch.sh ./scripts/fetch.sh
 RUN chmod +x ./scripts/fetch.sh \
     && case "$TARGETARCH" in \
@@ -72,7 +74,19 @@ RUN chmod +x ./scripts/fetch.sh \
     && mkdir -p /opt/zig \
     && tar -xJf /tmp/zig.tar.xz -C /opt/zig --strip-components=1 \
     && rm /tmp/zig.tar.xz
-ENV PATH=/opt/zig:${PATH}
+# The upstream go.dev release, not Debian's: the same Go on every builder,
+# repinned like Zig. GOTOOLCHAIN=local stops a go.mod from fetching another.
+COPY --from=toolchain-pin /go.lock /tmp/go.lock
+RUN case "$TARGETARCH" in \
+        amd64) go_source=go-x86_64 ;; \
+        arm64) go_source=go-aarch64 ;; \
+        *) echo "unsupported builder architecture: $TARGETARCH" >&2; exit 1 ;; \
+       esac \
+    && SOURCES_LOCK=/tmp/go.lock ./scripts/fetch.sh "$go_source" /tmp/go.tar.gz \
+    && tar -xzf /tmp/go.tar.gz -C /opt \
+    && rm /tmp/go.tar.gz
+ENV PATH=/opt/go/bin:/opt/zig:${PATH} \
+    GOTOOLCHAIN=local
 
 FROM toolchain AS sources
 COPY sources.lock ./
@@ -83,6 +97,16 @@ RUN --mount=type=cache,id=statics-source-archives,target=/var/cache/statics \
          --archives /var/cache/statics \
          --extract /src \
          --bundle /archives
+
+# The only network access Go gets: the modules the Go tools import, checked
+# against each upstream go.sum, for the offline build and the source bundle.
+# Its own stage, so the manifests that choose the modules do not invalidate
+# the deps stage below.
+FROM sources AS go-modules
+COPY architectures.tsv components.tsv ./
+COPY scripts/fetch-go-modules.sh ./scripts/
+RUN chmod +x scripts/fetch-go-modules.sh \
+    && scripts/fetch-go-modules.sh /src /go-bundle
 
 # The shared libraries (OpenSSL above all) are about half of every compile and
 # change only with their pins or the build scripts, so they get their own
@@ -97,7 +121,8 @@ COPY scripts/build.sh scripts/run-builder.sh scripts/
 COPY scripts/lib/ scripts/lib/
 COPY scripts/builders/dependencies.sh scripts/builders/
 COPY scripts/toolchain/ scripts/toolchain/
-RUN chmod +x scripts/*.sh scripts/toolchain/* \
+# No network, as for the full build below.
+RUN --network=none chmod +x scripts/*.sh scripts/toolchain/* \
     && STATICS_ONLY_DEPS=1 STATICS_COMPONENT_TIMEOUT="$COMPONENT_TIMEOUT" \
         scripts/build.sh "$ARCH" "/deps/$ARCH/out" \
     && mv "/build/$ARCH/prefix" "/deps/$ARCH/prefix" \
@@ -115,12 +140,14 @@ ARG JOBS
 ARG COMPONENT_TIMEOUT
 # Only what the build reads. Anything else in the context (CI config, docs,
 # verify.sh, dev tooling) must not invalidate every architecture's compile.
+COPY --from=go-modules /src/go-modules/ /src/go-modules/
 COPY LICENSE architectures.tsv components.tsv ./
 COPY configs/ configs/
 COPY patches/ patches/
 COPY tunpipe/ tunpipe/
 COPY scripts/build.sh scripts/run-builder.sh scripts/merge-kconfig.sh \
-     scripts/collect-licenses.sh scripts/generate-sbom.py scripts/
+     scripts/collect-licenses.sh scripts/generate-sbom.py scripts/components.sh \
+     scripts/
 COPY scripts/lib/ scripts/lib/
 COPY scripts/builders/ scripts/builders/
 COPY scripts/toolchain/ scripts/toolchain/
@@ -129,7 +156,9 @@ COPY --from=deps /deps/ /deps/
 # removed in the same layer: it is never read again, and keeping it made each
 # arch's exported layer cache about a gigabyte, enough for the 13 arches to
 # evict one another from GitHub's 10 GB cache.
-RUN chmod +x scripts/*.sh scripts/toolchain/* \
+# No network: every input is already in /src, so a build that reaches for one
+# (a Go module, a toolchain download, a configure probe) fails here.
+RUN --network=none chmod +x scripts/*.sh scripts/toolchain/* \
     && JOBS="$JOBS" STATICS_COMPONENT_TIMEOUT="$COMPONENT_TIMEOUT" \
         STATICS_DEPS_FROM="/deps/$ARCH" scripts/build.sh "$ARCH" "/out/$ARCH" \
     && rm -rf /build
@@ -137,9 +166,16 @@ RUN chmod +x scripts/*.sh scripts/toolchain/* \
 FROM builder AS test
 ARG ARCH=x86_64
 COPY --chmod=0755 scripts/verify.sh scripts/
-RUN apt-get -o Acquire::Retries=3 update \
+# QEMU from bookworm-backports at the same snapshot date: bookworm's 7.2
+# cannot run any Go 386 binary ("fatal: morestack on gsignal"), and 8.0 and
+# later can. Only this test stage sees it; the build never does.
+RUN sed -i 's/^Suites: bookworm bookworm-updates$/& bookworm-backports/' \
+        /etc/apt/sources.list.d/debian.sources \
+    && grep -q '^Suites: bookworm bookworm-updates bookworm-backports$' \
+        /etc/apt/sources.list.d/debian.sources \
+    && apt-get -o Acquire::Retries=3 update \
     && apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
-        qemu-user-static \
+        -t bookworm-backports qemu-user-static \
     && rm -rf /var/lib/apt/lists/* \
     && scripts/verify.sh "/out/$ARCH" "$ARCH"
 
@@ -148,3 +184,4 @@ COPY --from=builder /out/ /
 
 FROM scratch AS source-artifact
 COPY --from=sources /archives/ /
+COPY --from=go-modules /go-bundle/ /go-modules/

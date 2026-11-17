@@ -47,11 +47,13 @@ workflow artifacts.
 
 | Path | Responsibility |
 | --- | --- |
-| `architectures.tsv` | Target name, Zig triple/CPU, QEMU runner, and description |
+| `architectures.tsv` | Target name, Zig triple/CPU, QEMU runner, description, and Go environment (or `none`) |
 | `sources.lock` | Pinned upstream/toolchain version, SHA-256, and URL |
-| `components.tsv` | Component license expression and role in the bundle |
+| `components.tsv` | Component license expression, role, archive (`main` or `extra`), and Go main packages |
 | `docker/Dockerfile` | Clean toolchain, source, build, test, and export stages |
-| `scripts/build.sh` | Target environment and build orchestration |
+| `scripts/build.sh` | Target environment, including the hermetic Go settings, and build orchestration |
+| `scripts/components.sh` | The components that belong in one archive of one target |
+| `scripts/fetch-go-modules.sh` | Downloads the Go modules the Go tools import, against each `go.sum` |
 | `scripts/builders/` | One source-oriented recipe per component |
 | `scripts/lib/build-common.sh` | Shared cross-build, install, and link helpers |
 | `scripts/verify.sh` | Artifact contract, static checks, checksums, and QEMU smoke tests |
@@ -75,7 +77,9 @@ Use this checklist:
 
 1. Add the release archive to `sources.lock` with its exact version, URL, and
    SHA-256.
-2. Add the component and SPDX license expression to `components.tsv`.
+2. Add the component, SPDX license expression, archive, and Go main packages
+   (`-` for a non-Go tool) to `components.tsv`. Small core tools go in the
+   `main` archive; large tools go in `extra`.
 3. Add a builder in `scripts/builders/`. Cross-build only; never execute a
    target binary during compilation.
 4. Add the source directory, builder import, and build call to
@@ -90,6 +94,14 @@ Use this checklist:
 9. Document the tool's feature profile, intentional omissions, runtime data,
    privileges, and license caveats in `docs/TOOLKIT.md`.
 10. Build and smoke-test representative architectures.
+
+A Go tool's builder calls `go_build COMPONENT PACKAGE BINARY` from
+`scripts/lib/build-common.sh`, and `scripts/build.sh` adds it to the DAG only
+where `architectures.tsv` gives a Go environment. The go-modules stage fetches
+its modules from the main packages listed in `components.tsv`; the build is
+offline. `go_build` installs into the archive `components.tsv` names and
+collects every linked module's license files, failing if a module has none.
+Do not commit `vendor/` directories, and build with the upstream `go.sum`.
 
 Prefer disabling an optional integration to silently depending on a target
 shared library. If the utility cannot be useful without data files or plugins,

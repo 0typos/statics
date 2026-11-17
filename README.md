@@ -34,14 +34,15 @@ source pins, CI, verification and release machinery—not generated binaries. Bu
 outputs stay in local files, CI artifacts or release assets.
 
 Every target is compiled against musl with a pinned
-[Zig](https://ziglang.org/) toolchain. Docker keeps the build environment clean; QEMU
+[Zig](https://ziglang.org/) toolchain; the Go tools are built with a pinned
+[Go](https://go.dev/) release, without cgo. Docker keeps the build environment clean; QEMU
 user-mode emulation proves that non-native outputs can actually start.
 
 ## At a glance
 
 | 🧰 Carry it | 🐧 Run it | 🔐 Trust it |
 |---|---|---|
-| 79 physical executables, plus BusyBox and Dropbear links | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
+| 80 physical executables, plus BusyBox and Dropbear links | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
 | Network, process, namespace, storage and hardware diagnosis | Static musl builds avoid a dependency on the target's libc | Deterministic archives, QEMU smoke tests and release attestations |
 
 ## Get a kit
@@ -111,14 +112,15 @@ data and safe starting commands.
 
 ## Inside the case
 
-The bundle contains 79 physical executables plus BusyBox and Dropbear multi-call links,
+The bundle contains 80 physical executables (79 on `powerpc` and `powerpc64`, which get no
+Go tools) plus BusyBox and Dropbear multi-call links,
 Nmap runtime data, checksums, an SPDX SBOM and upstream license texts.
 
 | Area | Outputs | What they are for |
 |---|---|---|
 | Rescue userspace | `busybox`, `nc`, `netcat` | Shell recovery, basic reachability and familiar applet links |
 | Remote access and transfer | `socat`, `ncat`, `rsync`, `dropbear`, `dbclient`, `dropbearkey`, `dropbearconvert`, `scp`, `sftp-server`, `tunpipe`, `tunpipe-standalone`, `pppd` | Relays, emergency SSH with SFTP, IP tunnels over SSH and file movement |
-| Network state and control | `ip`, `ss`, `bridge`, `tc`, `wg`, `ethtool`, `nft`, `conntrack`, `iw` | Interfaces, routes, sockets, policy, connection tracking, Wi-Fi and NIC state |
+| Network state and control | `ip`, `ss`, `bridge`, `tc`, `wg`, `wireguard-go`, `ethtool`, `nft`, `conntrack`, `iw` | Interfaces, routes, sockets, policy, WireGuard without the kernel module, connection tracking, Wi-Fi and NIC state |
 | Discovery and packet diagnosis | `nmap`, `tcpdump`, `iperf3`, `mtr`, `mtr-packet` | Services, captures, paths and throughput |
 | HTTP, TLS, DNS and data | `curl`, `openssl`, `drill`, `jq` | Protocol checks and structured output |
 | Serial console and transfer | `picocom`, `sz`, `rz` | Serial consoles and ZMODEM file transfer over a serial or terminal session |
@@ -161,9 +163,10 @@ capabilities, device nodes and security policy.
 ## Trust what you carry
 
 [`sources.lock`](sources.lock) pins every compiler and upstream source archive by
-version, URL and SHA-256. Fetches fail closed on a checksum mismatch. Builds set a fixed
-`SOURCE_DATE_EPOCH`, strip debug and symbol tables with Zig's cross-linker flags, and
-emit:
+version, URL and SHA-256. Go modules are pinned by each Go tool's own `go.sum`, which
+arrives inside its pinned archive. Fetches fail closed on a checksum mismatch. Builds set a fixed
+`SOURCE_DATE_EPOCH`, run without network access, strip debug and symbol tables with
+Zig's cross-linker flags and Go's `-s -w`, and emit:
 
 - `BUILDINFO` with the target and component versions
 - `SHA256SUMS` for every executable payload and Nmap runtime file

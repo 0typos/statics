@@ -17,7 +17,7 @@ record=$(awk -F '|' -v wanted="$arch" '
     echo "unknown architecture: $arch" >&2
     exit 2
 }
-IFS='|' read -r _ _ _ qemu _ <<<"$record"
+IFS='|' read -r _ _ _ qemu _ go_env <<<"$record"
 
 required_binaries=(
     busybox socat dropbearmulti
@@ -36,63 +36,76 @@ required_binaries=(
     flash_erase flashcp nanddump nandwrite mtdinfo
     ubiattach ubidetach ubinfo ubimkvol ubirmvol ubiupdatevol
 )
+# Go tools exist only where architectures.tsv gives a Go environment.
+if [[ $go_env != none ]]; then
+    required_binaries+=(wireguard-go)
+fi
+# Smoke checks for the extra archive, as "expected output|arguments" per
+# executable. Every executable in it must have one, so an extra tool cannot
+# ship without being started.
+declare -A extra_smoke=()
 
-for metadata in BUILDINFO BUILD_RECIPES_LICENSE COMPONENTS.tsv SBOM.spdx.json \
-    SHA256SUMS THIRD_PARTY_NOTICES.md sources.lock; do
-    [[ -s $output_dir/$metadata ]] || {
-        echo "missing build metadata: $output_dir/$metadata" >&2
+# Checks every archive must pass: metadata, licenses for exactly the
+# components it should hold, its SBOM, static linkage, and SHA256SUMS.
+check_archive() { # directory archive
+    local dir=$1 archive=$2 name=statics-$arch
+    [[ $archive == main ]] || name=statics-extra-$arch
+
+    for metadata in BUILDINFO BUILD_RECIPES_LICENSE COMPONENTS.tsv SBOM.spdx.json \
+        SHA256SUMS THIRD_PARTY_NOTICES.md sources.lock; do
+        [[ -s $dir/$metadata ]] || {
+            echo "missing build metadata: $dir/$metadata" >&2
+            exit 1
+        }
+    done
+
+    local expected
+    expected=$("$repo_root/scripts/components.sh" "$arch" "$archive")
+    diff <(grep -v '^#' "$dir/COMPONENTS.tsv") <(printf '%s\n' "$expected") || {
+        echo "$dir/COMPONENTS.tsv does not list the $archive components for $arch" >&2
         exit 1
     }
-done
 
-for binary in "${required_binaries[@]}"; do
-    [[ -x $output_dir/$binary ]] || {
-        echo "missing executable: $output_dir/$binary" >&2
-        exit 1
-    }
-done
+    local source_name packages
+    while IFS='|' read -r source_name _ _ _ packages; do
+        [[ -d $dir/licenses/$source_name ]] || {
+            echo "missing license directory: $dir/licenses/$source_name" >&2
+            exit 1
+        }
+        find "$dir/licenses/$source_name" -type f -size +0c -print -quit |
+            grep -q . || {
+            echo "empty license directory: $dir/licenses/$source_name" >&2
+            exit 1
+        }
+        # A Go tool lists the modules it links, and each has its notices.
+        [[ $packages == - || $packages == runtime ]] && continue
+        local module_list=$dir/licenses/$source_name/go-modules.tsv path version
+        [[ -f $module_list ]] || {
+            echo "missing Go module list: $module_list" >&2
+            exit 1
+        }
+        while IFS='|' read -r path version _; do
+            [[ -n $(find "$dir/licenses/$source_name/modules/$path@$version" \
+                -type f -size +0c -print -quit 2>/dev/null) ]] || {
+                echo "no license files for Go module $path@$version in $source_name" >&2
+                exit 1
+            }
+        done <"$module_list"
+    done <<<"$expected"
 
-for nmap_data in \
-    nmap-mac-prefixes \
-    nmap-os-db \
-    nmap-protocols \
-    nmap-rpc \
-    nmap-service-probes \
-    nmap-services \
-    nmap.dtd \
-    nmap.xsl; do
-    [[ -s $output_dir/share/nmap/$nmap_data ]] || {
-        echo "missing Nmap runtime data: $nmap_data" >&2
-        exit 1
-    }
-done
-
-while IFS='|' read -r source_name _; do
-    [[ $source_name == \#* || -z $source_name ]] && continue
-    [[ -d $output_dir/licenses/$source_name ]] || {
-        echo "missing license directory: $output_dir/licenses/$source_name" >&2
-        exit 1
-    }
-    find "$output_dir/licenses/$source_name" -type f -size +0c -print -quit |
-        grep -q . || {
-        echo "empty license directory: $output_dir/licenses/$source_name" >&2
-        exit 1
-    }
-done < "$repo_root/components.tsv"
-
-python3 - "$output_dir/SBOM.spdx.json" "$arch" <<'PY'
+    python3 - "$dir/SBOM.spdx.json" "$name" <<'PY'
 import json
 import hashlib
 import re
 import sys
 from pathlib import Path
 
-path, arch = sys.argv[1:]
+path, name = sys.argv[1:]
 with open(path, encoding="utf-8") as handle:
     document = json.load(handle)
 if document.get("spdxVersion") != "SPDX-2.3":
     raise SystemExit("unexpected SPDX version")
-if document.get("name") != f"statics-{arch}":
+if document.get("name") != name:
     raise SystemExit("unexpected SPDX document name")
 if not document.get("packages") or not document.get("files"):
     raise SystemExit("SPDX document has no packages or files")
@@ -103,7 +116,7 @@ if not re.fullmatch(r"\d+\.\d+", license_list):
 bundle = next(
     package
     for package in document["packages"]
-    if package.get("name") == f"statics-{arch}"
+    if package.get("name") == name
 )
 if bundle.get("filesAnalyzed") is not True:
     raise SystemExit("SPDX bundle does not analyze its payload files")
@@ -131,20 +144,59 @@ if recorded_code != verification_code:
     raise SystemExit("bad SPDX package verification code")
 PY
 
-while IFS= read -r binary; do
-    file "$output_dir/$binary"
-    file "$output_dir/$binary" | grep -Eq 'statically linked|static-pie linked' || {
-        echo "$binary is not statically linked" >&2
+    local binary
+    while IFS= read -r binary; do
+        file "$dir/$binary"
+        file "$dir/$binary" | grep -Eq 'statically linked|static-pie linked' || {
+            echo "$binary is not statically linked" >&2
+            exit 1
+        }
+        if readelf --program-headers "$dir/$binary" | grep -q 'Requesting program interpreter'; then
+            echo "$binary has a dynamic program interpreter" >&2
+            exit 1
+        fi
+    done < <(
+        cd "$dir"
+        find . -maxdepth 1 -type f -perm /111 -printf '%P\n' | LC_ALL=C sort
+    )
+
+    (
+        cd "$dir"
+        sha256sum --check SHA256SUMS
+    )
+}
+
+check_archive "$output_dir" main
+# The extra archive must exist exactly when components.tsv gives it a tool.
+if [[ -n $("$repo_root/scripts/components.sh" "$arch" extra) ]]; then
+    check_archive "$output_dir-extra" extra
+elif [[ -e $output_dir-extra ]]; then
+    echo "$output_dir-extra exists, but components.tsv puts nothing in $arch's extra archive" >&2
+    exit 1
+fi
+
+for binary in "${required_binaries[@]}"; do
+    [[ -x $output_dir/$binary ]] || {
+        echo "missing executable: $output_dir/$binary" >&2
         exit 1
     }
-    if readelf --program-headers "$output_dir/$binary" | grep -q 'Requesting program interpreter'; then
-        echo "$binary has a dynamic program interpreter" >&2
+done
+
+for nmap_data in \
+    nmap-mac-prefixes \
+    nmap-os-db \
+    nmap-protocols \
+    nmap-rpc \
+    nmap-service-probes \
+    nmap-services \
+    nmap.dtd \
+    nmap.xsl; do
+    [[ -s $output_dir/share/nmap/$nmap_data ]] || {
+        echo "missing Nmap runtime data: $nmap_data" >&2
         exit 1
-    fi
-done < <(
-    cd "$output_dir"
-    find . -maxdepth 1 -type f -perm /111 -printf '%P\n' | LC_ALL=C sort
-)
+    }
+done
+
 
 for link in nc netcat dropbear dbclient dropbearkey dropbearconvert scp tunpipe \
     fsck.ext2 fsck.ext3 fsck.ext4 mkfs.ext4; do
@@ -153,11 +205,6 @@ for link in nc netcat dropbear dbclient dropbearkey dropbearconvert scp tunpipe 
         exit 1
     }
 done
-
-(
-    cd "$output_dir"
-    sha256sum --check SHA256SUMS
-)
 
 runner=()
 if [[ ${SKIP_QEMU:-0} != 1 ]]; then
@@ -270,6 +317,23 @@ if [[ ${SKIP_QEMU:-0} != 1 ]]; then
         ubiattach ubidetach ubinfo ubimkvol ubirmvol ubiupdatevol; do
         check_output mtd-utils "$output_dir/$program" --version
     done
+    if [[ $go_env != none ]]; then
+        check_output "wireguard-go v" "$output_dir/wireguard-go" --version
+    fi
+    if [[ -d $output_dir-extra ]]; then
+        while IFS= read -r binary; do
+            [[ -n ${extra_smoke[$binary]:-} ]] || {
+                echo "no smoke check in verify.sh for extra executable $binary" >&2
+                exit 1
+            }
+            IFS='|' read -r needle arguments <<<"${extra_smoke[$binary]}"
+            # shellcheck disable=SC2086  # arguments is a word list
+            check_output "$needle" "$output_dir-extra/$binary" $arguments
+        done < <(
+            cd "$output_dir-extra"
+            find . -maxdepth 1 -type f -perm /111 -printf '%P\n' | LC_ALL=C sort
+        )
+    fi
 fi
 
 echo "verified $arch"

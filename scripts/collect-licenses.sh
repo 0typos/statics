@@ -3,18 +3,22 @@ set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 
-if [[ $# -ne 2 ]]; then
-    echo "usage: $0 SOURCE_ROOT OUTPUT_DIR" >&2
+if [[ $# -ne 4 ]]; then
+    echo "usage: $0 SOURCE_ROOT OUTPUT_DIR ARCH main|extra" >&2
     exit 2
 fi
 
 source_root=$1
 output_dir=$2
 license_root="$output_dir/licenses"
+# The components in this archive; licenses of any other are skipped.
+components=$("$repo_root/scripts/components.sh" "$3" "$4")
+active=" $(cut -d '|' -f 1 <<<"$components" | tr '\n' ' ')"
 
 copy_license() {
     local source_name=$1
     local relative_path=$2
+    [[ $active == *" $source_name "* ]] || return 0
     local source_path="$source_root/$source_name/$relative_path"
     local destination="$license_root/$source_name/$relative_path"
 
@@ -102,8 +106,24 @@ copy_license mtd-utils COPYING
 copy_license mtd-utils MTD-UTILS-BSD-NOTICES
 copy_license libnl COPYING
 copy_license iw COPYING
+copy_license wireguard-go LICENSE
 
-cp "$repo_root/components.tsv" "$output_dir/COMPONENTS.tsv"
+# Go's runtime and standard library come from the toolchain that linked them.
+if [[ $active == *" go "* ]]; then
+    for file in LICENSE PATENTS; do
+        install -D -m 0644 "$(go env GOROOT)/$file" "$license_root/go/$file"
+    done
+fi
+# Each Go tool's module list and module notices, staged by go_build.
+while IFS='|' read -r source_name _ _ _ packages; do
+    [[ -z $source_name || $packages == - || $packages == runtime ]] && continue
+    cp -R "$source_root/go-licenses/$source_name/." "$license_root/$source_name/"
+done <<<"$components"
+
+{
+    head -n 1 "$repo_root/components.tsv"
+    printf '%s\n' "$components"
+} > "$output_dir/COMPONENTS.tsv"
 
 {
     echo "# Third-party notices"
@@ -114,8 +134,7 @@ cp "$repo_root/components.tsv" "$output_dir/COMPONENTS.tsv"
     echo
     echo "| Source | Version | SPDX expression | Role |"
     echo "| --- | --- | --- | --- |"
-    while IFS='|' read -r source_name license_expression role; do
-        [[ $source_name == \#* || -z $source_name ]] && continue
+    while IFS='|' read -r source_name license_expression role _; do
         record=$(awk -F '|' -v wanted="$source_name" '
             $0 !~ /^#/ && $1 == wanted { print; found++ }
             END { if (found != 1) exit 1 }
@@ -126,9 +145,15 @@ cp "$repo_root/components.tsv" "$output_dir/COMPONENTS.tsv"
         IFS='|' read -r _ version _ url <<<"$record"
         printf "| [%s](%s) | \`%s\` | \`%s\` | %s |\n" \
             "$source_name" "$url" "$version" "$license_expression" "$role"
-    done < "$repo_root/components.tsv"
+    done <<<"$components"
     echo
     echo "The exact source archives and checksums are recorded in \`sources.lock\`."
+    if [[ $active == *" go "* ]]; then
+        echo
+        echo "Each Go tool also links the Go modules listed, with their versions and"
+        echo "go.sum hashes, in \`licenses/<source>/go-modules.tsv\`. Their license"
+        echo "and notice files are under \`licenses/<source>/modules/<module>@<version>/\`."
+    fi
 } > "$output_dir/THIRD_PARTY_NOTICES.md"
 
 cp "$repo_root/LICENSE" "$output_dir/BUILD_RECIPES_LICENSE"

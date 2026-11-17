@@ -10,8 +10,9 @@ after:
 
 1. repository validation and ShellCheck pass;
 2. every architecture builds and passes static/QEMU verification;
-3. the x86-64 archive being released is byte-identical to an independent
-   rebuild without any cache, toolchain included;
+3. the x86-64 archives being released (main, and extra when x86-64 has one)
+   are byte-identical to an independent rebuild without any cache, toolchain
+   included;
 4. the corresponding-source archive is packaged;
 5. every archive is signed keylessly through CircleCI's OIDC identity, and
    each signature verifies against that identity;
@@ -22,7 +23,14 @@ The release contains, for every architecture:
 - `statics-<arch>.tar.xz` and its SHA-256 file;
 - a standalone deterministic SPDX 2.3 SBOM and its SHA-256 file;
 - Sigstore bundles `statics-<arch>.tar.xz.provenance.sigstore.json` (SLSA
-  provenance) and `statics-<arch>.tar.xz.sbom.sigstore.json` (the SBOM).
+  provenance) and `statics-<arch>.tar.xz.sbom.sigstore.json` (the SBOM);
+- when the architecture builds a component marked `extra` in
+  `components.tsv`, the same four files and two bundles for
+  `statics-extra-<arch>.tar.xz`, which has its own SBOM and checksums.
+
+No component is marked `extra` yet, so current releases have no extra
+archives; the build, cache, reproducibility, and publish steps all skip an
+extra archive that does not exist.
 
 It also contains `statics-sources.tar.xz`, its SHA-256 file, and its
 provenance bundle. Binary

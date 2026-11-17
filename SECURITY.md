@@ -22,8 +22,12 @@ version stays buildable but is no longer distributed.
 
 ## Build inputs
 
-All upstream archives and both supported host toolchains are pinned by
-SHA-256 in `sources.lock`. The Docker base/frontend images, the CircleCI job
+All upstream archives and the Zig and Go toolchains for both supported hosts
+are pinned by SHA-256 in `sources.lock`. Go modules are pinned by each Go
+tool's upstream `go.sum`, which arrives inside that tool's pinned archive;
+they are downloaded once, before the build, and a module missing from
+`go.sum` or hashing differently stops it. The compile step itself has no
+network access. The Docker base/frontend images, the CircleCI job
 images, and the release tools (`gh`, `cosign`) are also pinned to immutable
 digests or release checksums.
 A build stops before extraction when a source digest does not match.
@@ -80,9 +84,11 @@ authenticated upstream mirror or automated signature validation is desirable.
 
 Each build:
 
-- uses a clean container and a pinned Zig release;
-- links against musl with no ELF program interpreter;
-- strips binaries with the same cross-aware toolchain;
+- uses a clean container and pinned Zig and Go releases;
+- links against musl, or for Go tools without cgo, with no ELF program
+  interpreter;
+- strips binaries with the same cross-aware toolchain, or Go's linker
+  (`-s -w`) for Go tools;
 - records versions and SHA-256 digests for executable payloads and Nmap
   runtime data;
 - records a deterministic SPDX SBOM and complete upstream notices;

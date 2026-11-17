@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate a deterministic SPDX 2.3 JSON SBOM for one architecture bundle."""
+"""Generate a deterministic SPDX 2.3 JSON SBOM for one architecture archive."""
 
 from __future__ import annotations
 
@@ -35,25 +35,32 @@ def checksum(path: Path, algorithm: str) -> str:
     return digest.hexdigest()
 
 
+def module_escape(path: str) -> str:
+    """Spell capitals as the Go module proxy does: ! plus the lowercase."""
+    return re.sub(r"[A-Z]", lambda m: "!" + m.group(0).lower(), path)
+
+
 def main() -> int:
-    if len(sys.argv) != 3:
-        print(f"usage: {sys.argv[0]} OUTPUT_DIR ARCH", file=sys.stderr)
+    if len(sys.argv) != 4 or sys.argv[3] not in ("main", "extra"):
+        print(f"usage: {sys.argv[0]} OUTPUT_DIR ARCH main|extra", file=sys.stderr)
         return 2
 
     output_dir = Path(sys.argv[1]).resolve()
     arch = sys.argv[2]
+    name = f"statics-{arch}" if sys.argv[3] == "main" else f"statics-extra-{arch}"
     source_records = {
         fields[0]: fields for fields in records(ROOT / "sources.lock")
     }
-    components = records(ROOT / "components.tsv")
+    # The archive's own component list, written by collect-licenses.sh.
+    components = records(output_dir / "COMPONENTS.tsv")
     lock_digest = hashlib.sha256(
         (ROOT / "sources.lock").read_bytes()
     ).hexdigest()
 
-    bundle_id = spdx_id("Package", f"statics-{arch}")
+    bundle_id = spdx_id("Package", name)
     bundle_package: dict[str, object] = {
         "SPDXID": bundle_id,
-        "name": f"statics-{arch}",
+        "name": name,
         "versionInfo": lock_digest[:16],
         "downloadLocation": "NOASSERTION",
         "filesAnalyzed": True,
@@ -71,13 +78,14 @@ def main() -> int:
         }
     ]
 
-    for source_name, license_expression, _role in components:
-        name, version, sha256, url = source_records[source_name]
+    module_ids: set[str] = set()
+    for source_name, license_expression, _role, _archive, go_packages in components:
+        _, version, sha256, url = source_records[source_name]
         package_id = spdx_id("Package", source_name)
         packages.append(
             {
                 "SPDXID": package_id,
-                "name": name,
+                "name": source_name,
                 "versionInfo": version,
                 "downloadLocation": url,
                 "filesAnalyzed": False,
@@ -97,6 +105,49 @@ def main() -> int:
                 "relatedSpdxElement": package_id,
             }
         )
+        if go_packages in ("-", "runtime"):
+            continue
+        # One package per Go module linked into the tool, from the list
+        # go_build took from the binary's own build info.
+        modules = output_dir / "licenses" / source_name / "go-modules.tsv"
+        for path, module_version, h1 in records(modules):
+            module_id = spdx_id("Package", f"go-{path}@{module_version}")
+            if module_id not in module_ids:
+                module_ids.add(module_id)
+                packages.append(
+                    {
+                        "SPDXID": module_id,
+                        "name": path,
+                        "versionInfo": module_version,
+                        "downloadLocation": (
+                            "https://proxy.golang.org/"
+                            f"{module_escape(path)}/@v/"
+                            f"{module_escape(module_version)}.zip"
+                        ),
+                        "filesAnalyzed": False,
+                        "licenseConcluded": "NOASSERTION",
+                        "licenseDeclared": "NOASSERTION",
+                        "copyrightText": "NOASSERTION",
+                        "comment": f"go.sum hash {h1}",
+                        "externalRefs": [
+                            {
+                                "referenceCategory": "PACKAGE-MANAGER",
+                                "referenceType": "purl",
+                                "referenceLocator": (
+                                    f"pkg:golang/{path}@{module_version}"
+                                ),
+                            }
+                        ],
+                        "primaryPackagePurpose": "LIBRARY",
+                    }
+                )
+            relationships.append(
+                {
+                    "spdxElementId": package_id,
+                    "relationshipType": "DEPENDS_ON",
+                    "relatedSpdxElement": module_id,
+                }
+            )
 
     files: list[dict[str, object]] = []
     file_sha1_checksums: list[str] = []
@@ -138,10 +189,10 @@ def main() -> int:
         "spdxVersion": "SPDX-2.3",
         "dataLicense": "CC0-1.0",
         "SPDXID": "SPDXRef-DOCUMENT",
-        "name": f"statics-{arch}",
+        "name": name,
         "documentNamespace": (
             "https://spdx.org/spdxdocs/"
-            f"statics-{arch}-{lock_digest}"
+            f"{name}-{lock_digest}"
         ),
         "creationInfo": {
             "created": "1970-01-01T00:00:00Z",

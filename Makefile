@@ -59,16 +59,21 @@ package: build
 # rebuild with no cache at all, toolchain included, at twice the make -j.
 # The local exporter never deletes, so clear the tree before each build or
 # stale files would land in both archives.
+# The extra archive, when x86_64 has one, is compared the same way.
 repro:
-	rm -rf dist/x86_64
+	rm -rf dist/x86_64 dist/x86_64-extra .build/repro
 	$(MAKE) package ARCH=x86_64
 	mkdir -p .build/repro
-	mv dist/statics-x86_64.tar.xz .build/repro/shipped.tar.xz
-	rm -rf dist/x86_64
+	mv dist/statics-x86_64.tar.xz .build/repro/
+	if [ -f dist/statics-extra-x86_64.tar.xz ]; then mv dist/statics-extra-x86_64.tar.xz .build/repro/; fi
+	rm -rf dist/x86_64 dist/x86_64-extra
 	TOOLCHAIN_IMAGE= $(BUILDX) artifact --no-cache --build-arg ARCH=x86_64 \
 		--build-arg JOBS=$$(( $$(nproc) * 2 )) --output type=local,dest=dist
 	./scripts/package.sh x86_64
-	./scripts/compare-builds.sh .build/repro/shipped.tar.xz dist/statics-x86_64.tar.xz
+	@set -e; for name in statics-x86_64.tar.xz statics-extra-x86_64.tar.xz; do \
+		[ -f .build/repro/$$name ] || [ -f dist/$$name ] || continue; \
+		./scripts/compare-builds.sh .build/repro/$$name dist/$$name; \
+	done
 
 sources:
 	$(BUILDX) source-artifact --output type=local,dest=dist/sources
