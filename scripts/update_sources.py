@@ -149,7 +149,7 @@ def latest_iproute2() -> tuple[str, str]:
         "https://mirrors.edge.kernel.org/pub/linux/utils/net/iproute2/",
         r'iproute2-(\d+\.\d+\.\d+)\.tar\.xz',
         (
-            "https://mirrors.edge.kernel.org/pub/linux/utils/net/iproute2/"
+            "https://cdn.kernel.org/pub/linux/utils/net/iproute2/"
             "iproute2-{version}.tar.xz"
         ),
     )
@@ -238,7 +238,7 @@ def latest_ethtool() -> tuple[str, str]:
         "https://mirrors.edge.kernel.org/pub/software/network/ethtool/",
         r"ethtool-(\d+\.\d+)\.tar\.xz",
         (
-            "https://mirrors.edge.kernel.org/pub/software/network/ethtool/"
+            "https://cdn.kernel.org/pub/software/network/ethtool/"
             "ethtool-{version}.tar.xz"
         ),
     )
@@ -298,7 +298,7 @@ def latest_i2c_tools() -> tuple[str, str]:
         "https://mirrors.edge.kernel.org/pub/software/utils/i2c-tools/",
         r"i2c-tools-(\d+\.\d+)\.tar\.xz",
         (
-            "https://mirrors.edge.kernel.org/pub/software/utils/i2c-tools/"
+            "https://cdn.kernel.org/pub/software/utils/i2c-tools/"
             "i2c-tools-{version}.tar.xz"
         ),
     )
