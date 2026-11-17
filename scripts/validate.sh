@@ -23,6 +23,10 @@ awk -F '|' '
     $4 !~ /^https:\/\// && $1 != "socat" {
         print FNR ": non-HTTPS source " $1; bad=1
     }
+    # Archives are cached and bundled by file name; GitHub tag archives are
+    # named only for the tag (v1.2.3.tar.gz), so two could collide.
+    { file = $4; sub(/.*\//, "", file) }
+    files[file]++ { print FNR ": archive file name " file " is not unique"; bad=1 }
     END { exit bad }
 ' "$repo_root/sources.lock"
 

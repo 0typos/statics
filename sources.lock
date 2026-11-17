@@ -48,3 +48,7 @@ libnl|3.12.0|fc51ca7196f1a3f5fdf6ffd3864b50f4f9c02333be28be4eeca057e103c0dd18|ht
 iw|6.17|7d182e498289ab39b257da6780d562e415377107f50358ee5b55b8cfe40b1e33|https://cdn.kernel.org/pub/software/network/iw/iw-6.17.tar.xz
 go|1.27.4|73cfb8571aec0c01177687db87163d46aa20e9779672772891aa17654d9a6099|https://dl.google.com/go/go1.27.4.src.tar.gz
 wireguard-go|0.0.20250522|70d0448d289a691978920f615c687864c3d7b0379d6f974e4f3590487dff35f7|https://github.com/WireGuard/wireguard-go/archive/refs/tags/0.0.20250522.tar.gz
+rclone|1.76.0|fa2b2e4ae56c4f1b91102285b736596e2a028be77cb2aaa5a0df53f3a7fc5902|https://github.com/rclone/rclone/releases/download/v1.76.0/rclone-v1.76.0.tar.gz
+croc|11.6.5|cba72f3d58a687a6fe8633c212568071ce7a8e9d9ec544ff9f75aa201f873b6a|https://github.com/schollz/croc/releases/download/v11.6.5/croc_v11.6.5_src.tar.gz
+cri-tools|1.37.0|ef81c240412a5b77b164ae6570857b7a0f347770031a697764ba5167389842d8|https://github.com/kubernetes-sigs/cri-tools/archive/refs/tags/v1.37.0.tar.gz
+containerd|2.4.2|02cbbecd0ef78a521d124afa791b843ba5458ef206e1f7f017999ff45c80c0b4|https://github.com/containerd/containerd/archive/refs/tags/v2.4.2.tar.gz

@@ -163,8 +163,19 @@ main kit stays small. `components.tsv` assigns each component to `main` or
 `extra`. The extra archive has the same layout and metadata as the main one,
 under a top-level `<arch>-extra/` directory, with its own `SHA256SUMS`,
 `COMPONENTS.tsv`, notices, and SBOM (`statics-extra-<arch>.spdx.json`). It
-exists only for an architecture that builds at least one extra tool; no
-component is marked `extra` yet, so no target currently produces one.
+exists only for an architecture that builds at least one extra tool: today
+`rclone`, `croc`, `crictl`, and `ctr`, on every target with Go. It is
+compressed with `xz -9` rather than the main archive's `-6`: the 64 MiB
+window spans all four binaries, which share Go's runtime and many modules,
+and makes the archive about 30% smaller, at about 65 MiB of memory to
+decompress.
+
+`components.tsv` may list `go build` flags before a Go tool's packages, such
+as croc's `-tags=croc_no_tailcat`; the module fetch and `go_build` both use
+them. A main package this repository adds to an upstream tree, such as
+rclone's trimmed `./cmd/statics`, lives under `patches/go-mains/<source>/`
+and is copied into that source tree by the module fetch and by `build.sh`,
+so the upstream `go.mod` and `go.sum` still govern it.
 
 Archives are normalized for stable ordering, ownership, and timestamps.
 Reproducibility still depends on identical repository inputs, source
@@ -241,6 +252,13 @@ tar -xJf dist/statics-sources.tar.xz -C /tmp
 GOPROXY=file:///tmp/sources/go-modules GOFLAGS=-mod=readonly \
     go build -o wireguard-go .
 ```
+
+The module tree holds only what the bundled tools link, so build the same
+packages with the same flags: rclone's `./cmd/statics` after copying in
+`patches/go-mains/rclone/`, croc with `-tags=croc_no_tailcat`, `./cmd/crictl`,
+and `./cmd/ctr`, adding the `-X` version flags from `scripts/builders/` for
+the same version strings. Upstream's full rclone build needs modules that are
+not in the bundle.
 
 ## Go tools and network access
 

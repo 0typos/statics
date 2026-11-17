@@ -135,6 +135,10 @@ sources=(
     libnl
     iw
     wireguard-go
+    rclone
+    croc
+    cri-tools
+    containerd
 )
 
 # STATICS_ONLY_DEPS builds just the shared libraries (the Dockerfile's deps
@@ -183,6 +187,11 @@ esac
 for source in "${sources[@]}"; do
     mkdir "$WORK_DIR/$source"
     cp -a "$SOURCES_DIR/$source/." "$WORK_DIR/$source/"
+    # Go main packages this repository adds to an upstream tree, also added
+    # by scripts/fetch-go-modules.sh, so the upstream go.mod still applies.
+    if [[ -d $repo_root/patches/go-mains/$source ]]; then
+        cp -R "$repo_root/patches/go-mains/$source/." "$WORK_DIR/$source/"
+    fi
 done
 
 # Components build as a GNU make DAG under one jobserver: `make -j$JOBS` is
@@ -219,7 +228,7 @@ dag=$WORK_DIR/dag.mk
         printf ' $(S)/%s' "$c"
     done
     if [[ $go_env != none ]]; then
-        printf ' $(S)/%s' wireguard-go
+        printf ' $(S)/%s' wireguard-go rclone croc crictl ctr
     fi
     printf '\n\n'
 
@@ -273,6 +282,10 @@ dag=$WORK_DIR/dag.mk
     emit libnl iw build_libnl deps
     emit iw iw build_iw libnl
     emit wireguard-go wireguard-go build_wireguard_go
+    emit rclone rclone build_rclone
+    emit croc croc build_croc
+    emit crictl cri-tools build_crictl
+    emit ctr containerd build_ctr
 } > "$dag"
 
 if ! make -f "$dag" -j"$JOBS" --output-sync=target "$goal"; then

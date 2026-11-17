@@ -107,6 +107,11 @@ copy_license mtd-utils MTD-UTILS-BSD-NOTICES
 copy_license libnl COPYING
 copy_license iw COPYING
 copy_license wireguard-go LICENSE
+copy_license rclone COPYING
+copy_license croc LICENSE
+copy_license cri-tools LICENSE
+copy_license containerd LICENSE
+copy_license containerd NOTICE
 
 # Go's runtime and standard library come from the toolchain that linked them.
 if [[ $active == *" go "* ]]; then

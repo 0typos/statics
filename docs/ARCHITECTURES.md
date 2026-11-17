@@ -28,7 +28,8 @@ runtime errors after choosing a target, see
 
 ## Go tools
 
-Go tools (currently `wireguard-go`) are built by the pinned Go release with
+Go tools (`wireguard-go` in the main archive; `rclone`, `croc`, `crictl`, and
+`ctr` in the extra archive) are built by the pinned Go release with
 cgo disabled, so they do not link musl at all. Go has its own CPU and kernel
 floors, recorded as the last column of `architectures.tsv`:
 
@@ -52,7 +53,8 @@ Every Go tool also needs Linux 3.2 or later. Go statically links its own
 runtime instead of calling a libc, so the CPU floor can sit above a row's C
 baseline: on a POWER7 `powerpc64le` system or a pre-z13 `s390x`, the C tools
 run and the Go tools stop at startup. `powerpc` and `powerpc64` bundles ship
-without Go tools; their `COMPONENTS.tsv` and SBOM say so. The floors are
+without Go tools and have no extra archive; their `COMPONENTS.tsv` and SBOM
+say so. The floors are
 those of the Go release pinned in `sources.lock`, per Go's
 [minimum requirements](https://go.dev/wiki/MinimumRequirements).
 

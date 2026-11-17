@@ -1,4 +1,4 @@
-# source|SPDX license expression|role and outputs|archive: main, extra, or any|Go main packages, - for none, runtime for Go itself
+# source|SPDX license expression|role and outputs|archive: main, extra, or any|Go main packages after any go build flags (-tags=...), - for none, runtime for Go itself
 busybox|GPL-2.0-only|busybox and applet links|main|-
 socat|GPL-2.0-only|socat|main|-
 dropbear|MIT AND Unlicense|dropbearmulti and applet links, including the repository-authored tunpipe; bundled libtomcrypt and libtommath|main|-
@@ -42,4 +42,8 @@ ipmitool|BSD-3-Clause|ipmitool|main|-
 mtd-utils|GPL-2.0-only AND GPL-2.0-or-later AND BSD-3-Clause|selected MTD and UBI tools|main|-
 libnl|LGPL-2.1-only|libnl-3 and libnl-genl-3, statically linked into iw|main|-
 iw|ISC|iw|main|-
+rclone|MIT|rclone, trimmed to the local, s3, sftp, http, and webdav backends and 12 commands, with the Go modules listed in licenses/rclone/go-modules.tsv|extra|./cmd/statics
+croc|MIT|croc, relay-only (upstream's croc_no_tailcat tag), with the Go modules listed in licenses/croc/go-modules.tsv|extra|-tags=croc_no_tailcat .
+cri-tools|Apache-2.0|crictl only, with the Go modules listed in licenses/cri-tools/go-modules.tsv|extra|./cmd/crictl
+containerd|Apache-2.0|ctr only, with the Go modules listed in licenses/containerd/go-modules.tsv|extra|./cmd/ctr
 go|BSD-3-Clause|the Go runtime and standard library, statically linked into every Go tool in the same archive|any|runtime

@@ -5,7 +5,8 @@ configuration, socket and packet inspection, HTTP/TLS/DNS checks, throughput
 and path diagnosis, firewall policy and connection tracking, Wi-Fi, syscall
 tracing, remote debugging, serial consoles, filesystem, block-device, and raw
 flash diagnosis, BMC management over IPMI, JSON processing, and common IoT
-field buses.
+field buses. The optional extra archive adds object-storage and SFTP sync,
+code-phrase file transfer, and container runtime inspection.
 
 This page records candidates, not commitments. The executable contract is in
 the [toolkit guide](TOOLKIT.md), and implementation proposals should follow
@@ -28,6 +29,10 @@ the [contribution checklist](../CONTRIBUTING.md).
 | Out-of-band management | `ipmitool` |
 | Namespaces and privilege | `nsenter`, `unshare`, `lsns`, `setpriv`, `findmnt` |
 | Embedded buses | selected `can-utils`, `i2c-tools`, and `spi-tools` programs |
+
+The extra archive adds `rclone` (trimmed), `croc`, `crictl`, and `ctr`.
+Further rclone backends and commands are requests against its trimmed main
+rather than new tools; see the [toolkit guide](TOOLKIT.md#rclone-trimmed).
 
 ## Candidates for the next expansion
 
