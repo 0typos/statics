@@ -35,6 +35,7 @@ required_binaries=(
     conntrack ipmitool iw
     flash_erase flashcp nanddump nandwrite mtdinfo
     ubiattach ubidetach ubinfo ubimkvol ubirmvol ubiupdatevol
+    zstd xz bzip2 pigz bsdtar bsdcpio pv mbuffer
 )
 # Go tools exist only where architectures.tsv gives a Go environment.
 if [[ $go_env != none ]]; then
@@ -216,7 +217,8 @@ done
 
 
 for link in nc netcat dropbear dbclient dropbearkey dropbearconvert scp tunpipe \
-    fsck.ext2 fsck.ext3 fsck.ext4 mkfs.ext4; do
+    fsck.ext2 fsck.ext3 fsck.ext4 mkfs.ext4 \
+    unzstd zstdcat unxz xzcat bunzip2 bzcat unpigz; do
     [[ -L $output_dir/$link ]] || {
         echo "missing applet link: $output_dir/$link" >&2
         exit 1
@@ -334,6 +336,47 @@ if [[ ${SKIP_QEMU:-0} != 1 ]]; then
         ubiattach ubidetach ubinfo ubimkvol ubirmvol ubiupdatevol; do
         check_output mtd-utils "$output_dir/$program" --version
     done
+    check_output "v$(pinned_version zstd)" "$output_dir/zstd" -V
+    check_output "xz (XZ Utils) $(pinned_version xz)" "$output_dir/xz" --version
+    check_output "Version $(pinned_version bzip2)" "$output_dir/bzip2" --help
+    check_output "pigz $(pinned_version pigz)" "$output_dir/pigz" --version
+    check_output "pv $(pinned_version pv)" "$output_dir/pv" --version
+    check_output "R$(pinned_version mbuffer)" "$output_dir/mbuffer" --version
+    # Each names the compression libraries it linked.
+    libraries="zlib/$(pinned_version zlib) liblzma/$(pinned_version xz)"
+    libraries+=" bz2lib/$(pinned_version bzip2) libzstd/$(pinned_version zstd)"
+    check_output "$libraries" "$output_dir/bsdtar" --version
+    check_output "$libraries" "$output_dir/bsdcpio" --version
+    # Round trips through each compressor, bsdtar's filters, pv, and
+    # mbuffer: the codecs' byte order and word size are what differ by arch.
+    # The host's xz, bzip2, and gzip also decode the target's output, which
+    # catches a fault shared by the target's encoder and decoder.
+    scratch=$(mktemp -d)
+    trap 'rm -rf "$scratch"' EXIT
+    sample=$output_dir/sources.lock
+    declare -A host_decoder=([xz]=xz [bzip2]=bzip2 [pigz]=gzip)
+    failed() { echo "$1 round trip failed" >&2; exit 1; }
+    for program in zstd xz bzip2 pigz; do
+        "${runner[@]}" "$output_dir/$program" -c <"$sample" >"$scratch/packed" ||
+            failed "$program"
+        "${runner[@]}" "$output_dir/$program" -dc <"$scratch/packed" >"$scratch/unpacked" ||
+            failed "$program"
+        cmp -s "$scratch/unpacked" "$sample" || failed "$program"
+        [[ -z ${host_decoder[$program]:-} ]] && continue
+        "${host_decoder[$program]}" -dc <"$scratch/packed" >"$scratch/unpacked" ||
+            failed "host ${host_decoder[$program]} of $program"
+        cmp -s "$scratch/unpacked" "$sample" || failed "host ${host_decoder[$program]} of $program"
+    done
+    for filter in --zstd --xz --bzip2 --gzip; do
+        "${runner[@]}" "$output_dir/bsdtar" -c "$filter" -f "$scratch/packed" \
+            -C "$output_dir" sources.lock || failed "bsdtar $filter"
+        "${runner[@]}" "$output_dir/bsdtar" -xOf "$scratch/packed" >"$scratch/unpacked" ||
+            failed "bsdtar $filter"
+        cmp -s "$scratch/unpacked" "$sample" || failed "bsdtar $filter"
+    done
+    "${runner[@]}" "$output_dir/pv" -q <"$sample" |
+        "${runner[@]}" "$output_dir/mbuffer" -q -m 1M >"$scratch/piped" || failed "pv | mbuffer"
+    cmp -s "$scratch/piped" "$sample" || failed "pv | mbuffer"
     if [[ $go_env != none ]]; then
         check_output "wireguard-go v" "$output_dir/wireguard-go" --version
     fi

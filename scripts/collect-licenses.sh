@@ -106,6 +106,18 @@ copy_license mtd-utils COPYING
 copy_license mtd-utils MTD-UTILS-BSD-NOTICES
 copy_license libnl COPYING
 copy_license iw COPYING
+copy_license zlib LICENSE
+copy_license bzip2 LICENSE
+copy_license xz COPYING
+copy_license xz COPYING.0BSD
+copy_license zstd LICENSE
+copy_license zstd COPYING
+# pigz.c's license, which the README reproduces in full.
+copy_license pigz README
+copy_license pv docs/COPYING
+copy_license mbuffer LICENSE
+copy_license libarchive COPYING
+copy_license libarchive LIBARCHIVE-BSD-NOTICES
 copy_license wireguard-go LICENSE
 copy_license rclone COPYING
 copy_license croc LICENSE

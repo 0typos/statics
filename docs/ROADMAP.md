@@ -4,8 +4,8 @@ The current bundle covers rescue userspace, relays and remote access, network
 configuration, socket and packet inspection, HTTP/TLS/DNS checks, throughput
 and path diagnosis, firewall policy and connection tracking, Wi-Fi, syscall
 tracing, remote debugging, serial consoles, filesystem, block-device, and raw
-flash diagnosis, BMC management over IPMI, JSON processing, and common IoT
-field buses. The optional extra archive adds object-storage and SFTP sync,
+flash diagnosis, BMC management over IPMI, compression, archives, and
+buffered pipe transfer, JSON processing, and common IoT field buses. The optional extra archive adds object-storage and SFTP sync,
 code-phrase file transfer, and container runtime inspection.
 
 This page records candidates, not commitments. The executable contract is in
@@ -20,6 +20,8 @@ the [contribution checklist](../CONTRIBUTING.md).
 | Packet, path, and throughput | `tcpdump`, `mtr`, `iperf3` |
 | Application protocols and data | `curl`, `openssl`, `drill`, `jq` |
 | Discovery and transfer | `nmap`, `ncat`, `rsync`, `sftp-server` |
+| Compression and archives | `zstd`, `xz`, `bzip2`, `pigz`, `bsdtar`, `bsdcpio` |
+| Pipe transfer | `pv`, `mbuffer` |
 | Tunnels | `tunpipe`, `pppd` |
 | Serial console and transfer | `picocom`, `sz`, `rz` |
 | Process diagnosis | `strace`, `lsof`, `gdbserver` |

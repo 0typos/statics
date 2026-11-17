@@ -91,7 +91,8 @@ make verify ARCH=mipsel
 ```
 
 Host verification needs Bash, Python 3, `file`, `readelf`, GNU core utilities,
-and the QEMU user executable named in `architectures.tsv`. On Debian-family
+`xz`, `bzip2`, `gzip`, and the QEMU user executable named in
+`architectures.tsv`. On Debian-family
 hosts, the emulator is normally supplied by `qemu-user-static`. The sole
 native fast path currently implemented is `x86_64` on an `x86_64` host; other
 targets require their named QEMU runner even when the host has the same CPU.

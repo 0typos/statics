@@ -139,8 +139,10 @@ Each row names a QEMU user-mode runner in `architectures.tsv`. Verification
 executes unprivileged smoke or version checks for BusyBox/netcat, socat,
 Dropbear, the iproute2 tools, WireGuard, OpenSSL, tcpdump, curl, iperf3,
 ethtool, strace, jq, drill, mtr, i2c-tools, Nmap/Ncat, rsync, lsof, the
-util-linux tools, sftp-server, conntrack, ipmitool, iw, and the MTD and UBI
-tools, and `wireguard-go`. Every physical executable, including the CAN,
+util-linux tools, sftp-server, conntrack, ipmitool, iw, the MTD and UBI
+tools, and `wireguard-go`, and runs zstd, xz, bzip2, pigz, bsdtar's
+filters, pv, and mbuffer through a compress-and-restore round trip. Every
+physical executable, including the CAN,
 ISO-TP, and SPI utilities, is checked for static linkage and the absence of a
 dynamic program interpreter. Nmap's runtime data files are checksum-verified
 separately. QEMU is an instruction/ABI smoke test, not proof that privileged
