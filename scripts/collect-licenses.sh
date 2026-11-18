@@ -136,6 +136,7 @@ copy_license bpftool libbpf/LICENSE.LGPL-2.1-only
 copy_license iputils LICENSE
 copy_license iputils Documentation/LICENSE.BSD3
 copy_license iputils Documentation/LICENSE.GPL2
+copy_license iputils IPUTILS-NOTICES
 copy_license traceroute COPYING
 copy_license traceroute COPYING.LIB
 copy_license ndisc6 COPYING

@@ -683,13 +683,18 @@ def latest_ncurses() -> tuple[str, str]:
 
 
 def latest_iftop() -> tuple[str, str]:
-    # Versions such as 1.0pre4 sort as (1, 0, 4) after their pre number.
+    # 1.0pre4 sorts before 1.0: numbers first, then final over prerelease.
     index = text("https://pdw.ex-parrot.com/iftop/download/")
     versions = set(re.findall(r"iftop-(\d+\.\d+(?:pre\d+)?)\.tar\.gz", index))
     if not versions:
         raise RuntimeError("no iftop releases found")
     version = max(
-        versions, key=lambda v: tuple(int(part) for part in re.findall(r"\d+", v))
+        versions,
+        key=lambda v: (
+            tuple(int(part) for part in re.split(r"\D+", v.split("pre")[0])),
+            "pre" not in v,
+            int(v.split("pre")[1]) if "pre" in v else 0,
+        ),
     )
     return version, f"https://pdw.ex-parrot.com/iftop/download/iftop-{version}.tar.gz"
 

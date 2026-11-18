@@ -356,8 +356,9 @@ tcptraceroute6 2001:db8::1 443
 
 `ndisc6` resolves a neighbor's link-layer address, `rdisc6` solicits router
 advertisements and prints prefixes, MTU, and RDNSS, and `rltraceroute6`
-traces IPv6 paths over UDP, ICMPv6 (`-I`), or TCP (`-t`). `tcptraceroute6`
-runs `rltraceroute6 -t` and finds it through `PATH`.
+traces IPv6 paths over UDP, ICMPv6 (`-I`), or TCP SYN (`-S`) or ACK (`-A`)
+probes. `tcptraceroute6` runs `rltraceroute6 -S`, from its own directory
+when called by path and through `PATH` otherwise.
 
 ### Who is using the network
 
@@ -447,8 +448,9 @@ ipset list
 Their rules and nft's coexist in the kernel and both apply. The kernel needs
 the legacy modules (`ip_tables`, `iptable_filter`, and so on), which
 `iptables-legacy` asks `modprobe` to load. `iptables-legacy` takes
-`/run/xtables.lock`, and `ebtables-legacy` creates `/var/lib/ebtables/lock`
-and reads Ethernet protocol names from `/etc/ethertypes`; without that file,
+`/run/xtables.lock`, and `ebtables-legacy --concurrent` creates
+`/var/lib/ebtables/lock`. `ebtables-legacy` reads Ethernet protocol names
+from `/etc/ethertypes`; without that file,
 give numbers (`-p 0x0800`). Changing or restoring rules can cut off access to
 the host.
 
@@ -851,7 +853,8 @@ links libcap, libidn2, OpenSSL, or a PCRE library.
   regex puts the binary under the GPL as well as ngrep's own license. No
   `tcpkill` (`-K`).
 - `hping3` is built from Debian's source and patch set, since upstream
-  stopped in 2005, plus a repository patch for a one-byte stack overflow in
+  stopped in 2005, plus a repository patch for two stack overflows Debian
+  leaves in place, in `--scan`'s handling of ICMP replies and in
   `--rand-dest` parsing. No Tcl scripting, so `hping3` with no arguments
   has no interactive shell. It reports upstream's version string,
   `3.0.0-alpha-2`.

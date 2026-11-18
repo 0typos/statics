@@ -12,7 +12,7 @@ build_hping3() {
             [[ -z $name || $name == \#* ]] && continue
             patch -s -p1 < "$debian/patches/$name"
         done < "$debian/patches/series"
-        patch -s -p1 < "$REPO_ROOT/patches/hping3-rand-dest-overflow.patch"
+        patch -s -p1 < "$REPO_ROOT/patches/hping3-overflows.patch"
         # configure is a shell script that compiles and runs byteorder.c to
         # learn the byte order. Run it with the host compiler, which only
         # writes the Makefile and headers, then replace byteorder.h with the

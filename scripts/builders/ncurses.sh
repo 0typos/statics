@@ -21,7 +21,7 @@ build_ncurses() {
         mkdir host
         (
             cd host || exit
-            CC=cc CFLAGS=-O1 ../configure "${common[@]}" >/dev/null
+            CONFIG_SITE='' CC=cc CFLAGS=-O1 ../configure "${common[@]}" >/dev/null
             run_make -C include
             run_make -C ncurses
             run_make -C progs tic infocmp

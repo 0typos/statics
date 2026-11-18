@@ -33,13 +33,21 @@ build_lldpd() {
         run_make
         install_binary src/daemon/lldpd lldpd
         install_binary src/client/lldpcli lldpcli
-        # LICENSE is ISC and libevent/LICENSE BSD-3-Clause; lldpcli's UTF-8
-        # code carries an MIT notice in its header comment.
-        awk '{ print } /Copyright/ { c = 1 } c && /\*\// { exit }' \
-            src/client/utf8.c > LLDPD-NOTICES
-        grep -q 'Permission is hereby granted' LLDPD-NOTICES || {
-            echo "LLDPD-NOTICES lacks the MIT notice of utf8.c" >&2
+        # LICENSE is ISC and libevent/LICENSE BSD-3-Clause. These linked
+        # files carry their own notices in their header comments: utf8.c
+        # (MIT), privsep_fd.c (BSD-2-Clause), and log.c and strtonum.c
+        # (ISC, other authors).
+        local file
+        for file in src/client/utf8.c src/daemon/privsep_fd.c src/log.c \
+            src/compat/strtonum.c; do
+            echo "$file:"
+            awk '{ print } /Permission|Redistribution/ { r = 1 } r && /\*\// { exit }' "$file"
+            echo
+        done > LLDPD-NOTICES
+        if ! grep -q 'Permission is hereby granted' LLDPD-NOTICES ||
+            ! grep -q 'Redistribution and use' LLDPD-NOTICES; then
+            echo "LLDPD-NOTICES lacks the MIT or BSD notice" >&2
             exit 1
-        }
+        fi
     )
 }

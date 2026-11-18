@@ -10,6 +10,8 @@ build_iputils() {
         # a raw socket; without libcap it cannot drop capabilities it was
         # given, so it is meant to run as root or unprivileged, not setuid.
         # No clockdiff, man pages, or tests.
+        # vcs_tag would take the version from any enclosing git checkout.
+        export GIT_CEILING_DIRECTORIES=$WORK_DIR
         meson setup build \
             --cross-file cross.ini \
             --buildtype=plain \
@@ -29,5 +31,13 @@ build_iputils() {
         install_binary build/tracepath tracepath
         # ping takes IPv6 when called as ping6.
         make_link ping ping6
+        # Documentation/LICENSE.BSD3 is the bare clause text; ping's
+        # copyright line is in its header comment.
+        awk '{ print } /Redistribution and use/ { r = 1 } r && /\*\// { exit }' \
+            ping/ping.c > IPUTILS-NOTICES
+        grep -q 'Regents of the University of California' IPUTILS-NOTICES || {
+            echo "IPUTILS-NOTICES lacks ping's copyright" >&2
+            exit 1
+        }
     )
 }

@@ -57,7 +57,7 @@ bpftool|(GPL-2.0-only OR BSD-2-Clause) AND (GPL-2.0-or-later OR BSD-2-Clause) AN
 iputils|GPL-2.0-or-later AND BSD-3-Clause|ping with a ping6 link (BSD-3-Clause), arping, and tracepath; no libcap, libidn2, or clockdiff|main|-
 traceroute|GPL-2.0-or-later AND LGPL-2.1-or-later|traceroute with a traceroute6 link, and its bundled libsupp|main|-
 ndisc6|GPL-2.0-only OR GPL-3.0-only|ndisc6, rdisc6, rltraceroute6, and tcptraceroute6|main|-
-lldpd|ISC AND MIT AND BSD-3-Clause|lldpd and lldpcli with bundled libevent; no SNMP, XML, readline, or privilege separation|main|-
+lldpd|ISC AND MIT AND BSD-3-Clause AND BSD-2-Clause|lldpd and lldpcli with bundled libevent; no SNMP, XML, readline, or privilege separation|main|-
 ipset|GPL-2.0-only|ipset, linking libmnl|main|-
 iptables|GPL-2.0-only AND GPL-2.0-or-later|xtables-legacy-multi with iptables-legacy and ip6tables-legacy links (and their -save and -restore); no nftables backend|main|-
 ebtables|GPL-2.0-or-later|ebtables-legacy|main|-
@@ -68,7 +68,7 @@ hping3-debian|GPL-2.0-only|Debian's patch set for hping3, applied to it|main|-
 ncurses|X11-distribute-modifications-variant|narrow-character libncurses with compiled-in terminal descriptions, statically linked into iftop and nethogs|main|-
 iftop|GPL-2.0-or-later|iftop|main|-
 nethogs|GPL-2.0-or-later|nethogs|main|-
-tcpreplay|GPL-3.0-only AND BSD-3-Clause AND (LGPL-3.0-or-later OR BSD-3-Clause)|tcpreplay, tcpprep, and tcprewrite with bundled libopts|main|-
+tcpreplay|GPL-3.0-only AND BSD-4-Clause-UC AND BSD-3-Clause AND BSD-2-Clause AND (LGPL-3.0-or-later OR BSD-3-Clause)|tcpreplay, tcpprep, and tcprewrite with bundled libopts|main|-
 dhcpdump|BSD-2-Clause|dhcpdump without the session tracker|main|-
 rclone|MIT|rclone, trimmed to the local, s3, sftp, http, and webdav backends and 12 commands, with the Go modules listed in licenses/rclone/go-modules.tsv|extra|./cmd/statics
 croc|MIT|croc, relay-only (upstream's croc_no_tailcat tag), with the Go modules listed in licenses/croc/go-modules.tsv|extra|-tags=croc_no_tailcat .

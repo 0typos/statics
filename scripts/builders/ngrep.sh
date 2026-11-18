@@ -16,7 +16,7 @@ build_ngrep() {
             LDFLAGS="$STATIC_LDFLAGS -L$DEPS_PREFIX/lib"
         # Its rule for the regex object passes $(MAKEFLAGS) as arguments,
         # which reads make's -s as a target; build that object directly.
-        run_make -C regex-0.12 regex.o
+        run_make -C regex-0.12 regex.o CFLAGS="$STATIC_CFLAGS"
         # The binary is already stripped at link time (-Wl,-s); the host's
         # strip cannot read foreign ELF.
         run_make STRIP=true
