@@ -1,8 +1,8 @@
 # Toolkit guide
 
-The default bundle is a compact Linux troubleshooting kit: 91 physical
-executables (90 on `powerpc` and `powerpc64`, which have no Go tools),
-BusyBox applet links, Dropbear and kmod multi-call links, decompressor links, Nmap runtime
+The default bundle is a compact Linux troubleshooting kit: 116 physical
+executables (115 on `powerpc` and `powerpc64`, which have no Go tools),
+BusyBox applet links, Dropbear, kmod, and iptables multi-call links, decompressor links, Nmap runtime
 data, license texts, checksums, and build metadata. Static linking removes the
 dependency on a target's installed libc; it does not replace kernel features,
 drivers, device nodes, certificate stores, permissions, or runtime databases.
@@ -26,10 +26,13 @@ Nmap data, notices, and licenses remain available.
 
 | Area | Executables and links | Primary use |
 | --- | --- | --- |
-| Rescue userspace | `busybox`; `ping`, `ping6`, `traceroute`, `traceroute6`, `nslookup`, `wget`, `telnet`, `arp`, `arping`, `route`, `ifconfig`, `netstat`, `nc`, `netcat` | Shell recovery, basic reachability, and legacy network inspection |
+| Rescue userspace | `busybox`; `nslookup`, `wget`, `telnet`, `arp`, `route`, `ifconfig`, `netstat`, `nc`, `netcat` | Shell recovery, basic reachability, and legacy network inspection |
 | Relays and remote access | `socat`, `ncat`, `pppd`, `tunpipe-standalone`, `sftp-server`, `dropbearmulti`; `dropbear`, `dbclient`, `dropbearkey`, `dropbearconvert`, `scp`, `tunpipe` | TCP/UDP/TLS relays, port checks, emergency SSH, SFTP and SCP file copy, and IP tunnels over SSH |
-| Network control | `ip`, `ss`, `bridge`, `tc`, `wg`, `wireguard-go`, `ethtool`, `nft`, `conntrack`, `iw` | Addresses, routes, sockets, links, traffic control, WireGuard (with or without the kernel module), firewall policy, connection tracking, Wi-Fi, and NIC state |
-| Discovery and packet diagnosis | `nmap`, `tcpdump`, `mtr`, `mtr-packet`, `iperf3` | Host/service discovery, capture, path analysis, and throughput |
+| Network control | `ip`, `ss`, `bridge`, `tc`, `nstat`, `devlink`, `rdma`, `wg`, `wireguard-go`, `ethtool`, `nft`, `conntrack`, `ipset`, `iw` | Addresses, routes, sockets, links, traffic control, protocol counters, NIC/switch and RDMA devices, WireGuard (with or without the kernel module), firewall policy, connection tracking, IP sets, Wi-Fi, and NIC state |
+| Legacy firewalls | `xtables-legacy-multi`, `ebtables-legacy`, `arptables-legacy`; `iptables-legacy`, `iptables-legacy-save`, `iptables-legacy-restore`, `ip6tables-legacy`, `ip6tables-legacy-save`, `ip6tables-legacy-restore` | x_tables rules on kernels and firmware without nf_tables |
+| Reachability and path | `ping`, `arping`, `tracepath`, `traceroute`, `ndisc6`, `rdisc6`, `rltraceroute6`, `tcptraceroute6`, `mtr`, `mtr-packet`; `ping6`, `traceroute6` | ICMP (unprivileged where allowed), ARP, path MTU, UDP/ICMP/TCP traceroute, and IPv6 neighbor and router discovery |
+| Discovery and packet diagnosis | `nmap`, `tcpdump`, `ngrep`, `dhcpdump`, `hping3`, `tcpreplay`, `tcpprep`, `tcprewrite`, `lldpd`, `lldpcli`, `iperf3` | Host/service discovery, capture, payload grep, DHCP decoding, crafted probes, capture replay, LLDP/CDP neighbors, and throughput |
+| Live traffic | `iftop`, `nethogs` | Bandwidth by host pair and by process, interactively |
 | Protocol and data checks | `curl`, `openssl`, `drill`, `jq`, `rsync` | HTTP, TLS, DNS, structured output, and efficient file transfer |
 | Compression and archives | `zstd`, `xz`, `bzip2`, `pigz`, `bsdtar`, `bsdcpio`; `unzstd`, `zstdcat`, `unxz`, `xzcat`, `bunzip2`, `bzcat`, `unpigz` | Stream compression, and tar, cpio, zip, 7z, ISO 9660, and ar archives; RAR read-only |
 | Pipe transfer | `pv`, `mbuffer` | Progress and rate limits on a pipe, and a large buffer that keeps a stream moving across stalls |
@@ -45,8 +48,11 @@ Nmap data, notices, and licenses remain available.
 | Hardware buses | `i2cdetect`, `i2cdump`, `i2cget`, `i2cset`, `i2ctransfer`, `spi-config`, `spi-pipe` | Linux I²C and spidev diagnosis |
 
 Entries after a semicolon are symbolic links to a multi-call binary (BusyBox,
-Dropbear, e2fsck, mke2fs, kmod) or to a compressor that picks its mode from its
-name; they do not add separate binary payloads.
+Dropbear, e2fsck, mke2fs, kmod, xtables-legacy-multi) or to a program that
+picks its mode from its name (a compressor, `ping6`, `traceroute6`); they do
+not add separate binary payloads. `ping`, `arping`, and `traceroute` are the
+iputils and traceroute.sourceforge.net programs, not BusyBox applets;
+`busybox ping` still reaches the applet.
 
 Four larger Go tools ship separately in `statics-extra-<arch>.tar.xz`, for
 every architecture with Go (not `powerpc` or `powerpc64`). It extracts to
@@ -154,6 +160,10 @@ ping -c 4 192.0.2.1
 traceroute 192.0.2.1
 mtr --report --report-cycles 5 192.0.2.1
 ```
+
+[Network diagnosis](#network-diagnosis) has more: TCP traceroute through a
+firewall, path MTU, ARP and IPv6 neighbors, live bandwidth, payload grep,
+DHCP, LLDP, crafted probes, and legacy firewalls.
 
 Run a conservative TCP connect scan against an authorized host:
 
@@ -303,6 +313,155 @@ bpftool --json --pretty prog show id ID
 They need `CAP_SYS_ADMIN` (or `CAP_BPF` with `CAP_PERFMON`); unprivileged,
 `prog show` fails with "Operation not permitted".
 
+## Network diagnosis
+
+Most of these need root or `CAP_NET_RAW`/`CAP_NET_ADMIN`; the exceptions are
+noted. Addresses and interface names are placeholders.
+
+### Reachability, path MTU, and traceroute
+
+`ping` uses an unprivileged ICMP socket when `net.ipv4.ping_group_range`
+admits the caller's group (systemd sets it to every group; the kernel default
+admits none), and a raw socket otherwise, which needs `CAP_NET_RAW`. `ping6`,
+or `ping -6`, is IPv6. `-M do -s 1472` sends unfragmentable 1500-byte packets
+to test a path MTU; `tracepath` finds it hop by hop without privileges.
+
+```console
+ping -c 4 -I eth0 192.0.2.1
+ping -M do -s 1472 -c 3 192.0.2.1
+tracepath -n 192.0.2.1
+arping -c 3 -I eth0 192.0.2.1
+arping -D -c 2 -I eth0 192.0.2.50
+```
+
+`arping -D` detects another host already using an address before it is
+assigned. `traceroute` sends UDP by default, or ICMP (`-I`), TCP SYN (`-T`),
+or UDP to one port (`-U`); TCP to an open port often gets through firewalls
+that drop the rest. `traceroute6`, or `-6`, is IPv6.
+
+```console
+traceroute -n 192.0.2.1
+traceroute -T -p 443 -n 192.0.2.1
+traceroute -U -p 53 -n 192.0.2.1
+```
+
+### IPv6 neighbors and routers
+
+```console
+ndisc6 fe80::1 eth0
+rdisc6 eth0
+rltraceroute6 2001:db8::1
+tcptraceroute6 2001:db8::1 443
+```
+
+`ndisc6` resolves a neighbor's link-layer address, `rdisc6` solicits router
+advertisements and prints prefixes, MTU, and RDNSS, and `rltraceroute6`
+traces IPv6 paths over UDP, ICMPv6 (`-I`), or TCP (`-t`). `tcptraceroute6`
+runs `rltraceroute6 -t` and finds it through `PATH`.
+
+### Who is using the network
+
+```console
+iftop -n -i eth0
+nethogs eth0
+nstat -az
+```
+
+`iftop` shows bandwidth by host pair and `nethogs` by process; both capture
+packets and redraw the terminal, `nethogs` also reads `/proc`. Their ncurses
+is built without a terminfo database: it knows `ansi`, `dumb`, `linux`,
+`vt100`, `vt220`, `xterm`, `xterm-256color`, `screen`, `screen-256color`,
+`tmux`, and `tmux-256color`. Under another `TERM`, run them with
+`TERM=xterm`. `nstat` prints the kernel's SNMP and netstat counters, such as
+retransmits and drops, unprivileged; without `-a` it shows the change since
+its last run.
+
+### Packet content, DHCP, and LLDP
+
+```console
+ngrep -q -d eth0 -W byline 'Host:' tcp port 80
+ngrep -q -I capture.pcap 'error' port 5060
+dhcpdump -i eth0
+dhcpdump -r capture.pcap
+```
+
+`ngrep` greps payloads with a BPF filter, live or from a capture.
+`dhcpdump` decodes DHCP requests and replies, including options.
+
+`lldpcli` talks to `lldpd`, which must be running. Started in the foreground
+with its client named explicitly, it announces this host by LLDP and lists
+the neighbors that announce themselves:
+
+```console
+lldpd -d -L "$TOOLKIT/lldpcli" &
+lldpcli show neighbors
+lldpcli show neighbors details -f json
+```
+
+Neighbors appear after their next advertisement, usually within 30 seconds.
+`-r` makes the daemon receive-only, and `-c`, `-e`, `-f`, and `-s` add Cisco
+CDP, Extreme EDP, Foundry FDP, and Nortel SONMP. It keeps its control socket
+at `/run/lldpd.socket` (`-u` on both commands changes it).
+
+### Crafted probes and replay
+
+```console
+hping3 -S -p 443 -c 3 192.0.2.1
+hping3 --traceroute -S -p 443 192.0.2.1
+hping3 -2 -p 53 -c 3 192.0.2.1
+```
+
+`hping3` sends hand-made TCP, UDP, ICMP, or raw IP packets and reports the
+replies: SYN probes past a firewall, a TCP traceroute, MTU and fragmentation
+tests. Flood options can take down a link; use them only in a test network.
+
+```console
+tcpprep --auto=bridge --pcap=capture.pcap --cachefile=capture.cache
+tcprewrite --infile=capture.pcap --outfile=rewritten.pcap \
+    --cachefile=capture.cache --dstipmap=10.0.0.2/32:192.0.2.9/32 --fixcsum
+tcpreplay --intf1=eth0 --mbps=10 rewritten.pcap
+```
+
+`tcpreplay` sends a capture back onto a link at a chosen rate; `tcprewrite`
+changes its addresses, ports, and MACs first, and `tcpprep` splits it into
+client and server sides for two-interface replay. Replayed traffic reaches
+real hosts.
+
+### Legacy firewalls and IP sets
+
+On kernels and firmware without nf_tables, where `nft` cannot work, list the
+x_tables rules. The commands carry upstream's `-legacy` names, so they cannot
+be mistaken for nft-backed `iptables`. `ipset` lists the address sets that
+iptables and nftables rules match against.
+
+```console
+iptables-legacy -L -n -v --line-numbers
+iptables-legacy-save
+ip6tables-legacy -S
+ebtables-legacy -L
+arptables-legacy -L
+ipset list
+```
+
+Their rules and nft's coexist in the kernel and both apply. `iptables-legacy`
+takes `/run/xtables.lock`, and `ebtables-legacy` creates
+`/var/lib/ebtables/lock`. Changing or restoring rules can cut off access to
+the host.
+
+### NIC, switch, and RDMA devices
+
+```console
+devlink dev show
+devlink port show
+devlink health show
+rdma link show
+rdma resource show
+```
+
+`devlink` covers device-level NIC and switch-ASIC state: ports, health
+reporters, firmware versions (`devlink dev info`), and parameters. `rdma`
+lists InfiniBand, RoCE, and iWARP links and their resources.
+
 ## Default profile and intentional omissions
 
 The recipes favor broad static portability over enabling every optional
@@ -312,6 +471,8 @@ feature.
 
 Nmap includes Ncat, TLS, service detection, OS detection, libpcap, and the
 core databases. NSE/Lua, libssh2, Nping, Zenmap, and Ndiff are disabled.
+Nping would add about 410 KB to the archive, mostly a third copy of
+OpenSSL's libcrypto, for probes that `hping3` covers.
 Runtime data is under `share/nmap`; either pass:
 
 ```console
@@ -657,6 +818,49 @@ support" (`prog dump xlated` works); no clang-built BPF skeletons, so `prog prof
 `prog show` lists no PIDs; no libcrypto, so no program signing; no libcap,
 so a permission failure is reported by the kernel rather than predicted;
 and no `bpftool gen` (skeleton generation and `min_core_btf`).
+
+### Network diagnosis tools
+
+Each tool links the bundle's libpcap or libmnl where it needs one; none
+links libcap, libidn2, OpenSSL, or a PCRE library.
+
+- iputils builds `ping`, `arping`, and `tracepath` without libcap (so a
+  setuid or file-capability install could not drop privileges; run them as
+  root or unprivileged instead), without libidn2 (no internationalized names),
+  and without `clockdiff`.
+- `traceroute` is the modern Linux traceroute 2.x with all of its modules.
+- ndisc6 builds `ndisc6`, `rdisc6`, `rltraceroute6`, and `tcptraceroute6`,
+  without the `rdnssd` daemon, `tcpspray`, and its Perl helper scripts.
+- `lldpd` uses its bundled libevent. No SNMP agent, XML output, readline
+  editing in `lldpcli`, or seccomp filter, and no privilege separation: that
+  needs an `_lldpd` user and a chroot directory, so the daemon keeps running
+  as root. JSON and key-value output are built in.
+- `ipset` has every set type compiled in.
+- The iptables legacy backend has every extension compiled into
+  `xtables-legacy-multi`, without the nftables backend, `nfnl_osf`, or
+  conntrack labels (libnetfilter_conntrack); `iptables-xml` is reachable as
+  `xtables-legacy-multi iptables-xml`. `ebtables-legacy` and
+  `arptables-legacy` come from their last releases (2019); their Perl `-save`
+  and `-restore` scripts are not shipped.
+- `ngrep` uses its bundled GNU regex rather than PCRE2, so patterns are POSIX
+  extended expressions (`-X` takes hex), and, as upstream notes, linking GNU
+  regex puts the binary under the GPL as well as ngrep's own license. No
+  `tcpkill` (`-K`).
+- `hping3` is built from Debian's source and patch set, since upstream
+  stopped in 2005, plus a repository patch for a one-byte stack overflow in
+  `--rand-dest` parsing. No Tcl scripting, so `hping3` with no arguments
+  has no interactive shell. It reports upstream's version string,
+  `3.0.0-alpha-2`.
+- `iftop` and `nethogs` link a narrow-character ncurses with the terminal
+  descriptions above compiled in and no terminfo database.
+- tcpreplay builds `tcpreplay`, `tcpprep`, and `tcprewrite` with its bundled
+  libopts, sending through `PF_PACKET`; no `tcpreplay-edit`, `tcpbridge`,
+  `tcpliveplay`, or `tcpcapinfo`, no fragroute, netmap, XDP, or io_uring
+  transmit, and no tcpdump-decoded verbose output (`-v`).
+- `dhcpdump` is built without its interactive session tracker (`-t`) and
+  its yascreen dependency.
+- iproute2 adds `nstat`, `devlink`, and `rdma` from the same build.
+- Not included: `tcpflow`, which needs Boost.
 
 ### Connection tracking: conntrack
 

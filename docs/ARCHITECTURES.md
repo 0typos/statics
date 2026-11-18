@@ -140,9 +140,13 @@ executes unprivileged smoke or version checks for BusyBox/netcat, socat,
 Dropbear, the iproute2 tools, WireGuard, OpenSSL, tcpdump, curl, iperf3,
 ethtool, strace, jq, drill, mtr, i2c-tools, Nmap/Ncat, rsync, lsof, the
 util-linux tools, sftp-server, conntrack, ipmitool, iw, the MTD and UBI
-tools, kmod, kexec, bpftool, and `wireguard-go`, runs zstd, xz, bzip2, pigz,
+tools, kmod, kexec, bpftool, iputils, traceroute, ndisc6, lldpd, ipset, the
+legacy iptables, ebtables, and arptables, hping3, iftop, nethogs, and
+`wireguard-go`, runs zstd, xz, bzip2, pigz,
 bsdtar's filters, pv, and mbuffer through a compress-and-restore round trip,
-and has `modinfo` read a module plain and gzip-, xz-, and zstd-compressed. Every
+has `modinfo` read a module plain and gzip-, xz-, and zstd-compressed, and
+has dhcpdump, ngrep, tcpprep, tcprewrite, and tcpdump decode and rewrite a
+generated capture. Every
 physical executable, including the CAN,
 ISO-TP, and SPI utilities, is checked for static linkage and the absence of a
 dynamic program interpreter. Nmap's runtime data files are checksum-verified
