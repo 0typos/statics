@@ -73,7 +73,7 @@ ncurses|6.6|355b4cbbed880b0381a04c46617b7656e362585d52e9cf84a67e2009b749ff11|htt
 iftop|1.0pre4|f733eeea371a7577f8fe353d86dd88d16f5b2a2e702bd96f5ffb2c197d9b4f97|https://pdw.ex-parrot.com/iftop/download/iftop-1.0pre4.tar.gz
 nethogs|0.9.0|5961bef2155c05695d2fe7e79aa11194981b5afd1cad9bf1f259c7f30d5487c3|https://github.com/raboof/nethogs/archive/refs/tags/v0.9.0.tar.gz
 tcpreplay|4.6.2|83a7ca2f9daa367949926cfe34d30193e756c233c164b38f84f0d6d272a87e66|https://github.com/appneta/tcpreplay/releases/download/v4.6.2/tcpreplay-4.6.2.tar.xz
-dhcpdump|2.00|41c79aa975662f33b1b7acaa0ab4c071b654cc78166c6475e82e3f0cfbe4b009|https://github.com/bbonev/dhcpdump/releases/download/v2.00/dhcpdump-2.00.tar.xz
+dhcpdump|2.00|41c79aa975662f33b1b7acaa0ab4c071b654cc78166c6475e82e3f0cfbe4b009|https://github.com/dhcpdump-org/dhcpdump/releases/download/v2.00/dhcpdump-2.00.tar.xz
 go|1.27.4|73cfb8571aec0c01177687db87163d46aa20e9779672772891aa17654d9a6099|https://dl.google.com/go/go1.27.4.src.tar.gz
 wireguard-go|0.0.20250522|70d0448d289a691978920f615c687864c3d7b0379d6f974e4f3590487dff35f7|https://github.com/WireGuard/wireguard-go/archive/refs/tags/0.0.20250522.tar.gz
 rclone|1.76.0|fa2b2e4ae56c4f1b91102285b736596e2a028be77cb2aaa5a0df53f3a7fc5902|https://github.com/rclone/rclone/releases/download/v1.76.0/rclone-v1.76.0.tar.gz

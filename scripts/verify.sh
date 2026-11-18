@@ -37,6 +37,10 @@ required_binaries=(
     ubiattach ubidetach ubinfo ubimkvol ubirmvol ubiupdatevol
     zstd xz bzip2 pigz bsdtar bsdcpio pv mbuffer
     kmod kexec bpftool
+    ping arping tracepath traceroute ndisc6 rdisc6 rltraceroute6 tcptraceroute6
+    nstat devlink rdma lldpd lldpcli ipset xtables-legacy-multi
+    ebtables-legacy arptables-legacy ngrep hping3 iftop nethogs
+    tcpreplay tcpprep tcprewrite dhcpdump
 )
 # Go tools exist only where architectures.tsv gives a Go environment.
 if [[ $go_env != none ]]; then
@@ -220,7 +224,9 @@ done
 for link in nc netcat dropbear dbclient dropbearkey dropbearconvert scp tunpipe \
     fsck.ext2 fsck.ext3 fsck.ext4 mkfs.ext4 \
     unzstd zstdcat unxz xzcat bunzip2 bzcat unpigz \
-    modinfo lsmod insmod rmmod modprobe depmod; do
+    modinfo lsmod insmod rmmod modprobe depmod ping6 traceroute6 \
+    iptables-legacy iptables-legacy-save iptables-legacy-restore \
+    ip6tables-legacy ip6tables-legacy-save ip6tables-legacy-restore; do
     [[ -L $output_dir/$link ]] || {
         echo "missing applet link: $output_dir/$link" >&2
         exit 1
@@ -420,6 +426,100 @@ PY
     done
     check_output "kexec-tools $(pinned_version kexec-tools)" "$output_dir/kexec" --version
     check_output "bpftool v$(pinned_version bpftool)" "$output_dir/bpftool" version
+    for program in ping arping tracepath; do
+        check_output "$program from iputils $(pinned_version iputils)" "$output_dir/$program" -V
+    done
+    check_output "version $(pinned_version traceroute)" "$output_dir/traceroute" -V
+    for program in ndisc6 rdisc6 rltraceroute6; do
+        check_output " $(pinned_version ndisc6) " "$output_dir/$program" -V
+    done
+    check_output "Usage:" "$output_dir/tcptraceroute6" -h
+    for program in nstat devlink rdma; do
+        check_output "iproute2-$(pinned_version iproute2)" "$output_dir/$program" -V
+    done
+    check_output "$(pinned_version lldpd)" "$output_dir/lldpd" -v
+    check_output "$(pinned_version lldpd)" "$output_dir/lldpcli" -v
+    for program in iptables ip6tables; do
+        check_output "v$(pinned_version iptables) (legacy)" "$output_dir/$program-legacy" -V
+    done
+    check_output "ebtables v$(pinned_version ebtables) (legacy)" "$output_dir/ebtables-legacy" -V
+    # ipset prints its version, then asks the kernel for its protocol over
+    # netlink, and arptables opens its table before reading -V; both fail
+    # unprivileged or under qemu-user after printing their name and version.
+    for program in "ipset v$(pinned_version ipset)|ipset|version" \
+        "arptables v$(pinned_version arptables)|arptables-legacy|-V"; do
+        IFS='|' read -r needle binary argument <<<"$program"
+        program_output=$("${runner[@]}" "$output_dir/$binary" "$argument" 2>&1) || true
+        [[ $program_output == *"$needle"* ]] || {
+            echo "unexpected output from $binary $argument: $program_output" >&2
+            exit 1
+        }
+    done
+    check_output "V$(pinned_version ngrep)" "$output_dir/ngrep" -V
+    # hping3 reports upstream's 2004 version string, not Debian's.
+    check_output "hping3 version 3.0.0-alpha-2" "$output_dir/hping3" -v
+    check_output "iftop: display bandwidth usage" "$output_dir/iftop" -h
+    check_output "version $(pinned_version nethogs)" "$output_dir/nethogs" -V
+    for program in tcpreplay tcpprep tcprewrite; do
+        check_output "$program version: $(pinned_version tcpreplay)" "$output_dir/$program" -V
+    done
+    # A capture of a DHCPDISCOVER and a TCP segment carrying a marker:
+    # dhcpdump and ngrep decode it, tcpprep classifies it, tcprewrite
+    # rewrites the TCP destination and its checksum, and tcpdump confirms
+    # the checksum. The parsers' byte order is what differs by arch.
+    python3 -I - "$scratch/smoke.pcap" <<'PY'
+import struct
+import sys
+
+
+def checksum(data):
+    data += b"\0" * (len(data) % 2)
+    total = sum(struct.unpack(f"!{len(data) // 2}H", data))
+    total = (total >> 16) + (total & 0xFFFF)
+    return ~(total + (total >> 16)) & 0xFFFF
+
+
+def ipv4(protocol, source, destination, payload):
+    header = struct.pack(
+        "!BBHHHBBH4s4s", 0x45, 0, 20 + len(payload), 1, 0, 64, protocol, 0,
+        bytes(source), bytes(destination),
+    )
+    header = header[:10] + struct.pack("!H", checksum(header)) + header[12:]
+    return header + payload
+
+
+def frame(destination, payload):
+    return destination + bytes.fromhex("020000000001") + b"\x08\x00" + payload
+
+
+bootp = struct.pack(
+    "!BBBBIHH4s4s4s4s16s64s128s", 1, 1, 6, 0, 0x5EED, 0, 0x8000,
+    bytes(4), bytes(4), bytes(4), bytes(4),
+    bytes.fromhex("020000000001").ljust(16, b"\0"), bytes(64), bytes(128),
+)
+bootp += bytes.fromhex("63825363") + b"\x35\x01\x01\xff"
+dhcp = ipv4(17, [0, 0, 0, 0], [255, 255, 255, 255],
+            struct.pack("!HHHH", 68, 67, 8 + len(bootp), 0) + bootp)
+# The TCP checksum is left zero for tcprewrite --fixcsum to fill in.
+tcp = ipv4(6, [10, 0, 0, 1], [10, 0, 0, 2],
+           struct.pack("!HHIIBBHHH", 40000, 80, 1, 0, 0x50, 0x18, 1024, 0, 0)
+           + b"statics-smoke")
+packets = [frame(b"\xff" * 6, dhcp), frame(bytes.fromhex("020000000002"), tcp)]
+with open(sys.argv[1], "wb") as capture:
+    capture.write(struct.pack("<IHHiIII", 0xA1B2C3D4, 2, 4, 0, 0, 65535, 1))
+    for number, packet in enumerate(packets):
+        capture.write(struct.pack("<IIII", number + 1, 0, len(packet), len(packet)))
+        capture.write(packet)
+PY
+    check_output "1 (DHCPDISCOVER)" "$output_dir/dhcpdump" -r "$scratch/smoke.pcap"
+    check_output "10.0.0.1:40000 -> 10.0.0.2:80" "$output_dir/ngrep" -q -I "$scratch/smoke.pcap" statics-smoke
+    "${runner[@]}" "$output_dir/tcpprep" --auto=bridge --pcap="$scratch/smoke.pcap" \
+        --cachefile="$scratch/smoke.cache" || failed "tcpprep"
+    "${runner[@]}" "$output_dir/tcprewrite" --infile="$scratch/smoke.pcap" \
+        --outfile="$scratch/rewritten.pcap" --cachefile="$scratch/smoke.cache" \
+        --dstipmap=10.0.0.2/32:10.0.0.9/32 --fixcsum || failed "tcprewrite"
+    check_output "10.0.0.1:40000 -> 10.0.0.9:80" "$output_dir/ngrep" -q -I "$scratch/rewritten.pcap" statics-smoke
+    check_output "cksum 0x01d2 (correct)" "$output_dir/tcpdump" -vvnr "$scratch/rewritten.pcap" tcp
     if [[ $go_env != none ]]; then
         check_output "wireguard-go v" "$output_dir/wireguard-go" --version
     fi
