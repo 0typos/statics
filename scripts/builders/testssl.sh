@@ -20,5 +20,20 @@ build_testssl() {
             ln -s ../../../busybox "$OUTPUT_DIR/share/testssl/bin/$file"
         done
         install -m 0755 "$REPO_ROOT/configs/testssl.sh" "$OUTPUT_DIR/testssl.sh"
+        # The script's own license statement, including the client
+        # simulation data's CC BY 3.0 US terms and Qualys SSL Labs
+        # attribution, and the trust store's MPL-2.0 source.
+        {
+            echo "From testssl.sh's header:"
+            sed -n '/^# License: GPLv2/,/creativecommons.org\/licenses\/by\/3.0\/us/p' testssl.sh
+            echo
+            echo "From etc/README.md (only the Mozilla store is shipped, as etc/Mozilla.pem):"
+            grep -F '**Mozilla:**' etc/README.md
+        } > TESTSSL-NOTICES
+        if ! grep -q 'Qualys SSL Labs' TESTSSL-NOTICES ||
+            ! grep -q 'MPL 2.0' TESTSSL-NOTICES; then
+            echo "TESTSSL-NOTICES lacks the data licenses" >&2
+            exit 1
+        fi
     )
 }

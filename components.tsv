@@ -71,7 +71,7 @@ nethogs|GPL-2.0-or-later|nethogs|main|-
 tcpreplay|GPL-3.0-only AND BSD-4-Clause-UC AND BSD-3-Clause AND BSD-2-Clause AND (LGPL-3.0-or-later OR BSD-3-Clause)|tcpreplay, tcpprep, and tcprewrite with bundled libopts|main|-
 dhcpdump|BSD-2-Clause|dhcpdump without the session tracker|main|-
 libevent|BSD-3-Clause AND ISC|libevent_core, statically linked into tmux|main|-
-tmux|ISC AND BSD-2-Clause AND BSD-3-Clause AND LicenseRef-IBM-base64|tmux with libevent_core and ncurses; no utempter, utf8proc, systemd, or sixel|main|-
+tmux|ISC AND BSD-2-Clause AND BSD-3-Clause AND SSH-short AND LicenseRef-IBM-base64|tmux with libevent_core and ncurses; no utempter, utf8proc, systemd, or sixel|main|-
 stunnel|GPL-2.0-or-later WITH stunnel-exception|stunnel in fork mode; no TCP wrappers, systemd, or FIPS|main|-
 openvpn|GPL-2.0-only WITH openvpn-openssl-exception AND BSD-3-Clause|openvpn client and server with the compression stub only; no LZO, LZ4, data channel offload, plugins, PKCS#11, systemd, or SELinux|main|-
 microsocks|MIT|microsocks|main|-

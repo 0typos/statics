@@ -56,17 +56,19 @@ build_tmux() {
             LDFLAGS="$STATIC_LDFLAGS -L$ncurses/lib"
         run_make
         install_binary tmux tmux
-        # tmux's own files are ISC; the compat replacements it compiled for
-        # musl, and the BSD queue.h and tree.h it uses, carry their own
-        # notices in the comments before their first directive.
+        # tmux's own files are ISC; xmalloc.c (Tatu Ylonen's SSH-short
+        # grant), the compat replacements it compiled for musl, and the BSD
+        # queue.h and tree.h it uses carry their own notices in the
+        # comments before their first directive.
         local file
-        for file in compat/queue.h compat/tree.h $(
+        for file in xmalloc.c compat/queue.h compat/tree.h $(
             find compat -name '*.o' | sed 's/\.o$/.c/' | LC_ALL=C sort
         ); do
             echo "$file:"
             awk '/^#/ { exit } { print }' "$file"
         done > TMUX-NOTICES
-        if ! grep -q 'The NetBSD Foundation' TMUX-NOTICES; then
+        if ! grep -q 'The NetBSD Foundation' TMUX-NOTICES ||
+            ! grep -q 'can be used freely for any purpose' TMUX-NOTICES; then
             echo "TMUX-NOTICES lacks the compat notices" >&2
             exit 1
         fi

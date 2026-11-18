@@ -490,7 +490,8 @@ tmux attach-session -t rescue
 tmux list-sessions
 ```
 
-Detach with `C-b d`. `tmux` starts `$SHELL`, or `/bin/sh` when it is unset;
+Detach with `C-b d`. `tmux` starts `$SHELL`, else the user's login shell,
+else `/bin/sh`;
 `SHELL="$TOOLKIT/bash" tmux new-session -s rescue` gives every window the
 bundled `bash`. Its ncurses has no terminfo database: the client's `TERM`
 must be one of the descriptions compiled in (`ansi`, `dumb`, `linux`,
@@ -698,7 +699,8 @@ testssl.sh -t smtp mail.example.com:25
 
 The `testssl.sh` in the bundle's top directory is a wrapper that runs
 upstream's unmodified script (`share/testssl/testssl.sh`) with the bundled
-`bash` and `openssl`, and `drill` for DNS. A full run takes a minute or
+`bash` and `openssl`, and `drill` for DNS where the host has neither `dig`
+nor `host`. A full run takes a minute or
 more. It checks certificates against Mozilla's trust store only; add
 another with `--add-ca FILE`.
 
@@ -1126,9 +1128,9 @@ left out, and the two tools that link OpenSSL use the bundle's static
 - `tmux` links libevent's core library (no OpenSSL bufferevents, threads,
   or debug mode) and the bundle's ncurses. No utempter (sessions are not in
   `utmp`), utf8proc (musl's `wcwidth` decides character widths), systemd
-  cgroups, sixel images, or jemalloc. Its compat code for musl carries
-  BSD and IBM notices, collected into `licenses/tmux/TMUX-NOTICES` and
-  `licenses/tmux/IBM-BASE64`.
+  cgroups, sixel images, or jemalloc. `xmalloc.c` and its compat code for
+  musl carry SSH-short, BSD, and IBM notices, collected into
+  `licenses/tmux/TMUX-NOTICES` and `licenses/tmux/IBM-BASE64`.
 - `bash` is 5.2 with the official patches rolled in (5.2.37); 5.3 would need
   each of its patches pinned separately. It uses its bundled readline and
   the bundle's ncurses, and musl's `malloc`. No NLS, programmable
@@ -1174,8 +1176,10 @@ left out, and the two tools that link OpenSSL use the bundle's static
   would add about 900 KB to the archive. The `testssl.sh` beside the other
   executables is this repository's wrapper (`configs/testssl.sh`), and
   `share/testssl/bin/` links BusyBox's `hexdump`, `grep`, `awk`, and `sed`
-  for it. The trust store is MPL-2.0 and the client simulation data CC BY
-  3.0 US; `licenses/testssl.sh/etc/README.md` describes both.
+  for it. The trust store is MPL-2.0 and the client simulation data, from
+  Qualys SSL Labs, CC BY 3.0 US; `licenses/testssl.sh/TESTSSL-NOTICES`
+  quotes upstream's statements of both, and `licenses/testssl.sh/MPL-2.0`
+  is the MPL text.
 - Not included: nghttp2's `nghttp` and `h2load`. They are C++ (C++23, so a
   static libc++), and upstream's build requires libev, c-ares, and zlib
   besides OpenSSL; each would link its own copy of OpenSSL, about 4 MB

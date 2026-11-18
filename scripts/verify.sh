@@ -566,7 +566,8 @@ PY
     # pane back through the server: the client, server, pty, and libevent.
     # shellcheck disable=SC2016  # expanded by the pane's shell
     "${runner[@]}" "$output_dir/tmux" -S "$scratch/tmux" -f /dev/null \
-        new-session -d -x 80 -y 24 'echo statics-$((6 * 7)); sleep 30' || failed "tmux new-session"
+        new-session -d -x 80 -y 24 /bin/sh -c 'echo statics-$((6 * 7)); sleep 30' ||
+        failed "tmux new-session"
     tmux_output=
     for _ in 1 2 3 4 5 6 7 8 9 10; do
         tmux_output=$("${runner[@]}" "$output_dir/tmux" -S "$scratch/tmux" capture-pane -p) ||
@@ -596,6 +597,35 @@ PY
         >"$scratch/dnsmasq.conf"
     check_output "syntax check OK" "$output_dir/dnsmasq" --test --conf-file="$scratch/dnsmasq.conf"
     check_output "version $(pinned_version ser2net)" "$output_dir/ser2net" -v
+    # ser2net shares one end of a socat pty pair on a loopback port; two
+    # connections in turn each read a line written to the other end, which
+    # catches a port that never finishes closing after the first client.
+    # Natively only: it needs real ptys and TCP between the two programs.
+    if [[ -z $emulated ]]; then
+        "${runner[@]}" "$output_dir/socat" pty,link="$scratch/ttyA",raw,echo=0 \
+            pty,link="$scratch/ttyB",raw,echo=0 &
+        socat_pid=$!
+        for _ in 1 2 3 4 5 6 7 8 9 10; do [[ -e $scratch/ttyB ]] && break; sleep 0.5; done
+        exec {tty_hold}<>"$scratch/ttyA"
+        ser2net_port=$((20000 + $$ % 20000))
+        printf 'connection: &smoke\n  accepter: tcp,127.0.0.1,%s\n  connector: serialdev,%s,115200n81,local\n' \
+            "$ser2net_port" "$scratch/ttyA" >"$scratch/ser2net.yaml"
+        "${runner[@]}" "$output_dir/ser2net" -n -c "$scratch/ser2net.yaml" -P "$scratch/ser2net.pid" &
+        ser2net_pid=$!
+        sleep 1
+        for attempt in 1 2; do
+            (sleep 1; printf 'statics-serial-%s\n' "$attempt" >"$scratch/ttyB") &
+            ser2net_output=$(sleep 3 | "${runner[@]}" "$output_dir/socat" -t 3 - \
+                "tcp:127.0.0.1:$ser2net_port" 2>&1) || true
+            [[ $ser2net_output == *statics-serial-$attempt* ]] || {
+                kill "$ser2net_pid" "$socat_pid" 2>/dev/null
+                failed "ser2net connection $attempt"
+            }
+            sleep 1
+        done
+        kill "$ser2net_pid" "$socat_pid" 2>/dev/null || true
+        exec {tty_hold}<&-
+    fi
     check_output "version $(pinned_version bash)" "$output_dir/bash" --version
     # shellcheck disable=SC2016  # expanded by the bash under test
     check_output "statics-42" "$output_dir/bash" -c \
