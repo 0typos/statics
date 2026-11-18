@@ -460,9 +460,22 @@ PY
     check_output "hping3 version 3.0.0-alpha-2" "$output_dir/hping3" -v
     check_output "iftop: display bandwidth usage" "$output_dir/iftop" -h
     check_output "version $(pinned_version nethogs)" "$output_dir/nethogs" -V
-    for program in tcpreplay tcpprep tcprewrite; do
+    for program in tcpprep tcprewrite; do
         check_output "$program version: $(pinned_version tcpreplay)" "$output_dir/$program" -V
     done
+    # tcpreplay probes every interface's link state with an ethtool ioctl
+    # before it reads -V, which qemu-user does not emulate. Under emulation
+    # that error proves it started; natively, -V runs.
+    if [[ ${#runner[@]} -eq 0 ]]; then
+        check_output "tcpreplay version: $(pinned_version tcpreplay)" "$output_dir/tcpreplay" -V
+    else
+        tcpreplay_output=$("${runner[@]}" "$output_dir/tcpreplay" -V 2>&1) || true
+        [[ $tcpreplay_output == *"tcpreplay version: $(pinned_version tcpreplay)"* ||
+            $tcpreplay_output == *"SIOCETHTOOL(ETHTOOL_GLINK) ioctl failed"* ]] || {
+            echo "unexpected output from tcpreplay -V: $tcpreplay_output" >&2
+            exit 1
+        }
+    fi
     # A capture of a DHCPDISCOVER and a TCP segment carrying a marker:
     # dhcpdump and ngrep decode it, tcpprep classifies it, tcprewrite
     # rewrites the TCP destination and its checksum, and tcpdump confirms
