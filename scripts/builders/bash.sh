@@ -4,7 +4,14 @@ build_bash() {
     echo "==> building bash"
     (
         cd "$WORK_DIR/bash" || exit
-        local ncurses=$WORK_DIR/ncurses/install
+        local ncurses=$WORK_DIR/ncurses/install pic=
+        # musl's MIPS sigsetjmp is PIC assembly that derives $gp from $t9,
+        # which a non-PIC caller's jal leaves unset, and the linker adds no
+        # stub to set it: bash crashed at its first sigsetjmp. PIC calls
+        # load $t9 first.
+        case $STATICS_ARCH in
+            mips | mipsel) pic=-fPIC ;;
+        esac
         # Interactive bash with its bundled readline and history, using the
         # static ncurses from build_ncurses for terminal descriptions. No
         # NLS, programmable completion, help builtin, or bash's own malloc
@@ -27,7 +34,7 @@ build_bash() {
             bash_cv_printf_a_format=yes \
             bash_cv_getcwd_malloc=yes \
             CPPFLAGS="-I$ncurses/include/ncurses -I$ncurses/include" \
-            CFLAGS="$STATIC_CFLAGS" \
+            CFLAGS="$STATIC_CFLAGS $pic" \
             LDFLAGS="$STATIC_LDFLAGS -L$ncurses/lib"
         run_make bash
         install_binary bash bash

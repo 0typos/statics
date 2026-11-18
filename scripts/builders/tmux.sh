@@ -36,10 +36,15 @@ build_tmux() {
         # tmux, tmux-256color, screen, and xterm-256color. No utempter,
         # utf8proc, systemd, sixel, or jemalloc. Both libraries are found
         # through pkg-config's own static .pc for libevent and plain -l
-        # for ncurses, which ships no .pc in its narrow build.
+        # for ncurses, which ships no .pc in its narrow build. --build makes
+        # every target a cross build, so configure's run-time probes take
+        # the same answers on x86_64 as elsewhere. Panes get TERM=screen,
+        # the description a target's own programs are likeliest to know.
         CC="$CC" ./configure \
+            --build="$(cc -dumpmachine)" \
             --host="$AUTOCONF_HOST" \
             --prefix=/usr \
+            --with-TERM=screen \
             --disable-utempter \
             --disable-utf8proc \
             --disable-systemd \

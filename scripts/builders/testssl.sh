@@ -14,6 +14,11 @@ build_testssl() {
             client-simulation.txt common-primes.txt openssl.cnf tls_data.txt; do
             install_output_file "etc/$file" "share/testssl/etc/$file"
         done
+        # BusyBox applets testssl.sh accepts, last in the wrapper's PATH.
+        mkdir -p "$OUTPUT_DIR/share/testssl/bin"
+        for file in hexdump grep awk sed; do
+            ln -s ../../../busybox "$OUTPUT_DIR/share/testssl/bin/$file"
+        done
         install -m 0755 "$REPO_ROOT/configs/testssl.sh" "$OUTPUT_DIR/testssl.sh"
     )
 }

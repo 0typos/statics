@@ -238,6 +238,13 @@ for testssl_data in testssl.sh etc/Mozilla.pem etc/ca_hashes.txt etc/cipher-mapp
     }
 done
 
+for link in hexdump grep awk sed; do
+    [[ -L $output_dir/share/testssl/bin/$link && -x $output_dir/share/testssl/bin/$link ]] || {
+        echo "missing testssl.sh BusyBox link: share/testssl/bin/$link" >&2
+        exit 1
+    }
+done
+
 for link in nc netcat dropbear dbclient dropbearkey dropbearconvert scp tunpipe \
     fsck.ext2 fsck.ext3 fsck.ext4 mkfs.ext4 \
     unzstd zstdcat unxz xzcat bunzip2 bzcat unpigz \
@@ -593,12 +600,11 @@ PY
     # shellcheck disable=SC2016  # expanded by the bash under test
     check_output "statics-42" "$output_dir/bash" -c \
         'a=(statics 42); [[ ${a[1]} =~ ^4 ]] && cat <(printf "%s-%s\n" "${a[@]}")'
-    # testssl.sh runs the bundled openssl, which under emulation only
-    # binfmt_misc could start; its help needs neither.
+    # testssl.sh runs the bundled openssl and BusyBox applets, which under
+    # emulation only binfmt_misc could start, so natively only; it is the
+    # same script on every target, and bash is checked above.
     if [[ -z $emulated ]]; then
-        check_output "testssl.sh version $(pinned_version testssl.sh)" "$output_dir/testssl.sh" --version
-    else
-        check_output "testssl.sh" "$output_dir/bash" "$output_dir/share/testssl/testssl.sh" --help
+        check_output "testssl.sh version $(pinned_version testssl.sh)" env COLOR=0 "$output_dir/testssl.sh" --version
     fi
     if [[ $go_env != none ]]; then
         check_output "wireguard-go v" "$output_dir/wireguard-go" --version
