@@ -525,13 +525,15 @@ with open(sys.argv[1], "wb") as capture:
         capture.write(packet)
 PY
     check_output "1 (DHCPDISCOVER)" "$output_dir/dhcpdump" -r "$scratch/smoke.pcap"
-    check_output "10.0.0.1:40000 -> 10.0.0.2:80" "$output_dir/ngrep" -q -I "$scratch/smoke.pcap" statics-smoke
+    # Without -d, ngrep lists the interfaces even to read a file, which
+    # qemu-user cannot emulate; with -I the device is not opened.
+    check_output "10.0.0.1:40000 -> 10.0.0.2:80" "$output_dir/ngrep" -q -d lo -I "$scratch/smoke.pcap" statics-smoke
     "${runner[@]}" "$output_dir/tcpprep" --auto=bridge --pcap="$scratch/smoke.pcap" \
         --cachefile="$scratch/smoke.cache" || failed "tcpprep"
     "${runner[@]}" "$output_dir/tcprewrite" --infile="$scratch/smoke.pcap" \
         --outfile="$scratch/rewritten.pcap" --cachefile="$scratch/smoke.cache" \
         --dstipmap=10.0.0.2/32:10.0.0.9/32 --fixcsum || failed "tcprewrite"
-    check_output "10.0.0.1:40000 -> 10.0.0.9:80" "$output_dir/ngrep" -q -I "$scratch/rewritten.pcap" statics-smoke
+    check_output "10.0.0.1:40000 -> 10.0.0.9:80" "$output_dir/ngrep" -q -d lo -I "$scratch/rewritten.pcap" statics-smoke
     check_output "cksum 0x01d2 (correct)" "$output_dir/tcpdump" -vvnr "$scratch/rewritten.pcap" tcp
     if [[ $go_env != none ]]; then
         check_output "wireguard-go v" "$output_dir/wireguard-go" --version
