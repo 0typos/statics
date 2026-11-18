@@ -41,7 +41,10 @@ required_binaries=(
     nstat devlink rdma lldpd lldpcli ipset xtables-legacy-multi
     ebtables-legacy arptables-legacy ngrep hping3 iftop nethogs
     tcpreplay tcpprep tcprewrite dhcpdump
+    tmux stunnel openvpn microsocks tinyproxy dnsmasq ser2net bash testssl.sh
 )
+# Executables that are scripts rather than static ELF programs.
+scripts=(testssl.sh)
 # Go tools exist only where architectures.tsv gives a Go environment.
 if [[ $go_env != none ]]; then
     required_binaries+=(wireguard-go)
@@ -160,6 +163,13 @@ PY
 
     local binary
     while IFS= read -r binary; do
+        if [[ " ${scripts[*]} " == *" $binary "* ]]; then
+            head -c 2 "$dir/$binary" | grep -qx '#!' || {
+                echo "$binary should be a script" >&2
+                exit 1
+            }
+            continue
+        fi
         file "$dir/$binary"
         file "$dir/$binary" | grep -Eq 'statically linked|static-pie linked' || {
             echo "$binary is not statically linked" >&2
@@ -220,6 +230,13 @@ for nmap_data in \
     }
 done
 
+for testssl_data in testssl.sh etc/Mozilla.pem etc/ca_hashes.txt etc/cipher-mapping.txt \
+    etc/client-simulation.txt etc/common-primes.txt etc/openssl.cnf etc/tls_data.txt; do
+    [[ -s $output_dir/share/testssl/$testssl_data ]] || {
+        echo "missing testssl.sh runtime data: $testssl_data" >&2
+        exit 1
+    }
+done
 
 for link in nc netcat dropbear dbclient dropbearkey dropbearconvert scp tunpipe \
     fsck.ext2 fsck.ext3 fsck.ext4 mkfs.ext4 \
@@ -537,6 +554,52 @@ PY
         --dstipmap=10.0.0.2/32:10.0.0.9/32 --fixcsum || failed "tcprewrite"
     check_output "10.0.0.1:40000 -> 10.0.0.9:80" "$output_dir/ngrep" -q -d lo -I "$scratch/rewritten.pcap" statics-smoke
     check_output "cksum 0x01d2 (correct)" "$output_dir/tcpdump" -vvnr "$scratch/rewritten.pcap" tcp
+    check_output "tmux $(pinned_version tmux)" "$output_dir/tmux" -V
+    # A detached session runs a command in its pane; capture-pane reads the
+    # pane back through the server: the client, server, pty, and libevent.
+    # shellcheck disable=SC2016  # expanded by the pane's shell
+    "${runner[@]}" "$output_dir/tmux" -S "$scratch/tmux" -f /dev/null \
+        new-session -d -x 80 -y 24 'echo statics-$((6 * 7)); sleep 30' || failed "tmux new-session"
+    tmux_output=
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        tmux_output=$("${runner[@]}" "$output_dir/tmux" -S "$scratch/tmux" capture-pane -p) ||
+            failed "tmux capture-pane"
+        [[ $tmux_output == *statics-42* ]] && break
+        sleep 1
+    done
+    "${runner[@]}" "$output_dir/tmux" -S "$scratch/tmux" kill-server || true
+    [[ $tmux_output == *statics-42* ]] || failed "tmux session"
+    check_output "stunnel $(pinned_version stunnel)" "$output_dir/stunnel" -version
+    check_output "OpenVPN $(pinned_version openvpn)" "$output_dir/openvpn" --version
+    # A static key, then OpenVPN's own loopback encrypt and decrypt with
+    # it: OpenSSL's ciphers and OpenVPN's packet code on every byte order.
+    "${runner[@]}" "$output_dir/openvpn" --genkey secret "$scratch/static.key" >/dev/null ||
+        failed "openvpn --genkey"
+    check_output "self-test mode SUCCEEDED" "$output_dir/openvpn" --test-crypto --secret "$scratch/static.key" \
+        --cipher AES-256-CBC --verb 1
+    # microsocks has no version flag; its usage proves it started.
+    microsocks_output=$("${runner[@]}" "$output_dir/microsocks" -h 2>&1) || true
+    [[ $microsocks_output == *"MicroSocks SOCKS5 Server"* ]] || {
+        echo "unexpected output from microsocks -h: $microsocks_output" >&2
+        exit 1
+    }
+    check_output "tinyproxy $(pinned_version tinyproxy)" "$output_dir/tinyproxy" -v
+    check_output "Dnsmasq version $(pinned_version dnsmasq)" "$output_dir/dnsmasq" --version
+    printf 'port=0\ndhcp-range=192.0.2.10,192.0.2.20,1h\nenable-tftp\ntftp-root=/tmp\n' \
+        >"$scratch/dnsmasq.conf"
+    check_output "syntax check OK" "$output_dir/dnsmasq" --test --conf-file="$scratch/dnsmasq.conf"
+    check_output "version $(pinned_version ser2net)" "$output_dir/ser2net" -v
+    check_output "version $(pinned_version bash)" "$output_dir/bash" --version
+    # shellcheck disable=SC2016  # expanded by the bash under test
+    check_output "statics-42" "$output_dir/bash" -c \
+        'a=(statics 42); [[ ${a[1]} =~ ^4 ]] && cat <(printf "%s-%s\n" "${a[@]}")'
+    # testssl.sh runs the bundled openssl, which under emulation only
+    # binfmt_misc could start; its help needs neither.
+    if [[ -z $emulated ]]; then
+        check_output "testssl.sh version $(pinned_version testssl.sh)" "$output_dir/testssl.sh" --version
+    else
+        check_output "testssl.sh" "$output_dir/bash" "$output_dir/share/testssl/testssl.sh" --help
+    fi
     if [[ $go_env != none ]]; then
         check_output "wireguard-go v" "$output_dir/wireguard-go" --version
     fi
