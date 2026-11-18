@@ -65,7 +65,7 @@ Not sure which archive fits the device? Start with the
 ### Main and extra archives
 
 Each architecture has two archives. **`statics-<arch>.tar.xz` is the kit**:
-every tool below, about 19 to 23 MiB (20.6 MiB on `x86_64`, 21.9 MiB on `mips`), and it is all most sessions need.
+every tool below, about 19 to 23 MiB (20.7 MiB on `x86_64`, 21.9 MiB on `mips`), and it is all most sessions need.
 **`statics-extra-<arch>.tar.xz` is optional** and holds four Go tools that
 together weigh about as much as the whole main kit: `rclone`, `croc`, `crictl`
 and `ctr`. Splitting them out keeps the main kit small enough for routers and
@@ -76,7 +76,7 @@ SBOM and notices, and exists for every target except `powerpc` and
 `powerpc64`, where Go does not run (see the
 [architecture guide](docs/ARCHITECTURES.md#go-tools)).
 
-Extra archive sizes for the current pins (the `x86_64` main kit is 20.6 MiB):
+Extra archive sizes for the current pins (the `x86_64` main kit is 20.7 MiB):
 
 | target | extra archive |
 |---|---|
