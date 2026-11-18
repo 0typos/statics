@@ -30,8 +30,8 @@ the [contribution checklist](../CONTRIBUTING.md).
 | Discovery and transfer | `nmap`, `ncat`, `rsync`, `sftp-server` |
 | Compression and archives | `zstd`, `xz`, `bzip2`, `pigz`, `bsdtar`, `bsdcpio` |
 | Pipe transfer | `pv`, `mbuffer` |
-| Tunnels and VPN | `tunpipe`, `pppd`, `openvpn` |
-| TLS wrapping and proxies | `stunnel`, `microsocks`, `tinyproxy` |
+| Tunnels and VPN | `tunpipe`, `pppd`; `openvpn` in the extra archive |
+| TLS wrapping and proxies | `microsocks`, `tinyproxy`; `stunnel` in the extra archive |
 | DHCP, DNS, and netboot | `dnsmasq` |
 | Sessions and shells | `tmux`, `bash` |
 | TLS auditing | `testssl.sh` |
@@ -45,7 +45,9 @@ the [contribution checklist](../CONTRIBUTING.md).
 | Namespaces and privilege | `nsenter`, `unshare`, `lsns`, `setpriv`, `findmnt` |
 | Embedded buses | selected `can-utils`, `i2c-tools`, and `spi-tools` programs |
 
-The extra archive adds `rclone` (trimmed), `croc`, `crictl`, and `ctr`.
+The extra archive adds `stunnel` and `openvpn` (each with its own OpenSSL)
+on every target, and `rclone` (trimmed), `croc`, `crictl`, and `ctr` where Go
+runs.
 Further rclone backends and commands are requests against its trimmed main
 rather than new tools; see the [toolkit guide](TOOLKIT.md#rclone-trimmed).
 

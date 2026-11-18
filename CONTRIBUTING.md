@@ -49,7 +49,7 @@ workflow artifacts.
 | --- | --- |
 | `architectures.tsv` | Target name, Zig triple/CPU, QEMU runner, description, and Go environment (or `none`) |
 | `sources.lock` | Pinned upstream/toolchain version, SHA-256, and URL |
-| `components.tsv` | Component license expression, role, archive (`main` or `extra`), and Go main packages with any build flags |
+| `components.tsv` | Component license expression, role, archive (`main`, `extra`, or `both` for a library linked into each), and Go main packages with any build flags |
 | `docker/Dockerfile` | Clean toolchain, source, build, test, and export stages |
 | `scripts/build.sh` | Target environment, including the hermetic Go settings, and build orchestration |
 | `scripts/components.sh` | The components that belong in one archive of one target |
@@ -79,7 +79,9 @@ Use this checklist:
    SHA-256.
 2. Add the component, SPDX license expression, archive, and Go main packages
    (`-` for a non-Go tool) to `components.tsv`. Small core tools go in the
-   `main` archive; large tools go in `extra`.
+   `main` archive; large tools go in `extra`. A C tool's builder installs
+   with `install_component_binary` so it lands in that archive; a library
+   it links that main tools link too is marked `both`.
 3. Add a builder in `scripts/builders/`. Cross-build only; never execute a
    target binary during compilation.
 4. Add the source directory, builder import, and build call to

@@ -42,7 +42,7 @@ user-mode emulation proves that non-native outputs can actually start.
 
 | 🧰 Carry it | 🐧 Run it | 🔐 Trust it |
 |---|---|---|
-| 125 physical executables, plus BusyBox, Dropbear, kmod, iptables and decompressor links, and four larger Go tools in an optional extra archive | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
+| 123 physical executables, plus BusyBox, Dropbear, kmod, iptables and decompressor links, and six larger tools (four in Go) in an optional extra archive | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
 | Network, process, namespace, storage and hardware diagnosis | Static musl builds avoid a dependency on the target's libc | Deterministic archives, QEMU smoke tests and release attestations |
 
 ## Get a kit
@@ -65,21 +65,22 @@ Not sure which archive fits the device? Start with the
 ### Main and extra archives
 
 Each architecture has two archives. **`statics-<arch>.tar.xz` is the kit**:
-every tool below, about 19 to 23 MiB (20.7 MiB on `x86_64`, 21.9 MiB on `mips`), and it is all most sessions need.
-**`statics-extra-<arch>.tar.xz` is optional** and holds four Go tools that
-together weigh about as much as the whole main kit: `rclone`, `croc`, `crictl`
-and `ctr`. Splitting them out keeps the main kit small enough for routers and
-other cramped devices; take the extra archive only when you need to sync with
-object storage, hand files across machines, or inspect a container runtime.
-It extracts beside the main kit as `<arch>-extra/`, with its own checksums,
-SBOM and notices, and exists for every target except `powerpc` and
-`powerpc64`, where Go does not run (see the
+every tool below, and it is all most sessions need.
+**`statics-extra-<arch>.tar.xz` is optional** and holds six larger tools:
+`stunnel` and `openvpn`, which each carry their own copy of OpenSSL, and
+four Go tools, `rclone`, `croc`, `crictl` and `ctr`. Splitting them out keeps
+the main kit small enough for routers and other cramped devices; take the
+extra archive when you need TLS wrapping or a VPN, to sync with object
+storage, hand files across machines, or inspect a container runtime. It
+extracts beside the main kit as `<arch>-extra/`, with its own checksums, SBOM
+and notices. On `powerpc` and `powerpc64`, where Go does not run, it holds
+only `stunnel` and `openvpn` (see the
 [architecture guide](docs/ARCHITECTURES.md#go-tools)).
 
-Extra archive sizes for the current pins (the `x86_64` main kit is 20.7 MiB):
+Archive sizes for the current pins:
 
-| target | extra archive |
-|---|---|
+| target | main archive | extra archive |
+|---|---|---|
 | `x86_64` | 16.7 MiB |
 | `i686` | 15.5 MiB |
 | `aarch64` | 14.4 MiB |
@@ -145,7 +146,7 @@ data and safe starting commands.
 
 ## Inside the case
 
-The bundle contains 125 physical executables (124 on `powerpc` and `powerpc64`, which get no
+The bundle contains 123 physical executables (122 on `powerpc` and `powerpc64`, which get no
 Go tools) plus BusyBox, Dropbear, kmod and iptables multi-call links, decompressor links such as `unxz`,
 Nmap runtime data, checksums, an SPDX SBOM and upstream license texts.
 
@@ -162,7 +163,7 @@ Nmap runtime data, checksums, an SPDX SBOM and upstream license texts.
 | Pipe transfer | `pv`, `mbuffer` | Progress, rate limits and buffering for data piped over SSH or a socket |
 | Serial console and transfer | `picocom`, `sz`, `rz`, `ser2net` | Serial consoles, ZMODEM file transfer over a serial or terminal session, and a serial port shared over TCP |
 | Sessions and shells | `tmux`, `bash` | Sessions that survive a dropped SSH connection, and a full bash |
-| TLS wrapping, VPN and proxies | `stunnel`, `openvpn`, `microsocks`, `tinyproxy` | TLS around plain services, OpenVPN client and server, and SOCKS5 and HTTP/HTTPS proxies |
+| Quick proxies | `microsocks`, `tinyproxy` | SOCKS5 and HTTP/HTTPS proxies |
 | Netboot and DHCP rescue | `dnsmasq` | DHCP, DNS and TFTP for an isolated link or a network boot |
 | Process and storage diagnosis | `strace`, `lsof`, `gdbserver`, `e2fsck`, `dumpe2fs`, `tune2fs`, `mke2fs`, `smartctl`, `nvme` | Syscalls, open files, remote debugging, filesystems and device health |
 | Disks, mounts and kernel log | `lsblk`, `blkid`, `sfdisk`, `losetup`, `mount`, `umount`, `dmesg` | Block devices, partition tables, loop devices, mounts and kernel messages |
@@ -176,6 +177,7 @@ The extra archive adds:
 
 | Area | Outputs | What they are for |
 |---|---|---|
+| TLS wrapping and VPN | `stunnel`, `openvpn` | TLS around plain TCP services, and OpenVPN client and server |
 | File transfer and sync | `rclone`, `croc` | Copy, sync and check against local disks, S3-compatible storage, SFTP, WebDAV and HTTP; send a file to another machine with a one-time code |
 | Container runtimes | `crictl`, `ctr` | Pods, containers, logs, images and snapshots through the CRI and containerd sockets |
 
@@ -191,7 +193,7 @@ are the full iputils and traceroute programs.
 The portable default deliberately leaves some integrations out. Keep Nmap's packaged
 `share/nmap/` beside the executable, provide curl a trusted CA bundle when the target
 lacks one, and do not expect rsync to preserve ACLs or extended attributes, or bsdtar
-to open AES-encrypted zip archives. `openvpn` needs the kernel's
+to open AES-encrypted zip archives. `openvpn` (extra archive) needs the kernel's
 `/dev/net/tun`, and `testssl.sh` still needs the host's coreutils and `ps`,
 which BusyBox does not replace for it. Nmap and
 Ncat use the Nmap Public Source License; review their packaged terms before deployment

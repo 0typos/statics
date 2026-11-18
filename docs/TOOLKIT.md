@@ -1,7 +1,7 @@
 # Toolkit guide
 
-The default bundle is a compact Linux troubleshooting kit: 125 physical
-executables (124 on `powerpc` and `powerpc64`, which have no Go tools),
+The default bundle is a compact Linux troubleshooting kit: 123 physical
+executables (122 on `powerpc` and `powerpc64`, which have no Go tools),
 BusyBox applet links, Dropbear, kmod, and iptables multi-call links, decompressor links, Nmap runtime
 data, license texts, checksums, and build metadata. Static linking removes the
 dependency on a target's installed libc; it does not replace kernel features,
@@ -38,7 +38,7 @@ Nmap data, notices, and licenses remain available.
 | Pipe transfer | `pv`, `mbuffer` | Progress and rate limits on a pipe, and a large buffer that keeps a stream moving across stalls |
 | Serial console and transfer | `picocom`, `sz`, `rz`, `ser2net` | Serial terminal sessions, XMODEM/YMODEM/ZMODEM file transfer, and a serial port shared over TCP or RFC 2217 |
 | Sessions and shells | `tmux`, `bash` | Sessions that survive a dropped connection, and bash for scripts and interactive use |
-| TLS wrapping, VPN, and proxies | `stunnel`, `openvpn`, `microsocks`, `tinyproxy` | TLS around plain TCP services, OpenVPN clients and servers, and SOCKS5 and HTTP/HTTPS proxies |
+| Quick proxies | `microsocks`, `tinyproxy` | SOCKS5 and HTTP/HTTPS proxies |
 | Netboot and DHCP rescue | `dnsmasq` | DHCP, DNS, and TFTP for an isolated link or a network boot |
 | TLS auditing | `testssl.sh` | Protocols, ciphers, certificates, and known TLS vulnerabilities of a server (a script; see below) |
 | Process diagnosis | `strace`, `lsof`, `gdbserver` | System-call tracing, process/file/socket correlation, and remote debugging with a host GDB |
@@ -58,13 +58,16 @@ not add separate binary payloads. `ping`, `arping`, and `traceroute` are the
 iputils and traceroute.sourceforge.net programs, not BusyBox applets;
 `busybox ping` still reaches the applet.
 
-Four larger Go tools ship separately in `statics-extra-<arch>.tar.xz`, for
-every architecture with Go (not `powerpc` or `powerpc64`). It extracts to
-`<arch>-extra/` with its own notices, SBOM, and checksums; see
+Six larger tools ship separately in `statics-extra-<arch>.tar.xz`:
+`stunnel` and `openvpn`, which each link their own copy of OpenSSL, on every
+architecture, and four Go tools on every architecture with Go (not
+`powerpc` or `powerpc64`). It extracts to `<arch>-extra/` with its own
+notices, SBOM, and checksums; see
 [the extra archive](#extra-archive-rclone-croc-crictl-and-ctr).
 
 | Area | Executables | Primary use |
 | --- | --- | --- |
+| TLS wrapping and VPN | `stunnel`, `openvpn` | TLS around plain TCP services, and OpenVPN clients and servers |
 | File transfer and sync | `rclone`, `croc` | Copy and sync with S3, SFTP, WebDAV, and HTTP; hand a file to another machine with a one-time code |
 | Container runtimes | `crictl`, `ctr` | Inspect pods, containers, images, logs, and snapshots through the CRI and containerd sockets |
 
@@ -512,7 +515,7 @@ and `~/.bashrc` apply as usual. `help` and programmable completion
 
 ### TLS wrapping: stunnel
 
-`stunnel` adds TLS to a plain TCP service or lets a plain client reach a
+`stunnel` is in the extra archive. It adds TLS to a plain TCP service or lets a plain client reach a
 TLS one. It reads a configuration file (the default is
 `/etc/stunnel/stunnel.conf`); `foreground = yes` and an empty `pid =` keep
 it from detaching and from writing under `/var/run`. Serve a plain service
@@ -546,7 +549,7 @@ handled by its own process (fork mode).
 
 ### VPN: openvpn
 
-`openvpn` is a client and a server for OpenVPN 2 peers and existing
+`openvpn`, in the extra archive, is a client and a server for OpenVPN 2 peers and existing
 `.ovpn` profiles:
 
 ```console
@@ -1265,7 +1268,14 @@ kernel's MTD character devices (`/dev/mtdN`) or UBI devices.
 
 ## Extra archive: rclone, croc, crictl, and ctr
 
-These tools are several times the size of anything in the main archive, so
+The extra archive also holds `stunnel` and `openvpn`, on every target,
+including `powerpc` and `powerpc64`; they are C programs like the main
+archive's, kept apart only because each carries a static OpenSSL (about 4 MB
+uncompressed). See [TLS wrapping](#tls-wrapping-stunnel) and
+[VPN](#vpn-openvpn) for their use and
+[the profile](#tunnel-session-and-service-tools) for how they are built.
+
+The Go tools are several times the size of anything in the main archive, so
 they are packaged apart. Each is a static Go binary built with cgo disabled,
 `-trimpath`, and `-ldflags="-s -w -buildid="` (plus upstream's `-X` version
 stamp where it has one), without UPX; the archive is
