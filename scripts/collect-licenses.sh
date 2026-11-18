@@ -160,6 +160,28 @@ copy_license tcpreplay libopts/COPYING.lgplv3
 copy_license tcpreplay libopts/COPYING.mbsd
 copy_license tcpreplay TCPREPLAY-NOTICES
 copy_license dhcpdump LICENSE
+copy_license libevent LICENSE
+copy_license tmux COPYING
+copy_license tmux TMUX-NOTICES
+copy_license tmux IBM-BASE64
+copy_license stunnel COPYING.md
+copy_license stunnel COPYRIGHT.md
+copy_license openvpn COPYING
+copy_license openvpn COPYRIGHT.GPL
+copy_license openvpn OPENVPN-NOTICES
+copy_license microsocks COPYING
+copy_license tinyproxy COPYING
+copy_license tinyproxy TINYPROXY-NOTICES
+copy_license dnsmasq COPYING
+copy_license dnsmasq COPYING-v3
+copy_license libyaml License
+copy_license gensio COPYING.LIB
+copy_license ser2net COPYING
+copy_license bash COPYING
+copy_license testssl.sh LICENSE
+# The trust store's MPL-2.0 and the client simulation data's CC-BY-3.0-US
+# terms are in the shipped files' headers; this describes them.
+copy_license testssl.sh etc/README.md
 copy_license wireguard-go LICENSE
 copy_license rclone COPYING
 copy_license croc LICENSE
