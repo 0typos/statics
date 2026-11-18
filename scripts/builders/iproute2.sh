@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 
 build_iproute2() {
-    echo "==> building iproute2 (ip, ss, bridge, tc)"
+    echo "==> building iproute2 (ip, ss, bridge, tc, nstat, devlink, rdma)"
     (
         cd "$WORK_DIR/iproute2" || exit
         CC="$CC" AR="$AR" \
         PKG_CONFIG_LIBDIR="$DEPS_PREFIX/lib/pkgconfig" \
         ./configure
         run_make \
-            SUBDIRS='lib ip bridge misc tc' \
+            SUBDIRS='lib ip bridge misc tc devlink rdma' \
             SHARED_LIBS=n \
             CC="$CC" \
             AR="$AR" \
@@ -17,5 +17,8 @@ build_iproute2() {
         install_binary bridge/bridge bridge
         install_binary misc/ss ss
         install_binary tc/tc tc
+        install_binary misc/nstat nstat
+        install_binary devlink/devlink devlink
+        install_binary rdma/rdma rdma
     )
 }

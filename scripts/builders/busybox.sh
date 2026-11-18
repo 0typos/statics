@@ -15,9 +15,10 @@ build_busybox() {
         install_binary busybox busybox
     )
 
+    # ping, ping6, arping, traceroute, and traceroute6 are the iputils and
+    # traceroute programs instead; `busybox ping` still reaches the applet.
     local applet
-    for applet in nc netcat ping ping6 traceroute traceroute6 nslookup wget \
-        telnet arp arping route ifconfig netstat; do
+    for applet in nc netcat nslookup wget telnet arp route ifconfig netstat; do
         make_link busybox "$applet"
     done
 }

@@ -203,17 +203,35 @@ def main() -> int:
         "files": files,
         "relationships": relationships,
     }
-    if any("LicenseRef-NPSL-0.95" in fields[1] for fields in components):
-        document["hasExtractedLicensingInfos"] = [
-            {
-                "licenseId": "LicenseRef-NPSL-0.95",
-                "name": "Nmap Public Source License Version 0.95",
-                "extractedText": (
-                    output_dir / "licenses" / "nmap" / "LICENSE"
-                ).read_text(encoding="utf-8"),
-                "seeAlsos": ["https://nmap.org/npsl/"],
-            }
-        ]
+    # Licenses without an SPDX identifier: id, name, text, and reference.
+    extracted = [
+        (
+            "LicenseRef-NPSL-0.95",
+            "Nmap Public Source License Version 0.95",
+            "nmap/LICENSE",
+            "https://nmap.org/npsl/",
+        ),
+        (
+            "LicenseRef-ngrep",
+            "ngrep license",
+            "ngrep/LICENSE",
+            "https://github.com/jpr5/ngrep/blob/master/LICENSE",
+        ),
+    ]
+    infos = [
+        {
+            "licenseId": license_id,
+            "name": license_name,
+            "extractedText": (output_dir / "licenses" / text).read_text(
+                encoding="utf-8"
+            ),
+            "seeAlsos": [reference],
+        }
+        for license_id, license_name, text, reference in extracted
+        if any(license_id in fields[1] for fields in components)
+    ]
+    if infos:
+        document["hasExtractedLicensingInfos"] = infos
     destination = output_dir / "SBOM.spdx.json"
     destination.write_text(
         json.dumps(document, indent=2, sort_keys=True) + "\n",

@@ -155,6 +155,22 @@ sources=(
     kexec-tools
     elfutils
     bpftool
+    iputils
+    traceroute
+    ndisc6
+    lldpd
+    ipset
+    iptables
+    ebtables
+    arptables
+    ngrep
+    hping3
+    hping3-debian
+    ncurses
+    iftop
+    nethogs
+    tcpreplay
+    dhcpdump
 )
 
 # STATICS_ONLY_DEPS builds just the shared libraries (the Dockerfile's deps
@@ -241,7 +257,9 @@ dag=$WORK_DIR/dag.mk
         e2fsprogs smartmontools libnvme nvme-cli ppp tunpipe picocom lrzsz gdb \
         sftp-server libnfnetlink libnetfilter_conntrack conntrack ipmitool \
         mtd-utils libnl iw zlib bzip2 xz zstd pigz pv mbuffer libarchive \
-        kmod kexec-tools libelf bpftool; do
+        kmod kexec-tools libelf bpftool iputils traceroute ndisc6 lldpd \
+        ipset iptables ebtables arptables ngrep hping3 ncurses iftop nethogs \
+        tcpreplay dhcpdump; do
         printf ' $(S)/%s' "$c"
     done
     if [[ $go_env != none ]]; then
@@ -310,6 +328,21 @@ dag=$WORK_DIR/dag.mk
     emit kexec-tools kexec-tools build_kexec_tools zlib
     emit libelf elfutils build_libelf zlib
     emit bpftool bpftool build_bpftool libelf
+    emit iputils iputils build_iputils
+    emit traceroute traceroute build_traceroute
+    emit ndisc6 ndisc6 build_ndisc6
+    emit lldpd lldpd build_lldpd
+    emit ipset ipset build_ipset deps
+    emit iptables iptables build_iptables
+    emit ebtables iptables build_ebtables
+    emit arptables iptables build_arptables
+    emit ngrep ngrep build_ngrep deps
+    emit hping3 hping3 build_hping3 deps
+    emit ncurses ncurses build_ncurses
+    emit iftop iftop build_iftop deps ncurses
+    emit nethogs nethogs build_nethogs deps ncurses
+    emit tcpreplay tcpreplay build_tcpreplay deps
+    emit dhcpdump dhcpdump build_dhcpdump deps
     emit wireguard-go wireguard-go build_wireguard_go
     emit rclone rclone build_rclone
     emit croc croc build_croc
