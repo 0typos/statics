@@ -81,17 +81,19 @@ Archive sizes for the current pins:
 
 | target | main archive | extra archive |
 |---|---|---|
-| `x86_64` | 16.7 MiB |
-| `i686` | 15.5 MiB |
-| `aarch64` | 14.4 MiB |
-| `armv6-hardfloat`, `armv7-hardfloat` | 14.4 MiB |
-| `armv7-softfloat` | 14.5 MiB |
-| `mips` | 13.0 MiB |
-| `mipsel` | 13.3 MiB |
-| `powerpc64le` | 14.1 MiB |
-| `riscv64` | 15.9 MiB |
-| `s390x` | 15.1 MiB |
-| `powerpc`, `powerpc64` | none |
+| `x86_64` | 19.6 MiB | 18.6 MiB |
+| `i686` | 19.4 MiB | 17.4 MiB |
+| `aarch64` | 17.9 MiB | 16.0 MiB |
+| `armv6-hardfloat` | 17.1 MiB | 16.1 MiB |
+| `armv7-hardfloat` | 17.0 MiB | 16.0 MiB |
+| `armv7-softfloat` | 16.9 MiB | 16.0 MiB |
+| `mips` | 20.9 MiB | 14.8 MiB |
+| `mipsel` | 21.3 MiB | 15.1 MiB |
+| `powerpc` | 18.8 MiB | 1.7 MiB |
+| `powerpc64` | 19.3 MiB | 1.8 MiB |
+| `powerpc64le` | 20.6 MiB | 16.0 MiB |
+| `riscv64` | 19.2 MiB | 17.8 MiB |
+| `s390x` | 19.4 MiB | 16.8 MiB |
 
 The extra archive is compressed with `xz -9` and needs about 65 MiB of memory
 to unpack; on a smaller device, unpack it elsewhere and copy the directory.
