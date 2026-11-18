@@ -1,14 +1,14 @@
-# source|SPDX license expression|role and outputs|archive: main, extra, or any|Go main packages after any go build flags (-tags=...), - for none, runtime for Go itself
+# source|SPDX license expression|role and outputs|archive: main, extra, both (a library linked into tools in each), or any|Go main packages after any go build flags (-tags=...), - for none, runtime for Go itself
 busybox|GPL-2.0-only|busybox and applet links|main|-
 socat|GPL-2.0-only|socat|main|-
 dropbear|MIT AND Unlicense|dropbearmulti and applet links, including the repository-authored tunpipe; bundled libtomcrypt and libtommath|main|-
 iproute2|GPL-2.0-only|ip, ss, bridge, tc, nstat, devlink, and rdma|main|-
 wireguard-tools|GPL-2.0-only|wg|main|-
 wireguard-go|MIT|wireguard-go, the userspace WireGuard daemon, with the Go modules listed in licenses/wireguard-go/go-modules.tsv|main|.
-openssl|Apache-2.0|openssl; statically linked into curl, iperf3, drill, nmap, ncat, socat, ipmitool, stunnel, and openvpn|main|-
+openssl|Apache-2.0|openssl; statically linked into curl, iperf3, drill, nmap, ncat, socat, and ipmitool, and in the extra archive into stunnel and openvpn|both|-
 libpcap|BSD-3-Clause|statically linked into tcpdump, nmap, ncat, ngrep, hping3, iftop, nethogs, tcpreplay, tcpprep, tcprewrite, and dhcpdump|main|-
 libmnl|LGPL-2.1-or-later|statically linked into iproute2, ethtool, libnftnl, nft, conntrack, and ipset|main|-
-libcap-ng|LGPL-2.1-or-later|statically linked into util-linux setpriv and openvpn|main|-
+libcap-ng|LGPL-2.1-or-later|statically linked into util-linux setpriv, and in the extra archive into openvpn|both|-
 libnftnl|GPL-2.0-or-later|statically linked into nft|main|-
 nftables|GPL-2.0-only AND GPL-2.0-or-later|nft|main|-
 tcpdump|BSD-3-Clause|tcpdump|main|-
@@ -72,8 +72,8 @@ tcpreplay|GPL-3.0-only AND BSD-4-Clause-UC AND BSD-3-Clause AND BSD-2-Clause AND
 dhcpdump|BSD-2-Clause|dhcpdump without the session tracker|main|-
 libevent|BSD-3-Clause AND ISC|libevent_core, statically linked into tmux|main|-
 tmux|ISC AND BSD-2-Clause AND BSD-3-Clause AND SSH-short AND LicenseRef-IBM-base64|tmux with libevent_core and ncurses; no utempter, utf8proc, systemd, or sixel|main|-
-stunnel|GPL-2.0-or-later WITH stunnel-exception|stunnel in fork mode; no TCP wrappers, systemd, or FIPS|main|-
-openvpn|GPL-2.0-only WITH openvpn-openssl-exception AND BSD-3-Clause|openvpn client and server with the compression stub only; no LZO, LZ4, data channel offload, plugins, PKCS#11, systemd, or SELinux|main|-
+stunnel|GPL-2.0-or-later WITH stunnel-exception|stunnel in fork mode; no TCP wrappers, systemd, or FIPS|extra|-
+openvpn|GPL-2.0-only WITH openvpn-openssl-exception AND BSD-3-Clause|openvpn client and server with the compression stub only; no LZO, LZ4, data channel offload, plugins, PKCS#11, systemd, or SELinux|extra|-
 microsocks|MIT|microsocks|main|-
 tinyproxy|GPL-2.0-or-later AND MIT|tinyproxy|main|-
 dnsmasq|GPL-2.0-only OR GPL-3.0-only|dnsmasq with DNS, DHCP, DHCPv6, router advertisements, and TFTP; no DNSSEC, IDN, D-Bus, conntrack marking, or nftables sets|main|-

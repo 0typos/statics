@@ -41,7 +41,7 @@ required_binaries=(
     nstat devlink rdma lldpd lldpcli ipset xtables-legacy-multi
     ebtables-legacy arptables-legacy ngrep hping3 iftop nethogs
     tcpreplay tcpprep tcprewrite dhcpdump
-    tmux stunnel openvpn microsocks tinyproxy dnsmasq ser2net bash testssl.sh
+    tmux microsocks tinyproxy dnsmasq ser2net bash testssl.sh
 )
 # Executables that are scripts rather than static ELF programs.
 scripts=(testssl.sh)
@@ -51,16 +51,23 @@ if [[ $go_env != none ]]; then
 fi
 # Smoke checks for the extra archive, as "expected output|arguments" per
 # executable. Every executable in it must have one, so an extra tool cannot
-# ship without being started.
+# ship without being started, and every one listed must be there. The C
+# tools are on every target; the Go tools only where Go is.
 # The pinned version is expected, so a version that upstream sets at link time
 # cannot silently fall back to a development string.
 pinned_version() { awk -F '|' -v n="$1" '$1 == n { print $2 }' "$repo_root/sources.lock"; }
 declare -A extra_smoke=(
-    [rclone]="rclone v$(pinned_version rclone)|version"
-    [croc]="croc version $(pinned_version croc)|--version"
-    [crictl]="crictl version v$(pinned_version cri-tools)|--version"
-    [ctr]="ctr github.com/containerd/containerd/v2 v$(pinned_version containerd)|--version"
+    [stunnel]="stunnel $(pinned_version stunnel)|-version"
+    [openvpn]="OpenVPN $(pinned_version openvpn)|--version"
 )
+if [[ $go_env != none ]]; then
+    extra_smoke+=(
+        [rclone]="rclone v$(pinned_version rclone)|version"
+        [croc]="croc version $(pinned_version croc)|--version"
+        [crictl]="crictl version v$(pinned_version cri-tools)|--version"
+        [ctr]="ctr github.com/containerd/containerd/v2 v$(pinned_version containerd)|--version"
+    )
+fi
 
 # Checks every archive must pass: metadata, licenses for exactly the
 # components it should hold, its SBOM, static linkage, and SHA256SUMS.
@@ -205,7 +212,8 @@ for binary in "${required_binaries[@]}"; do
         exit 1
     }
 done
-# Every extra tool is a Go tool, so an extra archive holds all of them.
+# Each extra tool listed above must be in the extra archive, which
+# check_archive has already required wherever components.tsv gives it one.
 if [[ -d $output_dir-extra ]]; then
     for binary in "${!extra_smoke[@]}"; do
         [[ -x $output_dir-extra/$binary ]] || {
@@ -577,13 +585,11 @@ PY
     done
     "${runner[@]}" "$output_dir/tmux" -S "$scratch/tmux" kill-server || true
     [[ $tmux_output == *statics-42* ]] || failed "tmux session"
-    check_output "stunnel $(pinned_version stunnel)" "$output_dir/stunnel" -version
-    check_output "OpenVPN $(pinned_version openvpn)" "$output_dir/openvpn" --version
     # A static key, then OpenVPN's own loopback encrypt and decrypt with
     # it: OpenSSL's ciphers and OpenVPN's packet code on every byte order.
-    "${runner[@]}" "$output_dir/openvpn" --genkey secret "$scratch/static.key" >/dev/null ||
+    "${runner[@]}" "$output_dir-extra/openvpn" --genkey secret "$scratch/static.key" >/dev/null ||
         failed "openvpn --genkey"
-    check_output "self-test mode SUCCEEDED" "$output_dir/openvpn" --test-crypto --secret "$scratch/static.key" \
+    check_output "self-test mode SUCCEEDED" "$output_dir-extra/openvpn" --test-crypto --secret "$scratch/static.key" \
         --cipher AES-256-CBC --verb 1
     # microsocks has no version flag; its usage proves it started.
     microsocks_output=$("${runner[@]}" "$output_dir/microsocks" -h 2>&1) || true

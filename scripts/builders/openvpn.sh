@@ -39,7 +39,7 @@ build_openvpn() {
             CFLAGS="$STATIC_CFLAGS" \
             LDFLAGS="$STATIC_LDFLAGS"
         run_make
-        install_binary src/openvpn/openvpn openvpn
+        install_component_binary openvpn src/openvpn/openvpn openvpn
         # COPYING carries the OpenSSL and Apache-2.0 linking exceptions;
         # base64.c is BSD-3-Clause, with its notice in its header.
         awk '/^#/ { exit } { print }' src/openvpn/base64.c > OPENVPN-NOTICES

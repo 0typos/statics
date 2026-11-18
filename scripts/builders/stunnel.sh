@@ -23,6 +23,6 @@ build_stunnel() {
             CFLAGS="$STATIC_CFLAGS" \
             LDFLAGS="$STATIC_LDFLAGS"
         run_make -C src stunnel
-        install_binary src/stunnel stunnel
+        install_component_binary stunnel src/stunnel stunnel
     )
 }

@@ -39,7 +39,8 @@ package "$arch" "statics-$arch" -6
 rm -f "$repo_root/dist/statics-extra-$arch".*
 if [[ -d $repo_root/dist/$arch-extra ]]; then
     # xz -9's 64 MiB window spans all the Go tools, which share most of
-    # their runtime and modules: about 30% smaller than -6 for the extra
-    # archive, at 65 MiB of memory to decompress.
+    # their runtime and modules, and stunnel's and openvpn's OpenSSL:
+    # about 30% smaller than -6 for the extra archive, at 65 MiB of memory
+    # to decompress.
     package "$arch-extra" "statics-extra-$arch" -9
 fi
