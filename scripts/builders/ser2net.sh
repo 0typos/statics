@@ -28,7 +28,10 @@ build_gensio() {
         # Unix sockets, serial devices and ptys, telnet with RFC 2217,
         # stdio, files, and the small helpers ser2net's defaults name. No
         # TLS (OpenSSL) or certauth, SCTP, mDNS, sound, IPMI SOL, AX.25,
-        # radio modems, or language bindings.
+        # radio modems, or language bindings. -UNDEBUG keeps assert():
+        # Zig defines NDEBUG when optimizing, and ll_fd.c restarts its
+        # timer inside an assert, so without it a serial port never
+        # finished closing and ser2net stopped accepting connections.
         local gensios=(
             --with-all-gensios=no
             --with-net=yes --with-dgram=yes --with-stdio=yes --with-pty=yes
@@ -59,7 +62,7 @@ build_gensio() {
             --with-python=no \
             --with-go=no \
             --with-tcp-wrappers=no \
-            CFLAGS="$STATIC_CFLAGS" \
+            CFLAGS="$STATIC_CFLAGS -UNDEBUG" \
             LDFLAGS="$STATIC_LDFLAGS"
         run_make -C lib
         # Not lib install: its hook expects a dynamic-module directory.

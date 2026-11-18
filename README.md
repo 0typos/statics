@@ -42,7 +42,7 @@ user-mode emulation proves that non-native outputs can actually start.
 
 | 🧰 Carry it | 🐧 Run it | 🔐 Trust it |
 |---|---|---|
-| 116 physical executables, plus BusyBox, Dropbear, kmod, iptables and decompressor links, and four larger Go tools in an optional extra archive | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
+| 125 physical executables, plus BusyBox, Dropbear, kmod, iptables and decompressor links, and four larger Go tools in an optional extra archive | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
 | Network, process, namespace, storage and hardware diagnosis | Static musl builds avoid a dependency on the target's libc | Deterministic archives, QEMU smoke tests and release attestations |
 
 ## Get a kit
@@ -65,7 +65,7 @@ Not sure which archive fits the device? Start with the
 ### Main and extra archives
 
 Each architecture has two archives. **`statics-<arch>.tar.xz` is the kit**:
-every tool below, about 14 to 18 MiB, and it is all most sessions need.
+every tool below, about 19 to 23 MiB (20.6 MiB on `x86_64`, 22.4 MiB on `mips`), and it is all most sessions need.
 **`statics-extra-<arch>.tar.xz` is optional** and holds four Go tools that
 together weigh about as much as the whole main kit: `rclone`, `croc`, `crictl`
 and `ctr`. Splitting them out keeps the main kit small enough for routers and
@@ -76,7 +76,7 @@ SBOM and notices, and exists for every target except `powerpc` and
 `powerpc64`, where Go does not run (see the
 [architecture guide](docs/ARCHITECTURES.md#go-tools)).
 
-Extra archive sizes for the current pins (the `x86_64` main kit is 16.3 MiB):
+Extra archive sizes for the current pins (the `x86_64` main kit is 20.6 MiB):
 
 | target | extra archive |
 |---|---|
@@ -145,7 +145,7 @@ data and safe starting commands.
 
 ## Inside the case
 
-The bundle contains 116 physical executables (115 on `powerpc` and `powerpc64`, which get no
+The bundle contains 125 physical executables (124 on `powerpc` and `powerpc64`, which get no
 Go tools) plus BusyBox, Dropbear, kmod and iptables multi-call links, decompressor links such as `unxz`,
 Nmap runtime data, checksums, an SPDX SBOM and upstream license texts.
 

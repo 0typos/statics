@@ -1,7 +1,7 @@
 # Toolkit guide
 
-The default bundle is a compact Linux troubleshooting kit: 116 physical
-executables (115 on `powerpc` and `powerpc64`, which have no Go tools),
+The default bundle is a compact Linux troubleshooting kit: 125 physical
+executables (124 on `powerpc` and `powerpc64`, which have no Go tools),
 BusyBox applet links, Dropbear, kmod, and iptables multi-call links, decompressor links, Nmap runtime
 data, license texts, checksums, and build metadata. Static linking removes the
 dependency on a target's installed libc; it does not replace kernel features,
@@ -1159,12 +1159,16 @@ left out, and the two tools that link OpenSSL use the bundle's static
   authoritative zones, kernel ipsets, loop detection, inotify, and packet
   dumps. No DNSSEC (nettle and GMP), IDN (libidn2), D-Bus, ubus, Lua scripts,
   conntrack marking, or nftables sets.
-- `ser2net` links gensio and libyaml, which together add about 400 KB. gensio
+- `ser2net` links gensio and libyaml statically and is about 520 KB on
+  `x86_64`, so gensio does not make it heavy. gensio
   is built with only the network (TCP, UDP, and Unix sockets), serial
   device, pty, telnet with RFC 2217, stdio, file, and helper gensios, all
   compiled in. No TLS or certificate authentication (it would be a third
   OpenSSL user), SCTP, mDNS, sound, IPMI serial-over-LAN, AX.25, or language
   bindings; no PAM for its admin interface, and no sysfs LED support.
+  gensio keeps its assertions: one of them restarts the timer that
+  finishes closing a serial port, and without it ser2net stopped accepting
+  connections after the first client left.
 - `testssl.sh` is upstream's script, unmodified, with the data it reads and
   Mozilla's trust store only; the Apple, Java, Linux, and Microsoft stores
   would add about 900 KB to the archive. The `testssl.sh` beside the other
