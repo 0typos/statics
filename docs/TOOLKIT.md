@@ -385,7 +385,8 @@ dhcpdump -i eth0
 dhcpdump -r capture.pcap
 ```
 
-`ngrep` greps payloads with a BPF filter, live or from a capture.
+`ngrep` greps payloads with a BPF filter, live or from a capture; add `-l`
+when piping its output, which is otherwise buffered.
 `dhcpdump` decodes DHCP requests and replies, including options.
 
 `lldpcli` talks to `lldpd`, which must be running. Started in the foreground
@@ -443,9 +444,12 @@ arptables-legacy -L
 ipset list
 ```
 
-Their rules and nft's coexist in the kernel and both apply. `iptables-legacy`
-takes `/run/xtables.lock`, and `ebtables-legacy` creates
-`/var/lib/ebtables/lock`. Changing or restoring rules can cut off access to
+Their rules and nft's coexist in the kernel and both apply. The kernel needs
+the legacy modules (`ip_tables`, `iptable_filter`, and so on), which
+`iptables-legacy` asks `modprobe` to load. `iptables-legacy` takes
+`/run/xtables.lock`, and `ebtables-legacy` creates `/var/lib/ebtables/lock`
+and reads Ethernet protocol names from `/etc/ethertypes`; without that file,
+give numbers (`-p 0x0800`). Changing or restoring rules can cut off access to
 the host.
 
 ### NIC, switch, and RDMA devices
@@ -858,7 +862,9 @@ links libcap, libidn2, OpenSSL, or a PCRE library.
   `tcpliveplay`, or `tcpcapinfo`, no fragroute, netmap, XDP, or io_uring
   transmit, and no tcpdump-decoded verbose output (`-v`).
 - `dhcpdump` is built without its interactive session tracker (`-t`) and
-  its yascreen dependency.
+  its yascreen dependency. A repository patch spells its capture filter's
+  ports as 67 and 68, since a target may have no `/etc/services` to resolve
+  `bootps` and `bootpc`.
 - iproute2 adds `nstat`, `devlink`, and `rdma` from the same build.
 - Not included: `tcpflow`, which needs Boost.
 

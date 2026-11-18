@@ -38,9 +38,12 @@ build_ebtables() {
         # ebtables-legacy with libebtc and its extensions linked in. The
         # extensions register themselves from constructors that nothing
         # references, so the static libebtc is linked whole. The Perl save
-        # script is not shipped.
+        # script is not shipped. Ethernet protocol names come from
+        # /etc/ethertypes when the target has one.
         CC="$CC" AR="$AR" RANLIB="$RANLIB" ./configure \
             --host="$AUTOCONF_HOST" \
+            --prefix=/usr \
+            --sysconfdir=/etc \
             --enable-static \
             --disable-shared \
             CFLAGS="$STATIC_CFLAGS" \

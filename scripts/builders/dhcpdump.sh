@@ -4,6 +4,7 @@ build_dhcpdump() {
     echo "==> building dhcpdump"
     (
         cd "$WORK_DIR/dhcpdump" || exit
+        patch -s -p1 < "$REPO_ROOT/patches/dhcpdump-numeric-ports.patch"
         # NO_TUI drops the interactive session tracker (-t) and its yascreen
         # dependency; the packet dump itself is unchanged. The Makefile adds
         # its own flags to CFLAGS from the environment; LDFLAGS on the
