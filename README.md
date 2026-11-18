@@ -42,7 +42,7 @@ user-mode emulation proves that non-native outputs can actually start.
 
 | 🧰 Carry it | 🐧 Run it | 🔐 Trust it |
 |---|---|---|
-| 91 physical executables, plus BusyBox, Dropbear, kmod and decompressor links, and four larger Go tools in an optional extra archive | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
+| 116 physical executables, plus BusyBox, Dropbear, kmod, iptables and decompressor links, and four larger Go tools in an optional extra archive | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
 | Network, process, namespace, storage and hardware diagnosis | Static musl builds avoid a dependency on the target's libc | Deterministic archives, QEMU smoke tests and release attestations |
 
 ## Get a kit
@@ -145,16 +145,18 @@ data and safe starting commands.
 
 ## Inside the case
 
-The bundle contains 91 physical executables (90 on `powerpc` and `powerpc64`, which get no
-Go tools) plus BusyBox, Dropbear and kmod multi-call links, decompressor links such as `unxz`,
+The bundle contains 116 physical executables (115 on `powerpc` and `powerpc64`, which get no
+Go tools) plus BusyBox, Dropbear, kmod and iptables multi-call links, decompressor links such as `unxz`,
 Nmap runtime data, checksums, an SPDX SBOM and upstream license texts.
 
 | Area | Outputs | What they are for |
 |---|---|---|
 | Rescue userspace | `busybox`, `nc`, `netcat` | Shell recovery, basic reachability and familiar applet links |
 | Remote access and transfer | `socat`, `ncat`, `rsync`, `dropbear`, `dbclient`, `dropbearkey`, `dropbearconvert`, `scp`, `sftp-server`, `tunpipe`, `tunpipe-standalone`, `pppd` | Relays, emergency SSH with SFTP, IP tunnels over SSH and file movement |
-| Network state and control | `ip`, `ss`, `bridge`, `tc`, `wg`, `wireguard-go`, `ethtool`, `nft`, `conntrack`, `iw` | Interfaces, routes, sockets, policy, WireGuard without the kernel module, connection tracking, Wi-Fi and NIC state |
-| Discovery and packet diagnosis | `nmap`, `tcpdump`, `iperf3`, `mtr`, `mtr-packet` | Services, captures, paths and throughput |
+| Network state and control | `ip`, `ss`, `bridge`, `tc`, `nstat`, `devlink`, `rdma`, `wg`, `wireguard-go`, `ethtool`, `nft`, `conntrack`, `ipset`, `iw` | Interfaces, routes, sockets, counters, policy, WireGuard without the kernel module, connection tracking, IP sets, Wi-Fi, NIC, switch and RDMA state |
+| Legacy firewalls | `iptables-legacy`, `ip6tables-legacy` (with `-save` and `-restore`), `ebtables-legacy`, `arptables-legacy` | x_tables rules on kernels and firmware without nf_tables |
+| Reachability and path | `ping`, `ping6`, `arping`, `tracepath`, `traceroute`, `traceroute6`, `ndisc6`, `rdisc6`, `rltraceroute6`, `tcptraceroute6`, `mtr`, `mtr-packet` | Unprivileged ping, ARP, path MTU, TCP and UDP traceroute, and IPv6 neighbor and router discovery |
+| Discovery and packet diagnosis | `nmap`, `tcpdump`, `ngrep`, `dhcpdump`, `hping3`, `tcpreplay`, `tcpprep`, `tcprewrite`, `lldpd`, `lldpcli`, `iftop`, `nethogs`, `iperf3` | Services, captures, payload grep, DHCP, crafted probes, capture replay, LLDP neighbors, live bandwidth by host and process, and throughput |
 | HTTP, TLS, DNS and data | `curl`, `openssl`, `drill`, `jq` | Protocol checks and structured output |
 | Compression and archives | `zstd`, `xz`, `bzip2`, `pigz`, `bsdtar`, `bsdcpio`, plus `unzstd`, `zstdcat`, `unxz`, `xzcat`, `bunzip2`, `bzcat`, `unpigz` | Compress and unpack streams; create and extract tar, cpio, zip, 7z and ISO images, and read RAR |
 | Pipe transfer | `pv`, `mbuffer` | Progress, rate limits and buffering for data piped over SSH or a socket |
@@ -179,8 +181,9 @@ The extra archive adds:
 the [toolkit guide](docs/TOOLKIT.md#extra-archive-rclone-croc-crictl-and-ctr)
 lists what is included and shows how to self-host the relay.
 
-Convenience links expose BusyBox applets such as `ping`, `traceroute`, `nslookup`,
-`arping`, `wget`, `ifconfig` and `netstat` without adding extra binary payload.
+Convenience links expose BusyBox applets such as `nslookup`, `wget`, `ifconfig`
+and `netstat` without adding extra binary payload; `ping`, `arping` and `traceroute`
+are the full iputils and traceroute programs.
 
 The portable default deliberately leaves some integrations out. Keep Nmap's packaged
 `share/nmap/` beside the executable, provide curl a trusted CA bundle when the target

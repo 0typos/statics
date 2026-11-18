@@ -1,0 +1,30 @@
+Two stack overflows that Debian's patch set leaves in place. --scan copies
+20 bytes of each ICMP error it receives into an 8-byte ICMP header: any
+ICMP reply during a scan overruns the stack of a process running as root.
+The --rand-dest parser reads up to four characters of each dotted
+component into a four-byte buffer, then a NUL past its end (input such as
+1234.x.x.x); three characters hold any decimal octet or `x`. Both are
+flagged by clang's -Wfortify-source. Not specific to cross-compilation.
+
+--- a/scan.c
++++ b/scan.c
+@@ -456,7 +456,7 @@
+ 				continue;
+ 			/* time to copy headers in a safe place */
+ 			p = packet+linkhdr_size+iphdrlen;
+-			memcpy(&icmp, p, sizeof(subtcp));
++			memcpy(&icmp, p, sizeof(icmp));
+ 			p += sizeof(icmp);
+ 			memcpy(&subip, p, sizeof(ip));
+ 			p += sizeof(ip);
+--- a/send.c
++++ b/send.c
+@@ -41,7 +41,7 @@
+ 	unsigned char ra[4];
+ 	char a[4], b[4], c[4], d[4];
+ 
+-	if (sscanf(targetname, "%4[^.].%4[^.].%4[^.].%4[^.]", a, b, c, d) != 4)
++	if (sscanf(targetname, "%3[^.].%3[^.].%3[^.].%3[^.]", a, b, c, d) != 4)
+ 	{
+ 		fprintf(stderr,
+ 			"wrong --rand-dest target host, correct examples:\n"

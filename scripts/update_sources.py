@@ -589,6 +589,146 @@ def latest_bpftool() -> tuple[str, str]:
     )
 
 
+def latest_iputils() -> tuple[str, str]:
+    return latest_from_github_release(
+        "iputils/iputils",
+        r"(\d{8})",
+        (
+            "https://github.com/iputils/iputils/releases/download/"
+            "{version}/iputils-{version}.tar.xz"
+        ),
+    )
+
+
+def latest_traceroute() -> tuple[str, str]:
+    return latest_from_index(
+        "https://sourceforge.net/projects/traceroute/rss?path=/traceroute",
+        r"traceroute-(\d+\.\d+\.\d+)\.tar\.gz",
+        (
+            "https://downloads.sourceforge.net/project/traceroute/traceroute/"
+            "traceroute-{version}/traceroute-{version}.tar.gz"
+        ),
+    )
+
+
+def latest_ndisc6() -> tuple[str, str]:
+    return latest_from_index(
+        "https://www.remlab.net/files/ndisc6/",
+        r"ndisc6-(\d+\.\d+\.\d+)\.tar\.bz2",
+        "https://www.remlab.net/files/ndisc6/ndisc6-{version}.tar.bz2",
+    )
+
+
+def latest_lldpd() -> tuple[str, str]:
+    # The archive upstream signs is on its own host, not the GitHub release.
+    return latest_from_github_tags(
+        "lldpd/lldpd",
+        r"(\d+\.\d+\.\d+)",
+        "https://media.luffy.cx/files/lldpd/lldpd-{version}.tar.gz",
+    )
+
+
+def latest_netfilter_pub(
+    project: str, pattern: str, extension: str
+) -> tuple[str, str]:
+    return latest_from_index(
+        f"https://www.netfilter.org/pub/{project}/",
+        rf"{re.escape(project)}-({pattern})\.tar\.{extension}",
+        (
+            f"https://www.netfilter.org/pub/{project}/"
+            f"{project}-{{version}}.tar.{extension}"
+        ),
+    )
+
+
+def latest_ngrep() -> tuple[str, str]:
+    return latest_from_github_tags(
+        "jpr5/ngrep",
+        r"v(\d+\.\d+\.\d+)",
+        "https://github.com/jpr5/ngrep/archive/refs/tags/v{version}.tar.gz",
+    )
+
+
+def latest_hping3(part: str) -> tuple[str, str]:
+    # Upstream hping3 is gone; Debian's newest upload is the maintained
+    # line. Both archives are taken from snapshot.debian.org at the time
+    # that upload's patch set was first seen, so the URLs stay valid.
+    package = "https://snapshot.debian.org/mr/package/hping3"
+    version = json.loads(text(f"{package}/"))["result"][0]["version"]
+    files = json.loads(text(f"{package}/{version}/srcfiles?fileinfo=1"))
+    seen = {
+        info["name"]: info["first_seen"]
+        for infos in files["fileinfo"].values()
+        for info in infos
+        if info["archive_name"] == "debian"
+    }
+    patches = f"hping3_{version}.debian.tar.xz"
+    upstream = version.rsplit("-", 1)[0]
+    name = patches if part == "debian" else f"hping3_{upstream}.orig.tar.gz"
+    if patches not in seen or name not in seen:
+        raise RuntimeError(f"hping3 {version} has no {name} in snapshot.debian.org")
+    url = (
+        f"https://snapshot.debian.org/archive/debian/{seen[patches]}"
+        f"/pool/main/h/hping3/{name}"
+    )
+    return (version if part == "debian" else upstream), url
+
+
+def latest_ncurses() -> tuple[str, str]:
+    return latest_from_index(
+        "https://ftp.gnu.org/gnu/ncurses/",
+        r"ncurses-(\d+\.\d+)\.tar\.gz",
+        "https://ftp.gnu.org/gnu/ncurses/ncurses-{version}.tar.gz",
+    )
+
+
+def latest_iftop() -> tuple[str, str]:
+    # 1.0pre4 sorts before 1.0: numbers first, then final over prerelease.
+    index = text("https://pdw.ex-parrot.com/iftop/download/")
+    versions = set(re.findall(r"iftop-(\d+\.\d+(?:pre\d+)?)\.tar\.gz", index))
+    if not versions:
+        raise RuntimeError("no iftop releases found")
+    version = max(
+        versions,
+        key=lambda v: (
+            tuple(int(part) for part in re.split(r"\D+", v.split("pre")[0])),
+            "pre" not in v,
+            int(v.split("pre")[1]) if "pre" in v else 0,
+        ),
+    )
+    return version, f"https://pdw.ex-parrot.com/iftop/download/iftop-{version}.tar.gz"
+
+
+def latest_nethogs() -> tuple[str, str]:
+    return latest_from_github_tags(
+        "raboof/nethogs",
+        r"v(\d+\.\d+\.\d+)",
+        "https://github.com/raboof/nethogs/archive/refs/tags/v{version}.tar.gz",
+    )
+
+
+def latest_tcpreplay() -> tuple[str, str]:
+    return latest_from_github_release(
+        "appneta/tcpreplay",
+        r"v(\d+\.\d+\.\d+)",
+        (
+            "https://github.com/appneta/tcpreplay/releases/download/"
+            "v{version}/tcpreplay-{version}.tar.xz"
+        ),
+    )
+
+
+def latest_dhcpdump() -> tuple[str, str]:
+    return latest_from_github_release(
+        "dhcpdump-org/dhcpdump",
+        r"v(\d+\.\d+)",
+        (
+            "https://github.com/dhcpdump-org/dhcpdump/releases/download/"
+            "v{version}/dhcpdump-{version}.tar.xz"
+        ),
+    )
+
+
 def latest_zig(host: str) -> tuple[str, str]:
     index = json.loads(text("https://ziglang.org/download/index.json"))
     stable = [key for key in index if re.fullmatch(r"\d+\.\d+\.\d+", key)]
@@ -739,6 +879,22 @@ DISCOVERERS: dict[str, Callable[[], tuple[str, str]]] = {
     "kexec-tools": latest_kexec_tools,
     "elfutils": latest_elfutils,
     "bpftool": latest_bpftool,
+    "iputils": latest_iputils,
+    "traceroute": latest_traceroute,
+    "ndisc6": latest_ndisc6,
+    "lldpd": latest_lldpd,
+    "ipset": lambda: latest_netfilter_pub("ipset", r"\d+\.\d+", "bz2"),
+    "iptables": lambda: latest_netfilter("iptables", "xz"),
+    "ebtables": lambda: latest_netfilter_pub("ebtables", r"\d+\.\d+\.\d+", "gz"),
+    "arptables": lambda: latest_netfilter_pub("arptables", r"\d+\.\d+\.\d+", "gz"),
+    "ngrep": latest_ngrep,
+    "hping3": lambda: latest_hping3("orig"),
+    "hping3-debian": lambda: latest_hping3("debian"),
+    "ncurses": latest_ncurses,
+    "iftop": latest_iftop,
+    "nethogs": latest_nethogs,
+    "tcpreplay": latest_tcpreplay,
+    "dhcpdump": latest_dhcpdump,
     "zig-x86_64": lambda: latest_zig("x86_64-linux"),
     "zig-aarch64": lambda: latest_zig("aarch64-linux"),
     "go-x86_64": lambda: latest_go("amd64"),

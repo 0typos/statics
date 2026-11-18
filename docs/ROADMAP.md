@@ -2,7 +2,9 @@
 
 The current bundle covers rescue userspace, relays and remote access, network
 configuration, socket and packet inspection, HTTP/TLS/DNS checks, throughput
-and path diagnosis, firewall policy and connection tracking, Wi-Fi, syscall
+and path diagnosis, payload search, crafted probes and capture replay, live
+bandwidth by host and process, LLDP neighbors, firewall policy (nftables and
+legacy x_tables), IP sets, and connection tracking, Wi-Fi, syscall
 tracing, remote debugging, serial consoles, filesystem, block-device, and raw
 flash diagnosis, kernel modules, kexec, and eBPF inspection, BMC management over IPMI, compression, archives, and
 buffered pipe transfer, JSON processing, and common IoT field buses. The optional extra archive adds object-storage and SFTP sync,
@@ -16,8 +18,11 @@ the [contribution checklist](../CONTRIBUTING.md).
 
 | Area | Tools |
 | --- | --- |
-| Network control | `ip`, `ss`, `bridge`, `tc`, `wg`, `ethtool`, `nft`, `conntrack`, `iw` |
-| Packet, path, and throughput | `tcpdump`, `mtr`, `iperf3` |
+| Network control | `ip`, `ss`, `bridge`, `tc`, `nstat`, `devlink`, `rdma`, `wg`, `ethtool`, `nft`, `conntrack`, `ipset`, `iw` |
+| Legacy firewalls | `iptables-legacy`, `ip6tables-legacy`, `ebtables-legacy`, `arptables-legacy` |
+| Reachability and path | `ping`, `arping`, `tracepath`, `traceroute`, `ndisc6`, `rdisc6`, `rltraceroute6`, `tcptraceroute6`, `mtr` |
+| Packet and throughput | `tcpdump`, `ngrep`, `dhcpdump`, `hping3`, `tcpreplay`, `tcpprep`, `tcprewrite`, `iftop`, `nethogs`, `iperf3` |
+| Link-layer discovery | `lldpd`, `lldpcli` |
 | Application protocols and data | `curl`, `openssl`, `drill`, `jq` |
 | Discovery and transfer | `nmap`, `ncat`, `rsync`, `sftp-server` |
 | Compression and archives | `zstd`, `xz`, `bzip2`, `pigz`, `bsdtar`, `bsdcpio` |
@@ -48,12 +53,14 @@ disruptive.
 | 1 | `usbutils`, `pciutils` | Bus topology, descriptors, and device identification | Package and update hardware ID databases explicitly |
 | 1 | `mmc-utils` | eMMC/SD health, EXT_CSD, and device configuration | Write operations can be destructive; needs real-device tests |
 | 2 | `fio` | Storage and I/O characterization | Larger binary, workload safety, and reproducibility considerations |
-| 3 | `iftop`, `nethogs` | Interactive per-flow or per-process traffic visibility | curses, procfs, capture privileges, and non-interactive testability |
 | 3 | `stress-ng` | CPU, memory, scheduler, and system stress | Large surface and intentionally disruptive workloads |
+| 3 | `tcpflow` | Reassemble TCP streams into files | Needs Boost (C++ headers), a large build dependency for one tool |
 
 Also consider focused variants instead of new binaries:
-compressed Dropbear sessions, interactive/curses mtr, broader curl protocols,
-Nmap NSE/Lua, and rsync ACL/xattr/compression/checksum integrations. Profiles
+compressed Dropbear sessions, interactive/curses mtr (the bundle now builds
+ncurses for iftop and nethogs), broader curl protocols, Nmap NSE/Lua, Nping
+(about 410 KB, mostly another copy of libcrypto), and rsync
+ACL/xattr/compression/checksum integrations. Profiles
 need distinct names and verification so the compact default remains
 predictable.
 
@@ -61,10 +68,12 @@ Before adding a standalone tool, check BusyBox and the existing specialist
 utilities. For example, `drill` already covers DNS queries, `ss` covers most
 socket-listing needs, and `ip` covers modern address/route/link inspection.
 
-BusyBox already provides useful versions of `ping`, `traceroute`, `arping`,
-`nslookup`, `wget`, `telnet`, `ifconfig`, `route`, `netstat`, `dmesg`, `hexdump`,
-`sha256sum`, and many ordinary shell tools. A standalone replacement should
-only be added when its missing functionality justifies the extra payload.
+BusyBox already provides useful versions of `nslookup`, `wget`, `telnet`,
+`ifconfig`, `route`, `netstat`, `dmesg`, `hexdump`, `sha256sum`, and many ordinary
+shell tools. A standalone replacement should only be added when its missing
+functionality justifies the extra payload, as iputils' `ping`, `arping`, and
+`tracepath` and the modern `traceroute` (TCP and UDP modes, unprivileged
+ICMP sockets, path MTU) now replace BusyBox's applets.
 
 ## Selection criteria
 

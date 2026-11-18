@@ -1,0 +1,16 @@
+dhcpdump's capture filter names the DHCP ports bootps and bootpc, which
+libpcap resolves through /etc/services: on a minimal target without that
+file, dhcpdump stops with "pcap_compile: unknown port 'bootpc'". The
+numbers are fixed by RFC 2131. Not specific to cross-compilation.
+
+--- a/main.c
++++ b/main.c
+@@ -30,7 +30,7 @@
+ // expression, and that shift leaks rightward across "or"; a flat list of
+ // alternatives therefore mis-decodes. The deeper level must be *nested* inside
+ // the previous "vlan" group so each shift stays scoped to its own subexpression.
+-#define DHCPFILTER "ip and udp and (src port bootpc or bootps) and (dst port bootpc or bootps)"
++#define DHCPFILTER "ip and udp and (src port 68 or 67) and (dst port 68 or 67)"
+ #define CAPFILTER "(" DHCPFILTER ") or (vlan and ((" DHCPFILTER ") or (vlan and (" DHCPFILTER "))))"
+ 
+ #ifdef NO_TUI // built without the -t TUI (see NO_TUI in the Makefile)
