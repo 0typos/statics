@@ -42,7 +42,7 @@ user-mode emulation proves that non-native outputs can actually start.
 
 | 🧰 Carry it | 🐧 Run it | 🔐 Trust it |
 |---|---|---|
-| 88 physical executables, plus BusyBox, Dropbear and decompressor links, and four larger Go tools in an optional extra archive | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
+| 91 physical executables, plus BusyBox, Dropbear, kmod and decompressor links, and four larger Go tools in an optional extra archive | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
 | Network, process, namespace, storage and hardware diagnosis | Static musl builds avoid a dependency on the target's libc | Deterministic archives, QEMU smoke tests and release attestations |
 
 ## Get a kit
@@ -145,8 +145,8 @@ data and safe starting commands.
 
 ## Inside the case
 
-The bundle contains 88 physical executables (87 on `powerpc` and `powerpc64`, which get no
-Go tools) plus BusyBox and Dropbear multi-call links, decompressor links such as `unxz`,
+The bundle contains 91 physical executables (90 on `powerpc` and `powerpc64`, which get no
+Go tools) plus BusyBox, Dropbear and kmod multi-call links, decompressor links such as `unxz`,
 Nmap runtime data, checksums, an SPDX SBOM and upstream license texts.
 
 | Area | Outputs | What they are for |
@@ -161,6 +161,7 @@ Nmap runtime data, checksums, an SPDX SBOM and upstream license texts.
 | Serial console and transfer | `picocom`, `sz`, `rz` | Serial consoles and ZMODEM file transfer over a serial or terminal session |
 | Process and storage diagnosis | `strace`, `lsof`, `gdbserver`, `e2fsck`, `dumpe2fs`, `tune2fs`, `mke2fs`, `smartctl`, `nvme` | Syscalls, open files, remote debugging, filesystems and device health |
 | Disks, mounts and kernel log | `lsblk`, `blkid`, `sfdisk`, `losetup`, `mount`, `umount`, `dmesg` | Block devices, partition tables, loop devices, mounts and kernel messages |
+| Kernel modules, boot and BPF | `kmod`, `modinfo`, `lsmod`, `insmod`, `rmmod`, `modprobe`, `depmod`, `kexec`, `bpftool` | Find and load drivers (compressed modules too), boot straight into a rescue kernel (so far tested only to start), and list eBPF programs and maps |
 | Flash and out-of-band management | `flash_erase`, `flashcp`, `nanddump`, `nandwrite`, `mtdinfo`, `ubi*`, `ipmitool` | Raw NOR/NAND flash, UBI volumes and BMCs over IPMI |
 | Namespaces and privilege | `nsenter`, `unshare`, `lsns`, `setpriv`, `findmnt` | Enter, create, inspect and constrain Linux execution contexts |
 | CAN and ISO-TP | `candump`, `cansend`, `cangen`, `canplayer`, `cansniffer`, `isotp*`, `slcand`, `canbusload` | Field and vehicle networks |

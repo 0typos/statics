@@ -118,12 +118,35 @@ copy_license pv docs/COPYING
 copy_license mbuffer LICENSE
 copy_license libarchive COPYING
 copy_license libarchive LIBARCHIVE-BSD-NOTICES
+copy_license kmod COPYING
+copy_license kmod tools/COPYING
+copy_license kexec-tools COPYING
+copy_license kexec-tools KEXEC-TOOLS-NOTICES
+# elfutils' COPYING is the GPLv3, which the LGPLv3 builds on.
+copy_license elfutils COPYING
+copy_license elfutils COPYING-GPLV2
+copy_license elfutils COPYING-LGPLV3
+copy_license elfutils ELFUTILS-ELF-H-NOTICE
+copy_license bpftool LICENSE
+copy_license bpftool LICENSE.BSD-2-Clause
+copy_license bpftool LICENSE.GPL-2.0
+copy_license bpftool libbpf/LICENSE
+copy_license bpftool libbpf/LICENSE.BSD-2-Clause
+copy_license bpftool libbpf/LICENSE.LGPL-2.1-only
 copy_license wireguard-go LICENSE
 copy_license rclone COPYING
 copy_license croc LICENSE
 copy_license cri-tools LICENSE
 copy_license containerd LICENSE
 copy_license containerd NOTICE
+
+# glibc's elf.h, in kexec-tools (LGPL-2.0-or-later) and elfutils
+# (LGPL-2.1-or-later), comes without the LGPL text. kmod's COPYING is the
+# LGPL 2.1, a later version that both permit.
+for source_name in kexec-tools elfutils; do
+    [[ $active == *" $source_name "* ]] || continue
+    install -D -m 0644 "$source_root/kmod/COPYING" "$license_root/$source_name/LGPL-2.1"
+done
 
 # Go's runtime and standard library come from the toolchain that linked them.
 if [[ $active == *" go "* ]]; then

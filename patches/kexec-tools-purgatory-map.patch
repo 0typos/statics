@@ -1,0 +1,15 @@
+Link kexec's purgatory without a linker map. Upstream passes -Wl,-Map to the
+compiler driver for a map file nothing reads, and zig cc rejects -Map as an
+unsupported linker argument. The purgatory object itself is unchanged.
+--- a/purgatory/Makefile
++++ b/purgatory/Makefile
+@@ -62,8 +62,7 @@
+ 			-I$(shell $(CC) -print-file-name=include)
+ $(PURGATORY): LDFLAGS=$($(ARCH)_PURGATORY_EXTRA_CFLAGS)\
+ 			-Wl,--no-undefined -nostartfiles -nostdlib \
+-			-nodefaultlibs -e purgatory_start -r \
+-			-Wl,-Map=$(PURGATORY_MAP)
++			-nodefaultlibs -e purgatory_start -r
+ 
+ $(PURGATORY): $(PURGATORY_OBJS)
+ 	$(MKDIR) -p $(@D)

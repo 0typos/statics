@@ -16,6 +16,40 @@ run_make() {
     fi
 }
 
+# A meson cross file for this target, for the meson-built components.
+meson_cross_file() {
+    local out=$1 family endian
+    case "$STATICS_ARCH" in
+        x86_64)                family=x86_64;  endian=little ;;
+        i686)                  family=x86;     endian=little ;;
+        aarch64)               family=aarch64; endian=little ;;
+        armv6-hardfloat|armv7-hardfloat|armv7-softfloat)
+                               family=arm;     endian=little ;;
+        mips)                  family=mips;    endian=big ;;
+        mipsel)                family=mips;    endian=little ;;
+        powerpc)               family=ppc;     endian=big ;;
+        powerpc64)             family=ppc64;   endian=big ;;
+        powerpc64le)           family=ppc64;   endian=little ;;
+        riscv64)               family=riscv64; endian=little ;;
+        s390x)                 family=s390x;   endian=big ;;
+        *) echo "no meson cpu_family mapping for $STATICS_ARCH" >&2; exit 1 ;;
+    esac
+    cat > "$out" <<EOF
+[binaries]
+c = '$CC'
+cpp = '$CXX'
+ar = '$AR'
+ranlib = '$RANLIB'
+pkg-config = 'pkg-config'
+
+[host_machine]
+system = 'linux'
+cpu_family = '$family'
+cpu = '$family'
+endian = '$endian'
+EOF
+}
+
 install_binary() {
     local source=$1
     local destination=$2

@@ -54,6 +54,10 @@ pigz|2.8|eb872b4f0e1f0ebe59c9f7bd8c506c4204893ba6a8492de31df416f0d5170fd0|https:
 pv|1.12.7|5326ed7ee95ef18039390c0b17891ac28985ac7c7a4235070fab767c1fe37bd8|https://codeberg.org/ivarch/pv/releases/download/v1.12.7/pv-1.12.7.tar.gz
 mbuffer|20261024|ed9b717f9517b0ad0a0c1fb42c809dfb615db442833b7b5c8442e224b45d86bf|https://www.maier-komor.de/software/mbuffer/mbuffer-20261024.tgz
 libarchive|3.8.11|a3dc0872b1b39da34dc18ef1b944f0f11ffd37425d70ae04be679279f1cf43d2|https://github.com/libarchive/libarchive/releases/download/v3.8.11/libarchive-3.8.11.tar.xz
+kmod|34.3|985554de49c21a58abd68c6cda2251384e1e5bb08b3b14c7f02b51f4c90c2958|https://cdn.kernel.org/pub/linux/utils/kernel/kmod/kmod-34.3.tar.xz
+kexec-tools|2.0.32|8f81422a5fd2362cf6cb001b511e535565ed0f32c2f4451fb5eb68fed6710a5d|https://cdn.kernel.org/pub/linux/utils/kernel/kexec/kexec-tools-2.0.32.tar.xz
+elfutils|0.197|1fdf525f22dcf796d99a99ba3ea00a1f7b1ae5421bc62e8443a708920b99b904|https://sourceware.org/elfutils/ftp/0.197/elfutils-0.197.tar.bz2
+bpftool|7.8.1|fed76b7acb54d810cc3982eb6394726010114977542fd146695887a7d904b60c|https://github.com/libbpf/bpftool/releases/download/v7.8.1/bpftool-libbpf-v7.8.1-sources.tar.gz
 go|1.27.4|73cfb8571aec0c01177687db87163d46aa20e9779672772891aa17654d9a6099|https://dl.google.com/go/go1.27.4.src.tar.gz
 wireguard-go|0.0.20250522|70d0448d289a691978920f615c687864c3d7b0379d6f974e4f3590487dff35f7|https://github.com/WireGuard/wireguard-go/archive/refs/tags/0.0.20250522.tar.gz
 rclone|1.76.0|fa2b2e4ae56c4f1b91102285b736596e2a028be77cb2aaa5a0df53f3a7fc5902|https://github.com/rclone/rclone/releases/download/v1.76.0/rclone-v1.76.0.tar.gz
