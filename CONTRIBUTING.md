@@ -156,7 +156,15 @@ The updater downloads the proposed archive to compute its SHA-256, and for
 rclone, croc, and zstd rejects it unless the release's own checksum file lists
 that digest. Check rclone's PGP-signed `SHA256SUMS` with
 `gpg --verify SHA256SUMS` against the key published at
-<https://rclone.org/KEYS>, and the signed tags of rclone and containerd. Review
+<https://rclone.org/KEYS>, and the signed tags of rclone and containerd.
+stunnel's release must also match its published `.sha256`. Verify the
+detached PGP signatures upstream publishes for libevent (Nick Mathewson,
+`7A02B3521DC75C542BA015456AFEE6D49E92B601`), stunnel (Michał Trojnara,
+`2BC7E4E67E3CC0C1BEA72F8C2EFC7FF0D416E014`), OpenVPN (security@openvpn.net,
+`33DA8C9EAE0EAE8C73172C10822F6DF096D04874`), dnsmasq (Simon Kelley,
+`D6EACBD6EE46B834248D111215CDDA6AE19135A2`), and bash (Chet Ramey,
+`7C0135FB088AAF6C66C650B9BB5869F064EA74AB`), for example with keys
+fetched from `hkps://keyserver.ubuntu.com`. Review
 upstream release notes, published checksums, signatures when available,
 license changes, and archive provenance. Then run the relevant builds and
 verification. A new digest is not evidence by itself that an update is safe.

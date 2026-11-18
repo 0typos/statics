@@ -141,16 +141,20 @@ Dropbear, the iproute2 tools, WireGuard, OpenSSL, tcpdump, curl, iperf3,
 ethtool, strace, jq, drill, mtr, i2c-tools, Nmap/Ncat, rsync, lsof, the
 util-linux tools, sftp-server, conntrack, ipmitool, iw, the MTD and UBI
 tools, kmod, kexec, bpftool, iputils, traceroute, ndisc6, lldpd, ipset, the
-legacy iptables, ebtables, and arptables, hping3, iftop, nethogs, and
-`wireguard-go`, runs zstd, xz, bzip2, pigz,
+legacy iptables, ebtables, and arptables, hping3, iftop, nethogs, stunnel,
+microsocks, tinyproxy, ser2net, and `wireguard-go`, runs zstd, xz, bzip2, pigz,
 bsdtar's filters, pv, and mbuffer through a compress-and-restore round trip,
-has `modinfo` read a module plain and gzip-, xz-, and zstd-compressed, and
+has `modinfo` read a module plain and gzip-, xz-, and zstd-compressed,
 has dhcpdump, ngrep, tcpprep, tcprewrite, and tcpdump decode and rewrite a
-generated capture. Every
-physical executable, including the CAN,
+generated capture, starts a tmux session and reads its pane back, runs
+OpenVPN's crypto self-test with a fresh static key, has dnsmasq check a
+DHCP and TFTP configuration, and runs a bash script with arrays, regular
+expressions, and process substitution. The `testssl.sh` wrapper, a script
+that starts the bundled `openssl` and BusyBox, runs only natively. Every
+other physical executable, including the CAN,
 ISO-TP, and SPI utilities, is checked for static linkage and the absence of a
-dynamic program interpreter. Nmap's runtime data files are checksum-verified
-separately. QEMU is an instruction/ABI smoke test, not proof that privileged
+dynamic program interpreter. Nmap's and testssl.sh's runtime data files are
+checksum-verified separately. QEMU is an instruction/ABI smoke test, not proof that privileged
 networking, namespace entry, or procfs inspection works on a real kernel and
 device.
 

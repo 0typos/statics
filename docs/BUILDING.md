@@ -132,7 +132,7 @@ is:
 ```text
 aarch64/
 ├── busybox, nmap, ncat, rsync, lsof, ...
-├── share/nmap/
+├── share/nmap/, share/testssl/
 ├── licenses/<upstream>/
 ├── BUILDINFO
 ├── BUILD_RECIPES_LICENSE
@@ -148,7 +148,8 @@ tool as read from its own build info, and each module's license and notice
 files under `licenses/<tool>/modules/<module>@<version>/`. The Go runtime's
 notices are under `licenses/go/`.
 
-`SHA256SUMS` covers all executable payloads and Nmap runtime data.
+`SHA256SUMS` covers all executable payloads and the Nmap and testssl.sh
+runtime data under `share/`.
 `SBOM.spdx.json` records the same payload plus its upstream package
 relationships. License texts and build metadata remain alongside the payload
 but are not entries in `SHA256SUMS`.

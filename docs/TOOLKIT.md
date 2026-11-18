@@ -36,7 +36,11 @@ Nmap data, notices, and licenses remain available.
 | Protocol and data checks | `curl`, `openssl`, `drill`, `jq`, `rsync` | HTTP, TLS, DNS, structured output, and efficient file transfer |
 | Compression and archives | `zstd`, `xz`, `bzip2`, `pigz`, `bsdtar`, `bsdcpio`; `unzstd`, `zstdcat`, `unxz`, `xzcat`, `bunzip2`, `bzcat`, `unpigz` | Stream compression, and tar, cpio, zip, 7z, ISO 9660, and ar archives; RAR read-only |
 | Pipe transfer | `pv`, `mbuffer` | Progress and rate limits on a pipe, and a large buffer that keeps a stream moving across stalls |
-| Serial console and transfer | `picocom`, `sz`, `rz` | Serial terminal sessions and XMODEM/YMODEM/ZMODEM file transfer |
+| Serial console and transfer | `picocom`, `sz`, `rz`, `ser2net` | Serial terminal sessions, XMODEM/YMODEM/ZMODEM file transfer, and a serial port shared over TCP or RFC 2217 |
+| Sessions and shells | `tmux`, `bash` | Sessions that survive a dropped connection, and bash for scripts and interactive use |
+| TLS wrapping, VPN, and proxies | `stunnel`, `openvpn`, `microsocks`, `tinyproxy` | TLS around plain TCP services, OpenVPN clients and servers, and SOCKS5 and HTTP/HTTPS proxies |
+| Netboot and DHCP rescue | `dnsmasq` | DHCP, DNS, and TFTP for an isolated link or a network boot |
+| TLS auditing | `testssl.sh` | Protocols, ciphers, certificates, and known TLS vulnerabilities of a server (a script; see below) |
 | Process diagnosis | `strace`, `lsof`, `gdbserver` | System-call tracing, process/file/socket correlation, and remote debugging with a host GDB |
 | Filesystems and storage | `lsblk`, `blkid`, `sfdisk`, `losetup`, `mount`, `umount`, `e2fsck`, `dumpe2fs`, `tune2fs`, `mke2fs`; `fsck.ext2`, `fsck.ext3`, `fsck.ext4`, `mkfs.ext4`; `smartctl`, `nvme` | Block-device and partition inventory, loop devices, mounts, ext filesystem inspection and repair, drive health, and NVMe diagnosis |
 | Kernel log | `dmesg` | Kernel ring buffer with levels, facilities, and readable timestamps |
@@ -468,6 +472,248 @@ rdma resource show
 reporters, firmware versions (`devlink dev info`), and parameters. `rdma`
 lists InfiniBand, RoCE, and iWARP links and their resources.
 
+## Sessions, tunnels, and services
+
+These stand up the small services a broken network or a bare device lacks.
+Every listener here is reachable by anything that can reach its address:
+bind to loopback or a link you control, and stop it when the session ends.
+Ports below 1024 need root or `CAP_NET_BIND_SERVICE`.
+
+### Persistent sessions: tmux and bash
+
+A `tmux` session keeps running when the SSH connection drops; reattach to
+it from the next login:
+
+```console
+tmux new-session -s rescue
+tmux attach-session -t rescue
+tmux list-sessions
+```
+
+Detach with `C-b d`. `tmux` starts `$SHELL`, or `/bin/sh` when it is unset;
+`SHELL="$TOOLKIT/bash" tmux new-session -s rescue` gives every window the
+bundled `bash`. Its ncurses has no terminfo database: the client's `TERM`
+must be one of the descriptions compiled in (`ansi`, `dumb`, `linux`,
+`vt100`, `vt220`, `xterm`, `xterm-256color`, `screen`, `screen-256color`,
+`tmux`, or `tmux-256color`), so connect with `TERM=xterm-256color` from a
+terminal that sets another. Panes get `TERM=screen`, the description a
+target's own programs are likeliest to know; on a target that has
+`tmux-256color`, `tmux set-option -g default-terminal tmux-256color` gives
+them italics and true colour. The server's socket is under
+`/tmp/tmux-UID/` (`TMUX_TMPDIR` moves it), and sessions are not recorded in
+`utmp`.
+
+`bash` is there for scripts that need it, such as `testssl.sh`, and for an
+interactive shell with line editing and history where the target has only
+BusyBox `ash`. It reads no system-wide startup file of its own; `/etc/profile`
+and `~/.bashrc` apply as usual. `help` and programmable completion
+(`complete`) are not built.
+
+### TLS wrapping: stunnel
+
+`stunnel` adds TLS to a plain TCP service or lets a plain client reach a
+TLS one. It reads a configuration file (the default is
+`/etc/stunnel/stunnel.conf`); `foreground = yes` and an empty `pid =` keep
+it from detaching and from writing under `/var/run`. Serve a plain service
+on port 8080 as TLS on 8443:
+
+```ini
+foreground = yes
+pid =
+
+[web]
+accept = 8443
+connect = 127.0.0.1:8080
+cert = /tmp/server.crt
+key = /tmp/server.key
+```
+
+```console
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -days 7 \
+    -subj /CN=device -keyout /tmp/server.key -out /tmp/server.crt
+stunnel /tmp/stunnel.conf
+```
+
+The bundled `openssl` needs `-config` pointing at any readable
+configuration file (`$TOOLKIT/share/testssl/etc/openssl.cnf` will do) on a
+target without `/etc/ssl/openssl.cnf`. In the other direction, a service
+with `client = yes`, `accept = 127.0.0.1:2525`, and `connect =
+mail.example.com:465` lets a plain client use `127.0.0.1:2525`; add
+`verifyChain = yes`, `CAfile`, and `checkHost` to check the server's
+certificate, which stunnel does not do by default. Each connection is
+handled by its own process (fork mode).
+
+### VPN: openvpn
+
+`openvpn` is a client and a server for OpenVPN 2 peers and existing
+`.ovpn` profiles:
+
+```console
+openvpn --config client.ovpn
+```
+
+It needs `CAP_NET_ADMIN` and the TUN device, which many minimal systems
+lack. Load the driver and create the node if `/dev/net/tun` is missing:
+
+```console
+modprobe tun
+mkdir -p /dev/net
+mknod /dev/net/tun c 10 200
+chmod 600 /dev/net/tun
+```
+
+It configures addresses and routes itself over netlink, so no `ip` or
+`ifconfig` is needed. For a quick point-to-point link between two hosts
+without a CA, give each side a self-signed certificate and pin the other's
+fingerprint:
+
+```console
+# Each side
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -days 7 \
+    -subj /CN=$(hostname) -keyout vpn.key -out vpn.crt
+openssl x509 -in vpn.crt -noout -fingerprint -sha256
+# Server, 192.0.2.1
+openvpn --dev tun --proto udp --port 1194 --ifconfig 10.8.0.1 10.8.0.2 \
+    --tls-server --dh none --cert vpn.crt --key vpn.key --peer-fingerprint CLIENT_SHA256
+# Client
+openvpn --dev tun --proto udp --remote 192.0.2.1 1194 --ifconfig 10.8.0.2 10.8.0.1 \
+    --tls-client --cert vpn.crt --key vpn.key --peer-fingerprint SERVER_SHA256
+```
+
+Compression is the stub only: a peer that negotiates `compress` or sends
+`comp-lzo no` works, but one that actually compresses with LZO or LZ4 does
+not. DNS servers that a server pushes are not applied, since the bundle has
+no `--dns-updown` script; write them to `/etc/resolv.conf` by hand or with
+an `--up` script. See [the profile](#tunnel-session-and-service-tools) for
+what else is left out.
+
+### Quick proxies: microsocks and tinyproxy
+
+`microsocks` is a SOCKS5 server, a few kilobytes in size. With no
+arguments it listens on every address, port 1080, without authentication,
+so give it an address and, off loopback, a user:
+
+```console
+microsocks -i 127.0.0.1 -p 1080
+microsocks -i 192.0.2.10 -p 1080 -u operator -P "$PASSWORD"
+curl --socks5-hostname 127.0.0.1:1080 http://10.0.0.5/
+```
+
+`--socks5-hostname` resolves names on the proxy's side. Over SSH,
+`dbclient -L 1080:127.0.0.1:1080 operator@device` reaches a proxy that
+stays on the device's loopback.
+
+`tinyproxy` is an HTTP proxy that also tunnels HTTPS with `CONNECT`. It
+needs a configuration file; this one serves only loopback:
+
+```text
+Port 8888
+Listen 127.0.0.1
+Allow 127.0.0.1
+ConnectPort 443
+```
+
+```console
+tinyproxy -d -c /tmp/tinyproxy.conf
+curl -x http://127.0.0.1:8888 https://example.com/
+```
+
+`-d` keeps it in the foreground, logging to standard output. `ConnectPort`
+lines limit the ports `CONNECT` may reach (none means all), `Allow` lines
+the clients, and `Upstream http PROXY:PORT` chains it to another proxy.
+
+### Netboot and DHCP rescue: dnsmasq
+
+`dnsmasq` serves DHCP, DNS, and TFTP from one process, enough to give a
+device an address on an isolated link, answer its name lookups, and network
+boot it. Run as root, it drops to the `nobody` user unless told otherwise;
+on a target without that user, add `--user=root`. Name the lease file
+explicitly, since `/var/lib/misc` rarely exists:
+
+```console
+dnsmasq --no-daemon --conf-file=/dev/null --interface=eth1 --bind-interfaces \
+    --dhcp-range=192.168.60.50,192.168.60.150,1h --dhcp-leasefile=/tmp/dnsmasq.leases \
+    --address=/device.lan/192.168.60.1 --log-dhcp
+```
+
+It forwards other queries to the servers in `/etc/resolv.conf`
+(`--no-resolv --server=192.0.2.53` picks one instead). To network-boot a
+device, add a TFTP root and the boot file name:
+
+```console
+dnsmasq --no-daemon --conf-file=/dev/null --interface=eth1 --bind-interfaces \
+    --dhcp-range=192.168.60.50,192.168.60.150,1h --dhcp-leasefile=/tmp/dnsmasq.leases \
+    --enable-tftp --tftp-root=/srv/tftp --dhcp-boot=pxelinux.0
+```
+
+On a network that already has a DHCP server, `--dhcp-range=192.168.60.0,proxy`
+with `--pxe-service` answers only the boot request. `--port=0` turns DNS off.
+A second DHCP server on a shared network takes over clients; use it on a
+link you control. The BusyBox client, `busybox udhcpc -i eth0`, tests it
+from the other end. The interface needs an address in the range's subnet
+first: `ip address add 192.168.60.1/24 dev eth1`.
+
+### Serial over the network: ser2net
+
+`ser2net` exposes a serial port on a TCP port, so a console on a device in
+the rack is reachable from anywhere. It reads YAML (the default file is
+`/etc/ser2net/ser2net.yaml`):
+
+```yaml
+connection: &console
+  accepter: tcp,127.0.0.1,2000
+  connector: serialdev,/dev/ttyUSB0,115200n81,local
+```
+
+```console
+ser2net -n -c /tmp/ser2net.yaml
+```
+
+`-n` keeps it in the foreground. `accepter: telnet(rfc2217),tcp,2000`
+speaks RFC 2217, which lets the client set the baud rate and line control.
+From the other end, `ncat 127.0.0.1 2000` (or `busybox telnet` for the
+telnet accepter) is a raw console. To use the bundled `picocom`, with its
+ZMODEM transfers, turn the TCP port back into a local pseudo-terminal
+first:
+
+```console
+socat pty,link=/tmp/ttyNET,raw,echo=0 tcp:192.0.2.10:2000 &
+picocom -b 115200 /tmp/ttyNET
+```
+
+ser2net has no authentication or TLS in this build: keep the accepter on
+loopback and reach it over SSH, or wrap it with `stunnel`. Opening the
+serial device needs its group (often `dialout`) or root.
+
+### HTTP/2 and TLS auditing: testssl.sh
+
+`testssl.sh` checks a TLS server's protocols, ciphers, certificate, and
+known vulnerabilities, and reports the HTTP/2 (`h2`) it offers through ALPN:
+
+```console
+testssl.sh example.com:443
+testssl.sh --fast --protocols --server-defaults example.com:443
+testssl.sh -t smtp mail.example.com:25
+```
+
+The `testssl.sh` in the bundle's top directory is a wrapper that runs
+upstream's unmodified script (`share/testssl/testssl.sh`) with the bundled
+`bash` and `openssl`, and `drill` for DNS. A full run takes a minute or
+more. It checks certificates against Mozilla's trust store only; add
+another with `--add-ca FILE`.
+
+testssl.sh still needs some of the host's own tools: `dd`, `tr`, `wc`,
+`date`, `cat`, `head`, `tail`, and `dirname` (GNU coreutils or a BSD's),
+and `ps` and `kill` (procps or a BSD's). It refuses BusyBox versions of these
+itself, and BusyBox `date` cannot read OpenSSL's certificate dates, so on a
+BusyBox-only device run it from another host. BusyBox's `hexdump`, `grep`,
+`awk`, and `sed`, which it does accept, fill in for any the host lacks.
+
+The bundle has no HTTP/2 client: `nghttp` and `h2load` are not included
+(see [the profile](#tunnel-session-and-service-tools)), and `curl` is built
+without nghttp2. `openssl s_client -alpn h2 -connect example.com:443` shows
+whether a server negotiates HTTP/2.
+
 ## Default profile and intentional omissions
 
 The recipes favor broad static portability over enabling every optional
@@ -871,6 +1117,68 @@ links libcap, libidn2, OpenSSL, or a PCRE library.
 - iproute2 adds `nstat`, `devlink`, and `rdma` from the same build.
 - Not included: `tcpflow`, which needs Boost.
 
+### Tunnel, session, and service tools
+
+These favor size: every optional dependency that would add a library is
+left out, and the two tools that link OpenSSL use the bundle's static
+3.5 LTS build.
+
+- `tmux` links libevent's core library (no OpenSSL bufferevents, threads,
+  or debug mode) and the bundle's ncurses. No utempter (sessions are not in
+  `utmp`), utf8proc (musl's `wcwidth` decides character widths), systemd
+  cgroups, sixel images, or jemalloc. Its compat code for musl carries
+  BSD and IBM notices, collected into `licenses/tmux/TMUX-NOTICES` and
+  `licenses/tmux/IBM-BASE64`.
+- `bash` is 5.2 with the official patches rolled in (5.2.37); 5.3 would need
+  each of its patches pinned separately. It uses its bundled readline and
+  the bundle's ncurses, and musl's `malloc`. No NLS, programmable
+  completion, `help` builtin, or loadable builtins. On `mips` and `mipsel` it
+  is compiled as position-independent code, which musl's `sigsetjmp` there
+  needs.
+- `stunnel` runs one process per connection (fork mode) on every target:
+  the 32-bit targets' OpenSSL is built without threads, which stunnel's
+  thread mode requires. No TCP wrappers, systemd socket activation, FIPS
+  mode, or the `libstunnel` preload helper, and no `stunnel3` Perl wrapper.
+- `openvpn` is 2.7 with OpenSSL and libcap-ng, which upstream requires on
+  Linux, and uses netlink rather than `ip` for interfaces and routes. Left
+  out: LZO and LZ4 (only the compression stub, for interoperability; both
+  are deprecated and disabled by default in current OpenVPN), data channel
+  offload (it needs libnl and the kernel's `ovpn` module; the userspace data
+  channel is used instead), plugins (no `auth-pam` or `down-root`),
+  PKCS#11, systemd, SELinux, and a default `--dns-updown` script.
+  Management, NTLM proxy authentication, `--fragment`, and `--port-share`
+  are built in. `--secret` static keys still work for `--test-crypto` and
+  old peers, but upstream deprecates them.
+- `microsocks` is upstream's single SOCKS5 server, with its optional
+  user/password and authenticate-once whitelist.
+- `tinyproxy` keeps upstream's defaults: filtering, upstream proxies, reverse
+  proxying, and transparent proxying. Its `hsearch.c`, from musl, is MIT
+  (`licenses/tinyproxy/TINYPROXY-NOTICES`).
+- `dnsmasq` keeps upstream's default feature set, which needs only libc:
+  DNS, DHCPv4, DHCPv6 and router advertisements, TFTP, lease-change scripts,
+  authoritative zones, kernel ipsets, loop detection, inotify, and packet
+  dumps. No DNSSEC (nettle and GMP), IDN (libidn2), D-Bus, ubus, Lua scripts,
+  conntrack marking, or nftables sets.
+- `ser2net` links gensio and libyaml, which together add about 400 KB. gensio
+  is built with only the network (TCP, UDP, and Unix sockets), serial
+  device, pty, telnet with RFC 2217, stdio, file, and helper gensios, all
+  compiled in. No TLS or certificate authentication (it would be a third
+  OpenSSL user), SCTP, mDNS, sound, IPMI serial-over-LAN, AX.25, or language
+  bindings; no PAM for its admin interface, and no sysfs LED support.
+- `testssl.sh` is upstream's script, unmodified, with the data it reads and
+  Mozilla's trust store only; the Apple, Java, Linux, and Microsoft stores
+  would add about 900 KB to the archive. The `testssl.sh` beside the other
+  executables is this repository's wrapper (`configs/testssl.sh`), and
+  `share/testssl/bin/` links BusyBox's `hexdump`, `grep`, `awk`, and `sed`
+  for it. The trust store is MPL-2.0 and the client simulation data CC BY
+  3.0 US; `licenses/testssl.sh/etc/README.md` describes both.
+- Not included: nghttp2's `nghttp` and `h2load`. They are C++ (C++23, so a
+  static libc++), and upstream's build requires libev, c-ares, and zlib
+  besides OpenSSL; each would link its own copy of OpenSSL, about 4 MB
+  uncompressed as `stunnel` shows, for roughly 3 MB more in the archive
+  for an HTTP/2 client and load generator. Linking the C library alone into
+  `curl` (`--http2`) would be the cheap way to add an HTTP/2 client.
+
 ### Connection tracking: conntrack
 
 `conntrack` comes from conntrack-tools with libnetfilter_conntrack,
@@ -1099,6 +1407,8 @@ Exact rules vary by kernel and security policy, but these are common:
 | Query a local BMC | root and `/dev/ipmi0` (`ipmi_devintf`) |
 | Inspect containers, images, and snapshots with `crictl` or `ctr` | root or access to the runtime's socket |
 | Start a listener on a privileged port | root or `CAP_NET_BIND_SERVICE` |
+| Bring up an OpenVPN tunnel | root or `CAP_NET_ADMIN`, and `/dev/net/tun` |
+| Serve DHCP, DNS, or TFTP with `dnsmasq` | root (it binds ports 53, 67, and 69 and writes the ARP cache) |
 
 Do not add capabilities to the whole toolkit directory. If policy permits,
 grant the minimum capability to the minimum executable and remove it after

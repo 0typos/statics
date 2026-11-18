@@ -157,10 +157,13 @@ Nmap runtime data, checksums, an SPDX SBOM and upstream license texts.
 | Legacy firewalls | `iptables-legacy`, `ip6tables-legacy` (with `-save` and `-restore`), `ebtables-legacy`, `arptables-legacy` | x_tables rules on kernels and firmware without nf_tables |
 | Reachability and path | `ping`, `ping6`, `arping`, `tracepath`, `traceroute`, `traceroute6`, `ndisc6`, `rdisc6`, `rltraceroute6`, `tcptraceroute6`, `mtr`, `mtr-packet` | Unprivileged ping, ARP, path MTU, TCP and UDP traceroute, and IPv6 neighbor and router discovery |
 | Discovery and packet diagnosis | `nmap`, `tcpdump`, `ngrep`, `dhcpdump`, `hping3`, `tcpreplay`, `tcpprep`, `tcprewrite`, `lldpd`, `lldpcli`, `iftop`, `nethogs`, `iperf3` | Services, captures, payload grep, DHCP, crafted probes, capture replay, LLDP neighbors, live bandwidth by host and process, and throughput |
-| HTTP, TLS, DNS and data | `curl`, `openssl`, `drill`, `jq` | Protocol checks and structured output |
+| HTTP, TLS, DNS and data | `curl`, `openssl`, `testssl.sh`, `drill`, `jq` | Protocol checks, TLS server audits and structured output |
 | Compression and archives | `zstd`, `xz`, `bzip2`, `pigz`, `bsdtar`, `bsdcpio`, plus `unzstd`, `zstdcat`, `unxz`, `xzcat`, `bunzip2`, `bzcat`, `unpigz` | Compress and unpack streams; create and extract tar, cpio, zip, 7z and ISO images, and read RAR |
 | Pipe transfer | `pv`, `mbuffer` | Progress, rate limits and buffering for data piped over SSH or a socket |
-| Serial console and transfer | `picocom`, `sz`, `rz` | Serial consoles and ZMODEM file transfer over a serial or terminal session |
+| Serial console and transfer | `picocom`, `sz`, `rz`, `ser2net` | Serial consoles, ZMODEM file transfer over a serial or terminal session, and a serial port shared over TCP |
+| Sessions and shells | `tmux`, `bash` | Sessions that survive a dropped SSH connection, and a full bash |
+| TLS wrapping, VPN and proxies | `stunnel`, `openvpn`, `microsocks`, `tinyproxy` | TLS around plain services, OpenVPN client and server, and SOCKS5 and HTTP/HTTPS proxies |
+| Netboot and DHCP rescue | `dnsmasq` | DHCP, DNS and TFTP for an isolated link or a network boot |
 | Process and storage diagnosis | `strace`, `lsof`, `gdbserver`, `e2fsck`, `dumpe2fs`, `tune2fs`, `mke2fs`, `smartctl`, `nvme` | Syscalls, open files, remote debugging, filesystems and device health |
 | Disks, mounts and kernel log | `lsblk`, `blkid`, `sfdisk`, `losetup`, `mount`, `umount`, `dmesg` | Block devices, partition tables, loop devices, mounts and kernel messages |
 | Kernel modules, boot and BPF | `kmod`, `modinfo`, `lsmod`, `insmod`, `rmmod`, `modprobe`, `depmod`, `kexec`, `bpftool` | Find and load drivers (compressed modules too), boot straight into a rescue kernel (so far tested only to start), and list eBPF programs and maps |
@@ -188,7 +191,9 @@ are the full iputils and traceroute programs.
 The portable default deliberately leaves some integrations out. Keep Nmap's packaged
 `share/nmap/` beside the executable, provide curl a trusted CA bundle when the target
 lacks one, and do not expect rsync to preserve ACLs or extended attributes, or bsdtar
-to open AES-encrypted zip archives. Nmap and
+to open AES-encrypted zip archives. `openvpn` needs the kernel's
+`/dev/net/tun`, and `testssl.sh` still needs the host's coreutils and `ps`,
+which BusyBox does not replace for it. Nmap and
 Ncat use the Nmap Public Source License; review their packaged terms before deployment
 or redistribution.
 
