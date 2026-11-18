@@ -9,7 +9,7 @@ build_zstd() {
         local options=(CC="$CC" AR="$AR" RANLIB="$RANLIB" ZSTD_LEGACY_SUPPORT=0
             HAVE_ZLIB=0 HAVE_LZMA=0 HAVE_LZ4=0 BACKTRACE=0)
         run_make -C lib libzstd.a-mt "${options[@]}" CFLAGS="$STATIC_CFLAGS"
-        make -s -C lib install-static install-includes \
+        make -s -C lib install-static install-includes install-pc \
             "${options[@]}" PREFIX="$COMPRESSION_PREFIX"
         # zstd-dll links the CLI against -lzstd, here the static library
         # just built, instead of compiling the library into it again. Like

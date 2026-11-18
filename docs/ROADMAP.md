@@ -4,7 +4,7 @@ The current bundle covers rescue userspace, relays and remote access, network
 configuration, socket and packet inspection, HTTP/TLS/DNS checks, throughput
 and path diagnosis, firewall policy and connection tracking, Wi-Fi, syscall
 tracing, remote debugging, serial consoles, filesystem, block-device, and raw
-flash diagnosis, BMC management over IPMI, compression, archives, and
+flash diagnosis, kernel modules, kexec, and eBPF inspection, BMC management over IPMI, compression, archives, and
 buffered pipe transfer, JSON processing, and common IoT field buses. The optional extra archive adds object-storage and SFTP sync,
 code-phrase file transfer, and container runtime inspection.
 
@@ -27,6 +27,7 @@ the [contribution checklist](../CONTRIBUTING.md).
 | Process diagnosis | `strace`, `lsof`, `gdbserver` |
 | Filesystems and storage | `lsblk`, `blkid`, `sfdisk`, `losetup`, `mount`, `umount`, `e2fsck`, `dumpe2fs`, `tune2fs`, `mke2fs`, `smartctl`, `nvme` |
 | Kernel log | `dmesg` |
+| Kernel modules, boot, and BPF | `kmod` (`modinfo`, `lsmod`, `insmod`, `rmmod`, `modprobe`, `depmod`), `kexec`, `bpftool` |
 | Raw flash and UBI | selected `mtd-utils` programs |
 | Out-of-band management | `ipmitool` |
 | Namespaces and privilege | `nsenter`, `unshare`, `lsns`, `setpriv`, `findmnt` |
@@ -46,7 +47,6 @@ disruptive.
 | --- | --- | --- | --- |
 | 1 | `usbutils`, `pciutils` | Bus topology, descriptors, and device identification | Package and update hardware ID databases explicitly |
 | 1 | `mmc-utils` | eMMC/SD health, EXT_CSD, and device configuration | Write operations can be destructive; needs real-device tests |
-| 2 | `bpftool` | Inspect BPF programs, maps, links, and features | Large kernel-header/libbpf surface and strong kernel coupling |
 | 2 | `fio` | Storage and I/O characterization | Larger binary, workload safety, and reproducibility considerations |
 | 3 | `iftop`, `nethogs` | Interactive per-flow or per-process traffic visibility | curses, procfs, capture privileges, and non-interactive testability |
 | 3 | `stress-ng` | CPU, memory, scheduler, and system stress | Large surface and intentionally disruptive workloads |

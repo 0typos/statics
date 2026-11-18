@@ -550,6 +550,45 @@ def latest_libarchive() -> tuple[str, str]:
     )
 
 
+def latest_kmod() -> tuple[str, str]:
+    return latest_from_index(
+        "https://mirrors.edge.kernel.org/pub/linux/utils/kernel/kmod/",
+        r"kmod-(\d+(?:\.\d+)*)\.tar\.xz",
+        "https://cdn.kernel.org/pub/linux/utils/kernel/kmod/kmod-{version}.tar.xz",
+    )
+
+
+def latest_kexec_tools() -> tuple[str, str]:
+    return latest_from_index(
+        "https://mirrors.edge.kernel.org/pub/linux/utils/kernel/kexec/",
+        r"kexec-tools-(\d+\.\d+\.\d+)\.tar\.xz",
+        (
+            "https://cdn.kernel.org/pub/linux/utils/kernel/kexec/"
+            "kexec-tools-{version}.tar.xz"
+        ),
+    )
+
+
+def latest_elfutils() -> tuple[str, str]:
+    return latest_from_index(
+        "https://sourceware.org/elfutils/ftp/",
+        r'href="(\d+\.\d+)/"',
+        "https://sourceware.org/elfutils/ftp/{version}/elfutils-{version}.tar.bz2",
+    )
+
+
+def latest_bpftool() -> tuple[str, str]:
+    # The release's sources archive bundles the libbpf it was tested with.
+    return latest_from_github_release(
+        "libbpf/bpftool",
+        r"v(\d+\.\d+\.\d+)",
+        (
+            "https://github.com/libbpf/bpftool/releases/download/"
+            "v{version}/bpftool-libbpf-v{version}-sources.tar.gz"
+        ),
+    )
+
+
 def latest_zig(host: str) -> tuple[str, str]:
     index = json.loads(text("https://ziglang.org/download/index.json"))
     stable = [key for key in index if re.fullmatch(r"\d+\.\d+\.\d+", key)]
@@ -696,6 +735,10 @@ DISCOVERERS: dict[str, Callable[[], tuple[str, str]]] = {
     "pv": latest_pv,
     "mbuffer": latest_mbuffer,
     "libarchive": latest_libarchive,
+    "kmod": latest_kmod,
+    "kexec-tools": latest_kexec_tools,
+    "elfutils": latest_elfutils,
+    "bpftool": latest_bpftool,
     "zig-x86_64": lambda: latest_zig("x86_64-linux"),
     "zig-aarch64": lambda: latest_zig("aarch64-linux"),
     "go-x86_64": lambda: latest_go("amd64"),

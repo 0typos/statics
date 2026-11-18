@@ -151,6 +151,10 @@ sources=(
     pv
     mbuffer
     libarchive
+    kmod
+    kexec-tools
+    elfutils
+    bpftool
 )
 
 # STATICS_ONLY_DEPS builds just the shared libraries (the Dockerfile's deps
@@ -236,7 +240,8 @@ dag=$WORK_DIR/dag.mk
         busybox socat dropbear iproute2 wireguard-tools \
         e2fsprogs smartmontools libnvme nvme-cli ppp tunpipe picocom lrzsz gdb \
         sftp-server libnfnetlink libnetfilter_conntrack conntrack ipmitool \
-        mtd-utils libnl iw zlib bzip2 xz zstd pigz pv mbuffer libarchive; do
+        mtd-utils libnl iw zlib bzip2 xz zstd pigz pv mbuffer libarchive \
+        kmod kexec-tools libelf bpftool; do
         printf ' $(S)/%s' "$c"
     done
     if [[ $go_env != none ]]; then
@@ -301,6 +306,10 @@ dag=$WORK_DIR/dag.mk
     emit pv pv build_pv
     emit mbuffer mbuffer build_mbuffer
     emit libarchive libarchive build_libarchive zlib bzip2 xz zstd
+    emit kmod kmod build_kmod zlib xz zstd
+    emit kexec-tools kexec-tools build_kexec_tools zlib
+    emit libelf elfutils build_libelf zlib
+    emit bpftool bpftool build_bpftool libelf
     emit wireguard-go wireguard-go build_wireguard_go
     emit rclone rclone build_rclone
     emit croc croc build_croc

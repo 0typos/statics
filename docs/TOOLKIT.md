@@ -1,8 +1,8 @@
 # Toolkit guide
 
-The default bundle is a compact Linux troubleshooting kit: 88 physical
-executables (87 on `powerpc` and `powerpc64`, which have no Go tools),
-BusyBox applet links, Dropbear multi-call links, decompressor links, Nmap runtime
+The default bundle is a compact Linux troubleshooting kit: 91 physical
+executables (90 on `powerpc` and `powerpc64`, which have no Go tools),
+BusyBox applet links, Dropbear and kmod multi-call links, decompressor links, Nmap runtime
 data, license texts, checksums, and build metadata. Static linking removes the
 dependency on a target's installed libc; it does not replace kernel features,
 drivers, device nodes, certificate stores, permissions, or runtime databases.
@@ -37,6 +37,7 @@ Nmap data, notices, and licenses remain available.
 | Process diagnosis | `strace`, `lsof`, `gdbserver` | System-call tracing, process/file/socket correlation, and remote debugging with a host GDB |
 | Filesystems and storage | `lsblk`, `blkid`, `sfdisk`, `losetup`, `mount`, `umount`, `e2fsck`, `dumpe2fs`, `tune2fs`, `mke2fs`; `fsck.ext2`, `fsck.ext3`, `fsck.ext4`, `mkfs.ext4`; `smartctl`, `nvme` | Block-device and partition inventory, loop devices, mounts, ext filesystem inspection and repair, drive health, and NVMe diagnosis |
 | Kernel log | `dmesg` | Kernel ring buffer with levels, facilities, and readable timestamps |
+| Kernel modules, boot, and BPF | `kmod`, `kexec`, `bpftool`; `modinfo`, `lsmod`, `insmod`, `rmmod`, `modprobe`, `depmod` | Find and load drivers, including xz-, zstd-, and gzip-compressed modules; boot straight into another kernel; list loaded eBPF programs, maps, and attachments |
 | Raw flash and UBI | `flash_erase`, `flashcp`, `nanddump`, `nandwrite`, `mtdinfo`, `ubiattach`, `ubidetach`, `ubinfo`, `ubimkvol`, `ubirmvol`, `ubiupdatevol` | MTD NOR/NAND inspection, backup, and reflashing; UBI attach and volume management |
 | Out-of-band management | `ipmitool` | BMC sensors, event log, power control, and serial-over-LAN through the local IPMI driver or the network |
 | Namespaces and privilege | `nsenter`, `unshare`, `lsns`, `setpriv`, `findmnt` | Enter, create, enumerate, constrain, and inspect namespace state |
@@ -44,7 +45,7 @@ Nmap data, notices, and licenses remain available.
 | Hardware buses | `i2cdetect`, `i2cdump`, `i2cget`, `i2cset`, `i2ctransfer`, `spi-config`, `spi-pipe` | Linux I²C and spidev diagnosis |
 
 Entries after a semicolon are symbolic links to a multi-call binary (BusyBox,
-Dropbear, e2fsck, mke2fs) or to a compressor that picks its mode from its
+Dropbear, e2fsck, mke2fs, kmod) or to a compressor that picks its mode from its
 name; they do not add separate binary payloads.
 
 Four larger Go tools ship separately in `statics-extra-<arch>.tar.xz`, for
@@ -245,6 +246,62 @@ bsdtar -cf - -C /srv data | zstd -T0 | mbuffer -q -m 256M | ncat --send-only 192
 `mbuffer -I 9000` and `mbuffer -O 192.0.2.20:9000` do the same without
 `ncat`. Use `pv -L 5m` to cap a transfer at 5 MiB/s on a shared link, and
 `pv -s SIZE` for a percentage and ETA when the size is known.
+
+## Kernel and boot
+
+These need root, and the names below are placeholders. List the PCI and USB
+devices that have no driver bound, with their modaliases, then ask which
+module claims one and what loading it would do:
+
+```console
+for dev in /sys/bus/pci/devices/* /sys/bus/usb/devices/*; do
+    [ -e "$dev/modalias" ] && [ ! -e "$dev/driver" ] && echo "${dev##*/} $(cat "$dev/modalias")"
+done
+modprobe --resolve-alias "$(cat /sys/bus/pci/devices/DEVICE/modalias)"
+modinfo MODULE
+modprobe --dry-run --verbose MODULE
+```
+
+`modprobe MODULE` then loads it and its dependencies; `dmesg` shows whether
+the driver bound. `modprobe` resolves aliases and dependencies through the
+`modules.*` indexes under `/lib/modules/$(uname -r)`; if they are missing or
+stale, `depmod` rebuilds them there. A module file from elsewhere loads with
+`insmod FILE.ko.zst`, after the modules its `modinfo -F depends` names.
+`modinfo` reads any module file, so it also identifies modules on a mounted
+disk or for another kernel.
+
+Boot straight into a rescue kernel, skipping firmware and the bootloader.
+`kexec --load` only stages it, and `kexec --unload` drops it again:
+
+```console
+kexec --load /mnt/rescue/vmlinuz --initrd=/mnt/rescue/initrd.img \
+    --command-line="console=ttyS0,115200 root=/dev/ROOT ro"
+```
+
+`--reuse-cmdline` copies the running kernel's command line instead.
+`kexec --exec` then switches immediately, without stopping services or
+unmounting filesystems: unmount or at least `sync` first, or run
+`systemctl kexec` where systemd manages the host. `kexec --load` uses
+`kexec_file_load` and falls back to `kexec_load`; with Secure Boot or kernel
+lockdown, only the first works, and only for a signed kernel. The bundled
+`kexec` has only been started under QEMU; loading and executing a kernel with
+it has not been tested on any target, so keep another way back in.
+
+List the eBPF programs, maps, and attachments on a host, which shows what a
+CNI plugin, security agent, or tracer has loaded into the kernel:
+
+```console
+bpftool prog show
+bpftool map show
+bpftool net show
+bpftool cgroup tree
+bpftool link show
+bpftool prog dump xlated id ID
+bpftool --json --pretty prog show id ID
+```
+
+They need `CAP_SYS_ADMIN` (or `CAP_BPF` with `CAP_PERFMON`); unprivileged,
+`prog show` fails with "Operation not permitted".
 
 ## Default profile and intentional omissions
 
@@ -573,6 +630,33 @@ blkid
 sfdisk --dump /dev/DEVICE > DEVICE.sfdisk
 dmesg --level err,warn --ctime
 ```
+
+### Kernel tools: kmod, kexec, and bpftool
+
+`kmod` is one multi-call binary; `modinfo`, `lsmod`, `insmod`, `rmmod`,
+`modprobe`, and `depmod` are links to it. It links zlib, liblzma, and
+libzstd, so it reads gzip-, xz-, and zstd-compressed modules itself. It has no
+OpenSSL: `modinfo` shows that a module is signed (`sig_id: PKCS#7`) but not
+its signer, key, or hash. It reads configuration from `/etc/modprobe.d`,
+`/run/modprobe.d`, `/usr/local/lib/modprobe.d`, `/usr/lib/modprobe.d`, and
+`/lib/modprobe.d`, and modules from `/lib/modules`.
+
+`kexec` comes from kexec-tools with zlib, so it unpacks gzip-compressed
+kernels (`Image.gz` on arm64 and RISC-V, gzip EFI zboot images). It has no
+xz or zstd: unpack such a kernel with the bundle's `xz -d` or `zstd -d` first.
+No Xen support, and `vmcore-dmesg` is not built. It is built for every
+target. QEMU can only start it; loading and executing a kernel has not been
+tested on any target, and the PowerPC purgatory (the code that runs between
+the two kernels) is compiled with different flags than upstream's GCC build;
+see `scripts/builders/kexec-tools.sh`.
+
+`bpftool` comes from its release sources with the bundled libbpf, linking
+libelf (elfutils, built for libelf alone) and zlib. There is no LLVM or
+libbfd disassembler, so `prog dump jited` fails with "No JIT disassembly
+support" (`prog dump xlated` works); no clang-built BPF skeletons, so `prog profile` is unavailable and
+`prog show` lists no PIDs; no libcrypto, so no program signing; no libcap,
+so a permission failure is reported by the kernel rather than predicted;
+and no `bpftool gen` (skeleton generation and `min_core_btf`).
 
 ### Connection tracking: conntrack
 

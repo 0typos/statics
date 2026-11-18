@@ -36,6 +36,7 @@ required_binaries=(
     flash_erase flashcp nanddump nandwrite mtdinfo
     ubiattach ubidetach ubinfo ubimkvol ubirmvol ubiupdatevol
     zstd xz bzip2 pigz bsdtar bsdcpio pv mbuffer
+    kmod kexec bpftool
 )
 # Go tools exist only where architectures.tsv gives a Go environment.
 if [[ $go_env != none ]]; then
@@ -218,7 +219,8 @@ done
 
 for link in nc netcat dropbear dbclient dropbearkey dropbearconvert scp tunpipe \
     fsck.ext2 fsck.ext3 fsck.ext4 mkfs.ext4 \
-    unzstd zstdcat unxz xzcat bunzip2 bzcat unpigz; do
+    unzstd zstdcat unxz xzcat bunzip2 bzcat unpigz \
+    modinfo lsmod insmod rmmod modprobe depmod; do
     [[ -L $output_dir/$link ]] || {
         echo "missing applet link: $output_dir/$link" >&2
         exit 1
@@ -377,6 +379,47 @@ if [[ ${SKIP_QEMU:-0} != 1 ]]; then
     "${runner[@]}" "$output_dir/pv" -q <"$sample" |
         "${runner[@]}" "$output_dir/mbuffer" -q -m 1M >"$scratch/piped" || failed "pv | mbuffer"
     cmp -s "$scratch/piped" "$sample" || failed "pv | mbuffer"
+    check_output "kmod version $(pinned_version kmod)" "$output_dir/kmod" --version
+    check_output "+ZSTD +XZ +ZLIB" "$output_dir/kmod" --version
+    # modinfo reads a minimal module (an x86-64 ELF relocatable with only a
+    # .modinfo section) plain and compressed each way libkmod decodes:
+    # libkmod's ELF parsing and the linked decompressors on every byte
+    # order. zstd compresses from a file, as kbuild does, so the frame
+    # records the size libkmod requires.
+    python3 -I - "$scratch/smoke.ko" <<'PY'
+import struct
+import sys
+
+info = b"license=GPL\0description=statics smoke\0"
+names = b"\0.modinfo\0.shstrtab\0"
+section_offset = (64 + len(info) + len(names) + 7) & ~7
+header = b"\x7fELF\x02\x01\x01" + bytes(9) + struct.pack(
+    "<HHIQQQIHHHHHH", 1, 62, 1, 0, 0, section_offset, 0, 64, 0, 0, 64, 3, 2
+)
+body = (header + info + names).ljust(section_offset, b"\0")
+
+
+def section(name, kind, offset, size):
+    return struct.pack("<IIQQQQIIQQ", name, kind, 0, 0, offset, size, 0, 0, 1, 0)
+
+
+body += section(0, 0, 0, 0)
+body += section(1, 1, 64, len(info))
+body += section(10, 3, 64 + len(info), len(names))
+with open(sys.argv[1], "wb") as module:
+    module.write(body)
+PY
+    xz -c "$scratch/smoke.ko" >"$scratch/smoke.ko.xz"
+    gzip -c "$scratch/smoke.ko" >"$scratch/smoke.ko.gz"
+    "${runner[@]}" "$output_dir/zstd" -q -o "$scratch/smoke.ko.zst" "$scratch/smoke.ko" || {
+        echo "zstd could not compress the test module" >&2
+        exit 1
+    }
+    for module in smoke.ko smoke.ko.xz smoke.ko.gz smoke.ko.zst; do
+        check_output "statics smoke" "$output_dir/modinfo" -F description "$scratch/$module"
+    done
+    check_output "kexec-tools $(pinned_version kexec-tools)" "$output_dir/kexec" --version
+    check_output "bpftool v$(pinned_version bpftool)" "$output_dir/bpftool" version
     if [[ $go_env != none ]]; then
         check_output "wireguard-go v" "$output_dir/wireguard-go" --version
     fi

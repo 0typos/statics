@@ -1,0 +1,35 @@
+Build bpftool without `bpftool gen` (skeleton, subskeleton, object linking,
+and min_core_btf). It generates C source for building BPF programs, not
+something to run on a host being diagnosed, and it is 10% of the binary.
+Removing the command and its one source file changes nothing else; the
+build runs no target code.
+--- a/src/main.c
++++ b/src/main.c
+@@ -65,7 +65,7 @@
+ 		"       %s batch file FILE\n"
+ 		"       %s version\n"
+ 		"\n"
+-		"       OBJECT := { prog | map | link | cgroup | perf | net | feature | btf | gen | struct_ops | iter | token }\n"
++		"       OBJECT := { prog | map | link | cgroup | perf | net | feature | btf | struct_ops | iter | token }\n"
+ 		"       " HELP_SPEC_OPTIONS " |\n"
+ 		"                    {-V|--version} }\n"
+ 		"",
+@@ -88,7 +88,6 @@
+ 	{ "net",	do_net },
+ 	{ "feature",	do_feature },
+ 	{ "btf",	do_btf },
+-	{ "gen",	do_gen },
+ 	{ "struct_ops",	do_struct_ops },
+ 	{ "iter",	do_iter },
+ 	{ "token",	do_token },
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -170,7 +170,7 @@
+ 
+ all: $(OUTPUT)bpftool
+ 
+-SRCS := $(wildcard *.c)
++SRCS := $(filter-out gen.c,$(wildcard *.c))
+ 
+ ifeq ($(feature-llvm),1)
+ ifneq ($(SKIP_LLVM),1)
