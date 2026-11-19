@@ -7,7 +7,10 @@ bandwidth by host and process, LLDP neighbors, firewall policy (nftables and
 legacy x_tables), IP sets, and connection tracking, Wi-Fi, syscall
 tracing, remote debugging, serial consoles, filesystem, block-device, and raw
 flash diagnosis, kernel modules, kexec, and eBPF inspection, BMC management over IPMI, compression, archives, and
-buffered pipe transfer, JSON processing, and common IoT field buses. The optional extra archive adds object-storage and SFTP sync,
+buffered pipe transfer, JSON processing, common IoT field buses, persistent
+terminal sessions and bash, TLS wrapping, OpenVPN, SOCKS5 and HTTP proxies,
+DHCP, DNS, and TFTP for netboot, serial ports shared over the network, and
+TLS server auditing. The optional extra archive adds object-storage and SFTP sync,
 code-phrase file transfer, and container runtime inspection.
 
 This page records candidates, not commitments. The executable contract is in
@@ -27,8 +30,12 @@ the [contribution checklist](../CONTRIBUTING.md).
 | Discovery and transfer | `nmap`, `ncat`, `rsync`, `sftp-server` |
 | Compression and archives | `zstd`, `xz`, `bzip2`, `pigz`, `bsdtar`, `bsdcpio` |
 | Pipe transfer | `pv`, `mbuffer` |
-| Tunnels | `tunpipe`, `pppd` |
-| Serial console and transfer | `picocom`, `sz`, `rz` |
+| Tunnels and VPN | `tunpipe`, `pppd`; `openvpn` in the extra archive |
+| TLS wrapping and proxies | `microsocks`, `tinyproxy`; `stunnel` in the extra archive |
+| DHCP, DNS, and netboot | `dnsmasq` |
+| Sessions and shells | `tmux`, `bash` |
+| TLS auditing | `testssl.sh` |
+| Serial console and transfer | `picocom`, `sz`, `rz`, `ser2net` |
 | Process diagnosis | `strace`, `lsof`, `gdbserver` |
 | Filesystems and storage | `lsblk`, `blkid`, `sfdisk`, `losetup`, `mount`, `umount`, `e2fsck`, `dumpe2fs`, `tune2fs`, `mke2fs`, `smartctl`, `nvme` |
 | Kernel log | `dmesg` |
@@ -38,7 +45,9 @@ the [contribution checklist](../CONTRIBUTING.md).
 | Namespaces and privilege | `nsenter`, `unshare`, `lsns`, `setpriv`, `findmnt` |
 | Embedded buses | selected `can-utils`, `i2c-tools`, and `spi-tools` programs |
 
-The extra archive adds `rclone` (trimmed), `croc`, `crictl`, and `ctr`.
+The extra archive adds `stunnel` and `openvpn` (each with its own OpenSSL)
+on every target, and `rclone` (trimmed), `croc`, `crictl`, and `ctr` where Go
+runs.
 Further rclone backends and commands are requests against its trimmed main
 rather than new tools; see the [toolkit guide](TOOLKIT.md#rclone-trimmed).
 
@@ -55,8 +64,11 @@ disruptive.
 | 2 | `fio` | Storage and I/O characterization | Larger binary, workload safety, and reproducibility considerations |
 | 3 | `stress-ng` | CPU, memory, scheduler, and system stress | Large surface and intentionally disruptive workloads |
 | 3 | `tcpflow` | Reassemble TCP streams into files | Needs Boost (C++ headers), a large build dependency for one tool |
+| 3 | `nghttp`, `h2load` | HTTP/2 client and load generator | C++23 with libev, c-ares, and zlib, and two more static copies of OpenSSL: about 3 MB of archive; libnghttp2 in `curl` is the cheap alternative |
 
 Also consider focused variants instead of new binaries:
+HTTP/2 in `curl` (libnghttp2, C only), bash 5.3 (each official patch pinned
+separately), OpenVPN data channel offload (libnl is already built for `iw`),
 compressed Dropbear sessions, interactive/curses mtr (the bundle now builds
 ncurses for iftop and nethogs), broader curl protocols, Nmap NSE/Lua, Nping
 (about 410 KB, mostly another copy of libcrypto), and rsync

@@ -171,6 +171,18 @@ sources=(
     nethogs
     tcpreplay
     dhcpdump
+    libevent
+    tmux
+    stunnel
+    openvpn
+    microsocks
+    tinyproxy
+    dnsmasq
+    libyaml
+    gensio
+    ser2net
+    bash
+    testssl.sh
 )
 
 # STATICS_ONLY_DEPS builds just the shared libraries (the Dockerfile's deps
@@ -259,7 +271,8 @@ dag=$WORK_DIR/dag.mk
         mtd-utils libnl iw zlib bzip2 xz zstd pigz pv mbuffer libarchive \
         kmod kexec-tools libelf bpftool iputils traceroute ndisc6 lldpd \
         ipset iptables ebtables arptables ngrep hping3 ncurses iftop nethogs \
-        tcpreplay dhcpdump; do
+        tcpreplay dhcpdump libevent tmux stunnel openvpn microsocks tinyproxy \
+        dnsmasq libyaml gensio ser2net bash testssl; do
         printf ' $(S)/%s' "$c"
     done
     if [[ $go_env != none ]]; then
@@ -343,6 +356,18 @@ dag=$WORK_DIR/dag.mk
     emit nethogs nethogs build_nethogs deps ncurses
     emit tcpreplay tcpreplay build_tcpreplay deps
     emit dhcpdump dhcpdump build_dhcpdump deps
+    emit libevent tmux build_libevent
+    emit tmux tmux build_tmux libevent ncurses
+    emit stunnel stunnel build_stunnel deps
+    emit openvpn openvpn build_openvpn deps
+    emit microsocks microsocks build_microsocks
+    emit tinyproxy tinyproxy build_tinyproxy
+    emit dnsmasq dnsmasq build_dnsmasq
+    emit libyaml ser2net build_libyaml
+    emit gensio ser2net build_gensio
+    emit ser2net ser2net build_ser2net libyaml gensio
+    emit bash bash build_bash ncurses
+    emit testssl testssl build_testssl
     emit wireguard-go wireguard-go build_wireguard_go
     emit rclone rclone build_rclone
     emit croc croc build_croc
@@ -396,7 +421,7 @@ finish_archive() { # directory archive
     (
         cd "$dir"
         find . -type f \
-            \( -perm /111 -o -path './share/nmap/*' \) \
+            \( -perm /111 -o -path './share/nmap/*' -o -path './share/testssl/*' \) \
             -printf '%P\n' |
             LC_ALL=C sort |
             xargs -r sha256sum > SHA256SUMS

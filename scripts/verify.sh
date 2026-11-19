@@ -41,23 +41,33 @@ required_binaries=(
     nstat devlink rdma lldpd lldpcli ipset xtables-legacy-multi
     ebtables-legacy arptables-legacy ngrep hping3 iftop nethogs
     tcpreplay tcpprep tcprewrite dhcpdump
+    tmux microsocks tinyproxy dnsmasq ser2net bash testssl.sh
 )
+# Executables that are scripts rather than static ELF programs.
+scripts=(testssl.sh)
 # Go tools exist only where architectures.tsv gives a Go environment.
 if [[ $go_env != none ]]; then
     required_binaries+=(wireguard-go)
 fi
 # Smoke checks for the extra archive, as "expected output|arguments" per
 # executable. Every executable in it must have one, so an extra tool cannot
-# ship without being started.
+# ship without being started, and every one listed must be there. The C
+# tools are on every target; the Go tools only where Go is.
 # The pinned version is expected, so a version that upstream sets at link time
 # cannot silently fall back to a development string.
 pinned_version() { awk -F '|' -v n="$1" '$1 == n { print $2 }' "$repo_root/sources.lock"; }
 declare -A extra_smoke=(
-    [rclone]="rclone v$(pinned_version rclone)|version"
-    [croc]="croc version $(pinned_version croc)|--version"
-    [crictl]="crictl version v$(pinned_version cri-tools)|--version"
-    [ctr]="ctr github.com/containerd/containerd/v2 v$(pinned_version containerd)|--version"
+    [stunnel]="stunnel $(pinned_version stunnel)|-version"
+    [openvpn]="OpenVPN $(pinned_version openvpn)|--version"
 )
+if [[ $go_env != none ]]; then
+    extra_smoke+=(
+        [rclone]="rclone v$(pinned_version rclone)|version"
+        [croc]="croc version $(pinned_version croc)|--version"
+        [crictl]="crictl version v$(pinned_version cri-tools)|--version"
+        [ctr]="ctr github.com/containerd/containerd/v2 v$(pinned_version containerd)|--version"
+    )
+fi
 
 # Checks every archive must pass: metadata, licenses for exactly the
 # components it should hold, its SBOM, static linkage, and SHA256SUMS.
@@ -160,6 +170,13 @@ PY
 
     local binary
     while IFS= read -r binary; do
+        if [[ " ${scripts[*]} " == *" $binary "* ]]; then
+            head -c 2 "$dir/$binary" | grep -qx '#!' || {
+                echo "$binary should be a script" >&2
+                exit 1
+            }
+            continue
+        fi
         file "$dir/$binary"
         file "$dir/$binary" | grep -Eq 'statically linked|static-pie linked' || {
             echo "$binary is not statically linked" >&2
@@ -195,7 +212,8 @@ for binary in "${required_binaries[@]}"; do
         exit 1
     }
 done
-# Every extra tool is a Go tool, so an extra archive holds all of them.
+# Each extra tool listed above must be in the extra archive, which
+# check_archive has already required wherever components.tsv gives it one.
 if [[ -d $output_dir-extra ]]; then
     for binary in "${!extra_smoke[@]}"; do
         [[ -x $output_dir-extra/$binary ]] || {
@@ -220,6 +238,20 @@ for nmap_data in \
     }
 done
 
+for testssl_data in testssl.sh etc/Mozilla.pem etc/ca_hashes.txt etc/cipher-mapping.txt \
+    etc/client-simulation.txt etc/common-primes.txt etc/openssl.cnf etc/tls_data.txt; do
+    [[ -s $output_dir/share/testssl/$testssl_data ]] || {
+        echo "missing testssl.sh runtime data: $testssl_data" >&2
+        exit 1
+    }
+done
+
+for link in hexdump grep awk sed; do
+    [[ -L $output_dir/share/testssl/bin/$link && -x $output_dir/share/testssl/bin/$link ]] || {
+        echo "missing testssl.sh BusyBox link: share/testssl/bin/$link" >&2
+        exit 1
+    }
+done
 
 for link in nc netcat dropbear dbclient dropbearkey dropbearconvert scp tunpipe \
     fsck.ext2 fsck.ext3 fsck.ext4 mkfs.ext4 \
@@ -537,6 +569,79 @@ PY
         --dstipmap=10.0.0.2/32:10.0.0.9/32 --fixcsum || failed "tcprewrite"
     check_output "10.0.0.1:40000 -> 10.0.0.9:80" "$output_dir/ngrep" -q -d lo -I "$scratch/rewritten.pcap" statics-smoke
     check_output "cksum 0x01d2 (correct)" "$output_dir/tcpdump" -vvnr "$scratch/rewritten.pcap" tcp
+    check_output "tmux $(pinned_version tmux)" "$output_dir/tmux" -V
+    # A detached session runs a command in its pane; capture-pane reads the
+    # pane back through the server: the client, server, pty, and libevent.
+    # shellcheck disable=SC2016  # expanded by the pane's shell
+    "${runner[@]}" "$output_dir/tmux" -S "$scratch/tmux" -f /dev/null \
+        new-session -d -x 80 -y 24 /bin/sh -c 'echo statics-$((6 * 7)); sleep 30' ||
+        failed "tmux new-session"
+    tmux_output=
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        tmux_output=$("${runner[@]}" "$output_dir/tmux" -S "$scratch/tmux" capture-pane -p) ||
+            failed "tmux capture-pane"
+        [[ $tmux_output == *statics-42* ]] && break
+        sleep 1
+    done
+    "${runner[@]}" "$output_dir/tmux" -S "$scratch/tmux" kill-server || true
+    [[ $tmux_output == *statics-42* ]] || failed "tmux session"
+    # A static key, then OpenVPN's own loopback encrypt and decrypt with
+    # it: OpenSSL's ciphers and OpenVPN's packet code on every byte order.
+    "${runner[@]}" "$output_dir-extra/openvpn" --genkey secret "$scratch/static.key" >/dev/null ||
+        failed "openvpn --genkey"
+    check_output "self-test mode SUCCEEDED" "$output_dir-extra/openvpn" --test-crypto --secret "$scratch/static.key" \
+        --cipher AES-256-CBC --verb 1
+    # microsocks has no version flag; its usage proves it started.
+    microsocks_output=$("${runner[@]}" "$output_dir/microsocks" -h 2>&1) || true
+    [[ $microsocks_output == *"MicroSocks SOCKS5 Server"* ]] || {
+        echo "unexpected output from microsocks -h: $microsocks_output" >&2
+        exit 1
+    }
+    check_output "tinyproxy $(pinned_version tinyproxy)" "$output_dir/tinyproxy" -v
+    check_output "Dnsmasq version $(pinned_version dnsmasq)" "$output_dir/dnsmasq" --version
+    printf 'port=0\ndhcp-range=192.0.2.10,192.0.2.20,1h\nenable-tftp\ntftp-root=/tmp\n' \
+        >"$scratch/dnsmasq.conf"
+    check_output "syntax check OK" "$output_dir/dnsmasq" --test --conf-file="$scratch/dnsmasq.conf"
+    check_output "version $(pinned_version ser2net)" "$output_dir/ser2net" -v
+    # ser2net shares one end of a socat pty pair on a loopback port; two
+    # connections in turn each read a line written to the other end, which
+    # catches a port that never finishes closing after the first client.
+    # Natively only: it needs real ptys and TCP between the two programs.
+    if [[ -z $emulated ]]; then
+        "${runner[@]}" "$output_dir/socat" pty,link="$scratch/ttyA",raw,echo=0 \
+            pty,link="$scratch/ttyB",raw,echo=0 &
+        socat_pid=$!
+        for _ in 1 2 3 4 5 6 7 8 9 10; do [[ -e $scratch/ttyB ]] && break; sleep 0.5; done
+        exec {tty_hold}<>"$scratch/ttyA"
+        ser2net_port=$((20000 + $$ % 20000))
+        printf 'connection: &smoke\n  accepter: tcp,127.0.0.1,%s\n  connector: serialdev,%s,115200n81,local\n' \
+            "$ser2net_port" "$scratch/ttyA" >"$scratch/ser2net.yaml"
+        "${runner[@]}" "$output_dir/ser2net" -n -c "$scratch/ser2net.yaml" -P "$scratch/ser2net.pid" &
+        ser2net_pid=$!
+        sleep 1
+        for attempt in 1 2; do
+            (sleep 1; printf 'statics-serial-%s\n' "$attempt" >"$scratch/ttyB") &
+            ser2net_output=$(sleep 3 | "${runner[@]}" "$output_dir/socat" -t 3 - \
+                "tcp:127.0.0.1:$ser2net_port" 2>&1) || true
+            [[ $ser2net_output == *statics-serial-$attempt* ]] || {
+                kill "$ser2net_pid" "$socat_pid" 2>/dev/null
+                failed "ser2net connection $attempt"
+            }
+            sleep 1
+        done
+        kill "$ser2net_pid" "$socat_pid" 2>/dev/null || true
+        exec {tty_hold}<&-
+    fi
+    check_output "version $(pinned_version bash)" "$output_dir/bash" --version
+    # shellcheck disable=SC2016  # expanded by the bash under test
+    check_output "statics-42" "$output_dir/bash" -c \
+        'a=(statics 42); [[ ${a[1]} =~ ^4 ]] && cat <(printf "%s-%s\n" "${a[@]}")'
+    # testssl.sh runs the bundled openssl and BusyBox applets, which under
+    # emulation only binfmt_misc could start, so natively only; it is the
+    # same script on every target, and bash is checked above.
+    if [[ -z $emulated ]]; then
+        check_output "testssl.sh version $(pinned_version testssl.sh)" env COLOR=0 "$output_dir/testssl.sh" --version
+    fi
     if [[ $go_env != none ]]; then
         check_output "wireguard-go v" "$output_dir/wireguard-go" --version
     fi

@@ -68,6 +68,29 @@ install_dependency_file() {
     install -D -m 0644 "$source" "$DEPS_PREFIX/$destination"
 }
 
+# The output directory of the archive components.tsv names for COMPONENT
+# (main or extra), created on demand.
+archive_dir() { # component
+    local archive
+    archive=$(awk -F '|' -v wanted="$1" '$0 !~ /^#/ && $1 == wanted { print $4 }' \
+        "$REPO_ROOT/components.tsv")
+    case $archive in
+        main) echo "$OUTPUT_DIR" ;;
+        extra) mkdir -p "$EXTRA_OUTPUT_DIR" && echo "$EXTRA_OUTPUT_DIR" ;;
+        *)
+            echo "$1 has no main or extra archive in components.tsv" >&2
+            return 1
+            ;;
+    esac
+}
+
+# Install a C tool's executable into its component's archive.
+install_component_binary() { # component source destination
+    local directory
+    directory=$(archive_dir "$1") || return 1
+    install -m 0755 "$2" "$directory/$3"
+}
+
 make_link() {
     local target=$1
     local link_name=$2
@@ -91,22 +114,13 @@ source_version() { # name
 go_build() { # component package binary [ldflag...]
     local component=$1 package=$2 binary=$3
     shift 3
-    local record archive destination word flags=()
-    record=$(awk -F '|' -v wanted="$component" \
-        '$0 !~ /^#/ && $1 == wanted { print $4 "|" $5 }' "$REPO_ROOT/components.tsv")
-    archive=${record%%|*}
-    for word in ${record#*|}; do
+    local destination packages word flags=()
+    packages=$(awk -F '|' -v wanted="$component" \
+        '$0 !~ /^#/ && $1 == wanted { print $5 }' "$REPO_ROOT/components.tsv")
+    for word in $packages; do
         [[ $word == -* ]] && flags+=("$word")
     done
-    case $archive in
-        main) destination=$OUTPUT_DIR ;;
-        extra) destination=$EXTRA_OUTPUT_DIR ;;
-        *)
-            echo "$component has no main or extra archive in components.tsv" >&2
-            return 1
-            ;;
-    esac
-    mkdir -p "$destination"
+    destination=$(archive_dir "$component") || return 1
     (
         cd "$WORK_DIR/$component" &&
             go build "${flags[@]}" -ldflags="-s -w -buildid= $*" \

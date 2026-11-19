@@ -729,6 +729,120 @@ def latest_dhcpdump() -> tuple[str, str]:
     )
 
 
+def latest_libevent() -> tuple[str, str]:
+    # Stable releases only; the 2.2 line is still tagged alpha.
+    return latest_from_github_tags(
+        "libevent/libevent",
+        r"release-(\d+\.\d+\.\d+)-stable",
+        (
+            "https://github.com/libevent/libevent/releases/download/"
+            "release-{version}-stable/libevent-{version}-stable.tar.gz"
+        ),
+    )
+
+
+def latest_tmux() -> tuple[str, str]:
+    # Releases such as 3.7c carry a letter, so take GitHub's latest.
+    return latest_from_github_release(
+        "tmux/tmux",
+        r"(\d+\.\d+[a-z]?)",
+        "https://github.com/tmux/tmux/releases/download/{version}/tmux-{version}.tar.gz",
+    )
+
+
+def latest_stunnel() -> tuple[str, str]:
+    # The archive URL stays valid after the next release moves the file
+    # out of downloads/.
+    version, _ = latest_from_index(
+        "https://www.stunnel.org/downloads.html",
+        r"stunnel-(\d+\.\d+)\.tar\.gz",
+        "",
+    )
+    major = version.split(".")[0]
+    return version, (
+        f"https://www.stunnel.org/archive/{major}.x/stunnel-{version}.tar.gz"
+    )
+
+
+def latest_openvpn() -> tuple[str, str]:
+    # Tags, not GitHub's latest release: a 2.6 maintenance release can be
+    # published after the newest 2.7 one.
+    return latest_from_github_tags(
+        "OpenVPN/openvpn",
+        r"v(\d+\.\d+\.\d+)",
+        (
+            "https://github.com/OpenVPN/openvpn/releases/download/"
+            "v{version}/openvpn-{version}.tar.gz"
+        ),
+    )
+
+
+def latest_microsocks() -> tuple[str, str]:
+    return latest_from_github_tags(
+        "rofl0r/microsocks",
+        r"v(\d+\.\d+\.\d+)",
+        "https://github.com/rofl0r/microsocks/archive/refs/tags/v{version}.tar.gz",
+    )
+
+
+def latest_tinyproxy() -> tuple[str, str]:
+    return latest_from_github_release(
+        "tinyproxy/tinyproxy",
+        r"(\d+\.\d+\.\d+)",
+        (
+            "https://github.com/tinyproxy/tinyproxy/releases/download/"
+            "{version}/tinyproxy-{version}.tar.xz"
+        ),
+    )
+
+
+def latest_dnsmasq() -> tuple[str, str]:
+    # Test and release-candidate tarballs (2.94test1, 2.94rc1) never match.
+    return latest_from_index(
+        "https://thekelleys.org.uk/dnsmasq/",
+        r"dnsmasq-(\d+\.\d+)\.tar\.xz",
+        "https://thekelleys.org.uk/dnsmasq/dnsmasq-{version}.tar.xz",
+    )
+
+
+def latest_libyaml() -> tuple[str, str]:
+    return latest_from_github_release(
+        "yaml/libyaml",
+        r"(\d+\.\d+\.\d+)",
+        "https://github.com/yaml/libyaml/releases/download/{version}/yaml-{version}.tar.gz",
+    )
+
+
+def latest_cminyard(project: str) -> tuple[str, str]:
+    return latest_from_github_release(
+        f"cminyard/{project}",
+        r"v(\d+\.\d+\.\d+)",
+        (
+            f"https://github.com/cminyard/{project}/releases/download/"
+            f"v{{version}}/{project}-{{version}}.tar.gz"
+        ),
+    )
+
+
+def latest_bash() -> tuple[str, str]:
+    # Only tarballs with the official patches rolled in (5.2.37); a bare
+    # x.y release would need each patch pinned separately.
+    return latest_from_index(
+        "https://ftp.gnu.org/gnu/bash/",
+        r"bash-(\d+\.\d+\.\d+)\.tar\.gz\"",
+        "https://ftp.gnu.org/gnu/bash/bash-{version}.tar.gz",
+    )
+
+
+def latest_testssl() -> tuple[str, str]:
+    # Stable tags only, not the 3.3dev snapshots.
+    return latest_from_github_tags(
+        "testssl/testssl.sh",
+        r"v(\d+\.\d+\.\d+)",
+        "https://github.com/testssl/testssl.sh/archive/refs/tags/v{version}.tar.gz",
+    )
+
+
 def latest_zig(host: str) -> tuple[str, str]:
     index = json.loads(text("https://ziglang.org/download/index.json"))
     stable = [key for key in index if re.fullmatch(r"\d+\.\d+\.\d+", key)]
@@ -825,6 +939,7 @@ PUBLISHED_SHA256: dict[str, str] = {
         "https://github.com/schollz/croc/releases/download/"
         "v{version}/croc_v{version}_checksums.txt"
     ),
+    "stunnel": "https://www.stunnel.org/downloads/stunnel-{version}.tar.gz.sha256",
 }
 
 
@@ -895,6 +1010,18 @@ DISCOVERERS: dict[str, Callable[[], tuple[str, str]]] = {
     "nethogs": latest_nethogs,
     "tcpreplay": latest_tcpreplay,
     "dhcpdump": latest_dhcpdump,
+    "libevent": latest_libevent,
+    "tmux": latest_tmux,
+    "stunnel": latest_stunnel,
+    "openvpn": latest_openvpn,
+    "microsocks": latest_microsocks,
+    "tinyproxy": latest_tinyproxy,
+    "dnsmasq": latest_dnsmasq,
+    "libyaml": latest_libyaml,
+    "gensio": lambda: latest_cminyard("gensio"),
+    "ser2net": lambda: latest_cminyard("ser2net"),
+    "bash": latest_bash,
+    "testssl.sh": latest_testssl,
     "zig-x86_64": lambda: latest_zig("x86_64-linux"),
     "zig-aarch64": lambda: latest_zig("aarch64-linux"),
     "go-x86_64": lambda: latest_go("amd64"),

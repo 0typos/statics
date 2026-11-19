@@ -28,10 +28,10 @@ The release contains, for every architecture:
   `components.tsv`, the same four files and two bundles for
   `statics-extra-<arch>.tar.xz`, which has its own SBOM and checksums.
 
-Every architecture with Go has an extra archive (`rclone`, `croc`, `crictl`,
-and `ctr`); `powerpc` and `powerpc64` do not, and the build, cache,
-reproducibility, and publish steps all skip an extra archive that does not
-exist.
+Every architecture has an extra archive: `stunnel` and `openvpn` everywhere,
+plus `rclone`, `croc`, `crictl`, and `ctr` where Go runs (not `powerpc` or
+`powerpc64`). The build, cache, reproducibility, and publish steps handle
+each archive that exists, and would skip an extra archive that did not.
 
 It also contains `statics-sources.tar.xz`, its SHA-256 file, and its
 provenance bundle. Binary

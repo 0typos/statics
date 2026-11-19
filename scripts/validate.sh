@@ -44,8 +44,11 @@ awk -F '|' '
     /^#/ || NF == 0 { next }
     NF != 5 { print FNR ": malformed component record"; bad=1; next }
     seen[$1]++ { print FNR ": duplicate component " $1; bad=1 }
-    ($5 == "runtime") != ($4 == "any") || $4 !~ /^(main|extra|any)$/ {
-        print FNR ": archive must be main or extra, or any for the Go runtime"; bad=1
+    ($5 == "runtime") != ($4 == "any") || $4 !~ /^(main|extra|both|any)$/ {
+        print FNR ": archive must be main, extra, both (a library linked into each), or any for the Go runtime"; bad=1
+    }
+    $4 == "both" && $5 != "-" {
+        print FNR ": only a non-Go library can be in both archives"; bad=1
     }
     $5 == "" { print FNR ": Go packages must be -, runtime, or a list"; bad=1 }
     END { exit bad }

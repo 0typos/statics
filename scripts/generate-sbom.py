@@ -217,6 +217,12 @@ def main() -> int:
             "ngrep/LICENSE",
             "https://github.com/jpr5/ngrep/blob/master/LICENSE",
         ),
+        (
+            "LicenseRef-IBM-base64",
+            "IBM notice in tmux's compat/base64.c",
+            "tmux/IBM-BASE64",
+            "https://github.com/tmux/tmux/blob/master/compat/base64.c",
+        ),
     ]
     infos = [
         {

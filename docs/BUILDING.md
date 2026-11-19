@@ -132,7 +132,7 @@ is:
 ```text
 aarch64/
 ├── busybox, nmap, ncat, rsync, lsof, ...
-├── share/nmap/
+├── share/nmap/, share/testssl/
 ├── licenses/<upstream>/
 ├── BUILDINFO
 ├── BUILD_RECIPES_LICENSE
@@ -148,7 +148,8 @@ tool as read from its own build info, and each module's license and notice
 files under `licenses/<tool>/modules/<module>@<version>/`. The Go runtime's
 notices are under `licenses/go/`.
 
-`SHA256SUMS` covers all executable payloads and Nmap runtime data.
+`SHA256SUMS` covers all executable payloads and the Nmap and testssl.sh
+runtime data under `share/`.
 `SBOM.spdx.json` records the same payload plus its upstream package
 relationships. License texts and build metadata remain alongside the payload
 but are not entries in `SHA256SUMS`.
@@ -159,16 +160,20 @@ terms are indexed by `COMPONENTS.tsv` and packaged under `licenses/`.
 
 ### Extra archive
 
-Large Go tools go in a second archive, `statics-extra-<arch>.tar.xz`, so the
+Large tools go in a second archive, `statics-extra-<arch>.tar.xz`, so the
 main kit stays small. `components.tsv` assigns each component to `main` or
-`extra`. The extra archive has the same layout and metadata as the main one,
+`extra`, or to `both` for a library linked into tools in each archive (OpenSSL
+and libcap-ng), whose notices and SBOM entry then appear in each. The extra archive has the same layout and metadata as the main one,
 under a top-level `<arch>-extra/` directory, with its own `SHA256SUMS`,
 `COMPONENTS.tsv`, notices, and SBOM (`statics-extra-<arch>.spdx.json`). It
 exists only for an architecture that builds at least one extra tool: today
-`rclone`, `croc`, `crictl`, and `ctr`, on every target with Go. It is
+`stunnel` and `openvpn` on every target, and `rclone`, `croc`, `crictl`, and
+`ctr` on every target with Go. A C tool's builder installs with
+`install_component_binary`, which, like `go_build`, puts it in the archive
+`components.tsv` names. It is
 compressed with `xz -9` rather than the main archive's `-6`: the 64 MiB
-window spans all four binaries, which share Go's runtime and many modules,
-and makes the archive about 30% smaller, at about 65 MiB of memory to
+window spans all the binaries, which share Go's runtime and many modules,
+or OpenSSL, and makes the archive about 30% smaller, at about 65 MiB of memory to
 decompress.
 
 `components.tsv` may list `go build` flags before a Go tool's packages, such

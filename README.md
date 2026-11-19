@@ -42,7 +42,7 @@ user-mode emulation proves that non-native outputs can actually start.
 
 | 🧰 Carry it | 🐧 Run it | 🔐 Trust it |
 |---|---|---|
-| 116 physical executables, plus BusyBox, Dropbear, kmod, iptables and decompressor links, and four larger Go tools in an optional extra archive | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
+| 123 physical executables, plus BusyBox, Dropbear, kmod, iptables and decompressor links, and six larger tools (four in Go) in an optional extra archive | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
 | Network, process, namespace, storage and hardware diagnosis | Static musl builds avoid a dependency on the target's libc | Deterministic archives, QEMU smoke tests and release attestations |
 
 ## Get a kit
@@ -65,32 +65,35 @@ Not sure which archive fits the device? Start with the
 ### Main and extra archives
 
 Each architecture has two archives. **`statics-<arch>.tar.xz` is the kit**:
-every tool below, about 14 to 18 MiB, and it is all most sessions need.
-**`statics-extra-<arch>.tar.xz` is optional** and holds four Go tools that
-together weigh about as much as the whole main kit: `rclone`, `croc`, `crictl`
-and `ctr`. Splitting them out keeps the main kit small enough for routers and
-other cramped devices; take the extra archive only when you need to sync with
-object storage, hand files across machines, or inspect a container runtime.
-It extracts beside the main kit as `<arch>-extra/`, with its own checksums,
-SBOM and notices, and exists for every target except `powerpc` and
-`powerpc64`, where Go does not run (see the
+every tool below, and it is all most sessions need.
+**`statics-extra-<arch>.tar.xz` is optional** and holds six larger tools:
+`stunnel` and `openvpn`, which each carry their own copy of OpenSSL, and
+four Go tools, `rclone`, `croc`, `crictl` and `ctr`. Splitting them out keeps
+the main kit small enough for routers and other cramped devices; take the
+extra archive when you need TLS wrapping or a VPN, to sync with object
+storage, hand files across machines, or inspect a container runtime. It
+extracts beside the main kit as `<arch>-extra/`, with its own checksums, SBOM
+and notices. On `powerpc` and `powerpc64`, where Go does not run, it holds
+only `stunnel` and `openvpn` (see the
 [architecture guide](docs/ARCHITECTURES.md#go-tools)).
 
-Extra archive sizes for the current pins (the `x86_64` main kit is 16.3 MiB):
+Archive sizes for the current pins:
 
-| target | extra archive |
-|---|---|
-| `x86_64` | 16.7 MiB |
-| `i686` | 15.5 MiB |
-| `aarch64` | 14.4 MiB |
-| `armv6-hardfloat`, `armv7-hardfloat` | 14.4 MiB |
-| `armv7-softfloat` | 14.5 MiB |
-| `mips` | 13.0 MiB |
-| `mipsel` | 13.3 MiB |
-| `powerpc64le` | 14.1 MiB |
-| `riscv64` | 15.9 MiB |
-| `s390x` | 15.1 MiB |
-| `powerpc`, `powerpc64` | none |
+| target | main archive | extra archive |
+|---|---|---|
+| `x86_64` | 19.6 MiB | 18.6 MiB |
+| `i686` | 19.4 MiB | 17.4 MiB |
+| `aarch64` | 17.9 MiB | 16.0 MiB |
+| `armv6-hardfloat` | 17.1 MiB | 16.1 MiB |
+| `armv7-hardfloat` | 17.0 MiB | 16.0 MiB |
+| `armv7-softfloat` | 16.9 MiB | 16.0 MiB |
+| `mips` | 20.9 MiB | 14.8 MiB |
+| `mipsel` | 21.3 MiB | 15.1 MiB |
+| `powerpc` | 18.8 MiB | 1.7 MiB |
+| `powerpc64` | 19.3 MiB | 1.8 MiB |
+| `powerpc64le` | 20.6 MiB | 16.0 MiB |
+| `riscv64` | 19.2 MiB | 17.8 MiB |
+| `s390x` | 19.4 MiB | 16.8 MiB |
 
 The extra archive is compressed with `xz -9` and needs about 65 MiB of memory
 to unpack; on a smaller device, unpack it elsewhere and copy the directory.
@@ -145,7 +148,7 @@ data and safe starting commands.
 
 ## Inside the case
 
-The bundle contains 116 physical executables (115 on `powerpc` and `powerpc64`, which get no
+The bundle contains 123 physical executables (122 on `powerpc` and `powerpc64`, which get no
 Go tools) plus BusyBox, Dropbear, kmod and iptables multi-call links, decompressor links such as `unxz`,
 Nmap runtime data, checksums, an SPDX SBOM and upstream license texts.
 
@@ -157,10 +160,13 @@ Nmap runtime data, checksums, an SPDX SBOM and upstream license texts.
 | Legacy firewalls | `iptables-legacy`, `ip6tables-legacy` (with `-save` and `-restore`), `ebtables-legacy`, `arptables-legacy` | x_tables rules on kernels and firmware without nf_tables |
 | Reachability and path | `ping`, `ping6`, `arping`, `tracepath`, `traceroute`, `traceroute6`, `ndisc6`, `rdisc6`, `rltraceroute6`, `tcptraceroute6`, `mtr`, `mtr-packet` | Unprivileged ping, ARP, path MTU, TCP and UDP traceroute, and IPv6 neighbor and router discovery |
 | Discovery and packet diagnosis | `nmap`, `tcpdump`, `ngrep`, `dhcpdump`, `hping3`, `tcpreplay`, `tcpprep`, `tcprewrite`, `lldpd`, `lldpcli`, `iftop`, `nethogs`, `iperf3` | Services, captures, payload grep, DHCP, crafted probes, capture replay, LLDP neighbors, live bandwidth by host and process, and throughput |
-| HTTP, TLS, DNS and data | `curl`, `openssl`, `drill`, `jq` | Protocol checks and structured output |
+| HTTP, TLS, DNS and data | `curl`, `openssl`, `testssl.sh`, `drill`, `jq` | Protocol checks, TLS server audits and structured output |
 | Compression and archives | `zstd`, `xz`, `bzip2`, `pigz`, `bsdtar`, `bsdcpio`, plus `unzstd`, `zstdcat`, `unxz`, `xzcat`, `bunzip2`, `bzcat`, `unpigz` | Compress and unpack streams; create and extract tar, cpio, zip, 7z and ISO images, and read RAR |
 | Pipe transfer | `pv`, `mbuffer` | Progress, rate limits and buffering for data piped over SSH or a socket |
-| Serial console and transfer | `picocom`, `sz`, `rz` | Serial consoles and ZMODEM file transfer over a serial or terminal session |
+| Serial console and transfer | `picocom`, `sz`, `rz`, `ser2net` | Serial consoles, ZMODEM file transfer over a serial or terminal session, and a serial port shared over TCP |
+| Sessions and shells | `tmux`, `bash` | Sessions that survive a dropped SSH connection, and a full bash |
+| Quick proxies | `microsocks`, `tinyproxy` | SOCKS5 and HTTP/HTTPS proxies |
+| Netboot and DHCP rescue | `dnsmasq` | DHCP, DNS and TFTP for an isolated link or a network boot |
 | Process and storage diagnosis | `strace`, `lsof`, `gdbserver`, `e2fsck`, `dumpe2fs`, `tune2fs`, `mke2fs`, `smartctl`, `nvme` | Syscalls, open files, remote debugging, filesystems and device health |
 | Disks, mounts and kernel log | `lsblk`, `blkid`, `sfdisk`, `losetup`, `mount`, `umount`, `dmesg` | Block devices, partition tables, loop devices, mounts and kernel messages |
 | Kernel modules, boot and BPF | `kmod`, `modinfo`, `lsmod`, `insmod`, `rmmod`, `modprobe`, `depmod`, `kexec`, `bpftool` | Find and load drivers (compressed modules too), boot straight into a rescue kernel (so far tested only to start), and list eBPF programs and maps |
@@ -173,6 +179,7 @@ The extra archive adds:
 
 | Area | Outputs | What they are for |
 |---|---|---|
+| TLS wrapping and VPN | `stunnel`, `openvpn` | TLS around plain TCP services, and OpenVPN client and server |
 | File transfer and sync | `rclone`, `croc` | Copy, sync and check against local disks, S3-compatible storage, SFTP, WebDAV and HTTP; send a file to another machine with a one-time code |
 | Container runtimes | `crictl`, `ctr` | Pods, containers, logs, images and snapshots through the CRI and containerd sockets |
 
@@ -188,7 +195,9 @@ are the full iputils and traceroute programs.
 The portable default deliberately leaves some integrations out. Keep Nmap's packaged
 `share/nmap/` beside the executable, provide curl a trusted CA bundle when the target
 lacks one, and do not expect rsync to preserve ACLs or extended attributes, or bsdtar
-to open AES-encrypted zip archives. Nmap and
+to open AES-encrypted zip archives. `openvpn` (extra archive) needs the kernel's
+`/dev/net/tun`, and `testssl.sh` still needs the host's coreutils and `ps`,
+which BusyBox does not replace for it. Nmap and
 Ncat use the Nmap Public Source License; review their packaged terms before deployment
 or redistribution.
 

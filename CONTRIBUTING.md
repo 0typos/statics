@@ -49,7 +49,7 @@ workflow artifacts.
 | --- | --- |
 | `architectures.tsv` | Target name, Zig triple/CPU, QEMU runner, description, and Go environment (or `none`) |
 | `sources.lock` | Pinned upstream/toolchain version, SHA-256, and URL |
-| `components.tsv` | Component license expression, role, archive (`main` or `extra`), and Go main packages with any build flags |
+| `components.tsv` | Component license expression, role, archive (`main`, `extra`, or `both` for a library linked into each), and Go main packages with any build flags |
 | `docker/Dockerfile` | Clean toolchain, source, build, test, and export stages |
 | `scripts/build.sh` | Target environment, including the hermetic Go settings, and build orchestration |
 | `scripts/components.sh` | The components that belong in one archive of one target |
@@ -79,7 +79,9 @@ Use this checklist:
    SHA-256.
 2. Add the component, SPDX license expression, archive, and Go main packages
    (`-` for a non-Go tool) to `components.tsv`. Small core tools go in the
-   `main` archive; large tools go in `extra`.
+   `main` archive; large tools go in `extra`. A C tool's builder installs
+   with `install_component_binary` so it lands in that archive; a library
+   it links that main tools link too is marked `both`.
 3. Add a builder in `scripts/builders/`. Cross-build only; never execute a
    target binary during compilation.
 4. Add the source directory, builder import, and build call to
@@ -156,7 +158,15 @@ The updater downloads the proposed archive to compute its SHA-256, and for
 rclone, croc, and zstd rejects it unless the release's own checksum file lists
 that digest. Check rclone's PGP-signed `SHA256SUMS` with
 `gpg --verify SHA256SUMS` against the key published at
-<https://rclone.org/KEYS>, and the signed tags of rclone and containerd. Review
+<https://rclone.org/KEYS>, and the signed tags of rclone and containerd.
+stunnel's release must also match its published `.sha256`. Verify the
+detached PGP signatures upstream publishes for libevent (Nick Mathewson,
+`7A02B3521DC75C542BA015456AFEE6D49E92B601`), stunnel (Michał Trojnara,
+`2BC7E4E67E3CC0C1BEA72F8C2EFC7FF0D416E014`), OpenVPN (security@openvpn.net,
+`33DA8C9EAE0EAE8C73172C10822F6DF096D04874`), dnsmasq (Simon Kelley,
+`D6EACBD6EE46B834248D111215CDDA6AE19135A2`), and bash (Chet Ramey,
+`7C0135FB088AAF6C66C650B9BB5869F064EA74AB`), for example with keys
+fetched from `hkps://keyserver.ubuntu.com`. Review
 upstream release notes, published checksums, signatures when available,
 license changes, and archive provenance. Then run the relevant builds and
 verification. A new digest is not evidence by itself that an update is safe.

@@ -35,7 +35,7 @@ list:
 # CircleCI's validate job runs exactly this.
 check:
 	./scripts/validate.sh
-	shellcheck scripts/*.sh scripts/builders/*.sh scripts/lib/*.sh scripts/toolchain/*
+	shellcheck scripts/*.sh scripts/builders/*.sh scripts/lib/*.sh scripts/toolchain/* configs/testssl.sh
 
 build:
 	$(BUILDX) artifact --build-arg ARCH=$(ARCH) --output type=local,dest=dist
