@@ -687,15 +687,19 @@ PY
     for program in partclone.extfs partclone.restore partclone.info; do
         check_output "Partclone : v$(pinned_version partclone)" "$output_dir/$program" -v
     done
-    "${runner[@]}" "$output_dir/partclone.extfs" -q -c -s "$scratch/ext.img" \
-        -o "$scratch/ext.pcl" -L "$scratch/partclone.log" >/dev/null 2>&1 ||
-        failed "partclone.extfs clone"
-    "${runner[@]}" "$output_dir/partclone.chkimg" -s "$scratch/ext.pcl" \
-        -L "$scratch/partclone.log" >/dev/null 2>&1 || failed "partclone.chkimg"
-    "${runner[@]}" "$output_dir/partclone.restore" -q -W -s "$scratch/ext.pcl" \
-        -o "$scratch/restored.img" -L "$scratch/partclone.log" >/dev/null 2>&1 ||
-        failed "partclone.restore"
-    cmp -s "$scratch/ext.img" "$scratch/restored.img" || failed "partclone"
+    # With CRC32 (the default) and XXH64 checksums.
+    for mode in 1 2; do
+        rm -f "$scratch/ext.pcl" "$scratch/restored.img"
+        "${runner[@]}" "$output_dir/partclone.extfs" -q -c -a "$mode" -s "$scratch/ext.img" \
+            -o "$scratch/ext.pcl" -L "$scratch/partclone.log" >/dev/null 2>&1 ||
+            failed "partclone.extfs clone"
+        "${runner[@]}" "$output_dir/partclone.chkimg" -s "$scratch/ext.pcl" \
+            -L "$scratch/partclone.log" >/dev/null 2>&1 || failed "partclone.chkimg"
+        "${runner[@]}" "$output_dir/partclone.restore" -q -W -s "$scratch/ext.pcl" \
+            -o "$scratch/restored.img" -L "$scratch/partclone.log" >/dev/null 2>&1 ||
+            failed "partclone.restore"
+        cmp -s "$scratch/ext.img" "$scratch/restored.img" || failed "partclone"
+    done
     if [[ $go_env != none ]]; then
         check_output "wireguard-go v" "$output_dir/wireguard-go" --version
     fi

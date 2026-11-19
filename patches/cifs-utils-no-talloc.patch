@@ -37,7 +37,7 @@ at build time.
  	}
  
  
-+#ifdef HAVE_TALLOC_H
++#if 0 /* statics: no talloc, so no CLDAP ping */
  	// Is this a DFS domain where we need to do a cldap ping to find the closest node?
  	if (count_v4 > 1 || count_v6 > 1) {
  		int res;
@@ -45,7 +45,7 @@ at build time.
  			strlcat(addrstr, tmpbuf, MAX_ADDR_LIST_LEN);
  		}
  	}
-+#endif /* HAVE_TALLOC_H */
++#endif /* statics: no CLDAP ping */
  
  resolve_host_out:
  	freeaddrinfo(addrlist);

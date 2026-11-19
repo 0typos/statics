@@ -354,12 +354,14 @@ asks an NFSv3 server's `rpcbind` and `mountd`.
 (`partclone.ext4`) or FAT (`partclone.vfat`) filesystem into an image, and
 `partclone.dd` copies any partition whole. `partclone.restore` writes an
 image back, `partclone.chkimg` checks one, and `partclone.info` describes
-it. Unmount the filesystem first:
+it. Unmount the filesystem first. partclone logs to
+`/var/log/partclone.log` and stops when it cannot write there, so on a
+rescue system name a writable log with `-L`:
 
 ```console
-partclone.ext4 -c -s /dev/sda2 -o - | zstd -T0 -3 >sda2.pcl.zst
-zstd -dc sda2.pcl.zst | partclone.chkimg -s -
-zstd -dc sda2.pcl.zst | partclone.restore -s - -o /dev/sda2
+partclone.ext4 -L /tmp/partclone.log -c -s /dev/sda2 -o - | zstd -T0 -3 >sda2.pcl.zst
+zstd -dc sda2.pcl.zst | partclone.chkimg -L /tmp/partclone.log -s -
+zstd -dc sda2.pcl.zst | partclone.restore -L /tmp/partclone.log -s - -o /dev/sda2
 ```
 
 `udp-sender` sends one stream to any number of `udp-receiver`s on the same
@@ -370,9 +372,9 @@ for a key press without `--nokbd`:
 
 ```console
 # Each target
-udp-receiver --nokbd --pipe 'zstd -dc' | partclone.restore -s - -o /dev/sda2
+udp-receiver --nokbd --pipe 'zstd -dc' | partclone.restore -L /tmp/partclone.log -s - -o /dev/sda2
 # Source
-partclone.ext4 -c -s /dev/sda2 -o - | udp-sender --nokbd --min-receivers 3 --pipe 'zstd -c'
+partclone.ext4 -L /tmp/partclone.log -c -s /dev/sda2 -o - | udp-sender --nokbd --min-receivers 3 --pipe 'zstd -c'
 ```
 
 Name the interface with `--interface` on hosts with more than one. The
@@ -1329,10 +1331,11 @@ left out, and the two tools that link OpenSSL use the bundle's static
 
 ### File movement tools
 
-These favor size too. The main archive's tools add about 600 KB to it on
-`x86_64`; `lftp`, `aria2c`, and `par2`, each over 300 KB of xz (`lftp` and
-`aria2c` with a copy of OpenSSL each) or not needed on every device, are in
-the extra archive.
+These favor size too. The main archive's share adds about 360 KB to it on
+`x86_64` (420 KB on `mips`), libssh2 in `curl` about 100 KB of that. `lftp`
+and `aria2c` are about 1.9 MB of xz each, much of it their own OpenSSL,
+and `par2` (210 KB) repairs only what parity data was made for in advance,
+so all three are in the extra archive.
 
 - `curl` links libssh2 1.11 (OpenSSL crypto, zlib for SSH compression), so
   it gains `sftp://` and `scp://`, and the zlib it links also gives

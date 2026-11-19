@@ -26,7 +26,13 @@ build_libtirpc() {
             LDFLAGS="$STATIC_LDFLAGS"
         run_make
         make -s install
-        sed -n '1,/\*\//p' "$WORK_DIR/libevent/compat/sys/queue.h" > LIBTIRPC-NOTICES
+        # queue.h opens with two one-line RCS ID comments; its notice
+        # follows them, before the first directive.
+        awk '/^#/ { exit } { print }' "$WORK_DIR/libevent/compat/sys/queue.h" > LIBTIRPC-NOTICES
+        grep -q 'Redistribution and use' LIBTIRPC-NOTICES || {
+            echo "LIBTIRPC-NOTICES lacks queue.h's notice" >&2
+            exit 1
+        }
     )
 }
 
@@ -96,8 +102,13 @@ build_nfs_utils() {
             echo "support/export/mount.x:"
             sed -n '1,/\*\//p' support/export/mount.x
             echo "libevent compat/sys/queue.h:"
-            sed -n '1,/\*\//p' "$WORK_DIR/libevent/compat/sys/queue.h"
+            awk '/^#/ { exit } { print }' "$WORK_DIR/libevent/compat/sys/queue.h"
         } > NFS-UTILS-NOTICES
+        # One license per file above.
+        [[ $(grep -c 'Redistribution and use' NFS-UTILS-NOTICES) -eq 9 ]] || {
+            echo "NFS-UTILS-NOTICES lacks a BSD notice" >&2
+            exit 1
+        }
         install_binary utils/mount/mount.nfs mount.nfs
         install_binary utils/showmount/showmount showmount
         # mount.nfs picks its mode from its name.
