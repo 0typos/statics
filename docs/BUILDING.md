@@ -162,13 +162,13 @@ terms are indexed by `COMPONENTS.tsv` and packaged under `licenses/`.
 
 Large tools go in a second archive, `statics-extra-<arch>.tar.xz`, so the
 main kit stays small. `components.tsv` assigns each component to `main` or
-`extra`, or to `both` for a library linked into tools in each archive (OpenSSL
-and libcap-ng), whose notices and SBOM entry then appear in each. The extra archive has the same layout and metadata as the main one,
+`extra`, or to `both` for a library linked into tools in each archive (OpenSSL,
+libcap-ng, zlib, and ncurses), whose notices and SBOM entry then appear in each. The extra archive has the same layout and metadata as the main one,
 under a top-level `<arch>-extra/` directory, with its own `SHA256SUMS`,
 `COMPONENTS.tsv`, notices, and SBOM (`statics-extra-<arch>.spdx.json`). It
 exists only for an architecture that builds at least one extra tool: today
-`stunnel` and `openvpn` on every target, and `rclone`, `croc`, `crictl`, and
-`ctr` on every target with Go. A C tool's builder installs with
+`stunnel`, `openvpn`, `lftp`, `aria2c`, and `par2` on every target, and
+`rclone`, `croc`, `crictl`, and `ctr` on every target with Go. A C tool's builder installs with
 `install_component_binary`, which, like `go_build`, puts it in the archive
 `components.tsv` names. It is
 compressed with `xz -9` rather than the main archive's `-6`: the 64 MiB

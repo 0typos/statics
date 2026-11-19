@@ -9,9 +9,12 @@ tracing, remote debugging, serial consoles, filesystem, block-device, and raw
 flash diagnosis, kernel modules, kexec, and eBPF inspection, BMC management over IPMI, compression, archives, and
 buffered pipe transfer, JSON processing, common IoT field buses, persistent
 terminal sessions and bash, TLS wrapping, OpenVPN, SOCKS5 and HTTP proxies,
-DHCP, DNS, and TFTP for netboot, serial ports shared over the network, and
-TLS server auditing. The optional extra archive adds object-storage and SFTP sync,
-code-phrase file transfer, and container runtime inspection.
+DHCP, DNS, and TFTP for netboot, serial ports shared over the network,
+TLS server auditing, SFTP and SCP with curl, SMB and NFS mounts, partition
+imaging and multicast, and fast checksums. The optional extra archive adds
+object-storage and SFTP sync, directory mirroring, resumable segmented
+downloads, parity repair, code-phrase file transfer, and container runtime
+inspection.
 
 This page records candidates, not commitments. The executable contract is in
 the [toolkit guide](TOOLKIT.md), and implementation proposals should follow
@@ -27,7 +30,10 @@ the [contribution checklist](../CONTRIBUTING.md).
 | Packet and throughput | `tcpdump`, `ngrep`, `dhcpdump`, `hping3`, `tcpreplay`, `tcpprep`, `tcprewrite`, `iftop`, `nethogs`, `iperf3` |
 | Link-layer discovery | `lldpd`, `lldpcli` |
 | Application protocols and data | `curl`, `openssl`, `drill`, `jq` |
-| Discovery and transfer | `nmap`, `ncat`, `rsync`, `sftp-server` |
+| Discovery and transfer | `nmap`, `ncat`, `rsync`, `sftp-server`; `lftp` and `aria2c` in the extra archive |
+| Network shares | `mount.cifs`, `mount.nfs`, `showmount` |
+| Imaging and multicast | partclone (ext, FAT, `dd`), `udp-sender`, `udp-receiver` |
+| Checksums and parity | `xxhsum`; `par2` in the extra archive |
 | Compression and archives | `zstd`, `xz`, `bzip2`, `pigz`, `bsdtar`, `bsdcpio` |
 | Pipe transfer | `pv`, `mbuffer` |
 | Tunnels and VPN | `tunpipe`, `pppd`; `openvpn` in the extra archive |
@@ -45,8 +51,8 @@ the [contribution checklist](../CONTRIBUTING.md).
 | Namespaces and privilege | `nsenter`, `unshare`, `lsns`, `setpriv`, `findmnt` |
 | Embedded buses | selected `can-utils`, `i2c-tools`, and `spi-tools` programs |
 
-The extra archive adds `stunnel` and `openvpn` (each with its own OpenSSL)
-on every target, and `rclone` (trimmed), `croc`, `crictl`, and `ctr` where Go
+The extra archive adds `stunnel`, `openvpn`, `lftp`, and `aria2c` (each with
+its own OpenSSL) and `par2` on every target, and `rclone` (trimmed), `croc`, `crictl`, and `ctr` where Go
 runs.
 Further rclone backends and commands are requests against its trimmed main
 rather than new tools; see the [toolkit guide](TOOLKIT.md#rclone-trimmed).
@@ -62,8 +68,10 @@ disruptive.
 | 1 | `usbutils`, `pciutils` | Bus topology, descriptors, and device identification | Package and update hardware ID databases explicitly |
 | 1 | `mmc-utils` | eMMC/SD health, EXT_CSD, and device configuration | Write operations can be destructive; needs real-device tests |
 | 2 | `fio` | Storage and I/O characterization | Larger binary, workload safety, and reproducibility considerations |
+| 2 | partclone btrfs, XFS, and NTFS | Image the filesystems of most Linux servers and Windows disks | btrfs alone is about 280 KB of xz; XFS needs liburcu, NTFS ntfs-3g; probably the extra archive |
 | 3 | `stress-ng` | CPU, memory, scheduler, and system stress | Large surface and intentionally disruptive workloads |
 | 3 | `tcpflow` | Reassemble TCP streams into files | Needs Boost (C++ headers), a large build dependency for one tool |
+| 3 | `b3sum` | BLAKE3 checksums | Upstream's only CLI is Rust; a C `b3sum` would be new code over the C library |
 | 3 | `nghttp`, `h2load` | HTTP/2 client and load generator | C++23 with libev, c-ares, and zlib, and two more static copies of OpenSSL: about 3 MB of archive; libnghttp2 in `curl` is the cheap alternative |
 
 Also consider focused variants instead of new binaries:

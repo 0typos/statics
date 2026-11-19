@@ -42,7 +42,7 @@ user-mode emulation proves that non-native outputs can actually start.
 
 | 🧰 Carry it | 🐧 Run it | 🔐 Trust it |
 |---|---|---|
-| 123 physical executables, plus BusyBox, Dropbear, kmod, iptables and decompressor links, and six larger tools (four in Go) in an optional extra archive | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
+| 135 physical executables, plus BusyBox, Dropbear, kmod, iptables and decompressor links, and nine larger tools (four in Go) in an optional extra archive | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
 | Network, process, namespace, storage and hardware diagnosis | Static musl builds avoid a dependency on the target's libc | Deterministic archives, QEMU smoke tests and release attestations |
 
 ## Get a kit
@@ -66,15 +66,16 @@ Not sure which archive fits the device? Start with the
 
 Each architecture has two archives. **`statics-<arch>.tar.xz` is the kit**:
 every tool below, and it is all most sessions need.
-**`statics-extra-<arch>.tar.xz` is optional** and holds six larger tools:
-`stunnel` and `openvpn`, which each carry their own copy of OpenSSL, and
-four Go tools, `rclone`, `croc`, `crictl` and `ctr`. Splitting them out keeps
-the main kit small enough for routers and other cramped devices; take the
-extra archive when you need TLS wrapping or a VPN, to sync with object
-storage, hand files across machines, or inspect a container runtime. It
-extracts beside the main kit as `<arch>-extra/`, with its own checksums, SBOM
-and notices. On `powerpc` and `powerpc64`, where Go does not run, it holds
-only `stunnel` and `openvpn` (see the
+**`statics-extra-<arch>.tar.xz` is optional** and holds nine larger tools:
+`stunnel`, `openvpn`, `lftp` and `aria2c`, which each carry their own copy of
+OpenSSL, `par2`, and four Go tools, `rclone`, `croc`, `crictl` and `ctr`.
+Splitting them out keeps the main kit small enough for routers and other
+cramped devices; take the extra archive when you need TLS wrapping or a VPN,
+to mirror directory trees, resume large downloads, repair files from parity
+data, sync with object storage, hand files across machines, or inspect a
+container runtime. It extracts beside the main kit as `<arch>-extra/`, with
+its own checksums, SBOM and notices. On `powerpc` and `powerpc64`, where Go
+does not run, it holds only the five C tools (see the
 [architecture guide](docs/ARCHITECTURES.md#go-tools)).
 
 Archive sizes for the current pins:
@@ -148,7 +149,7 @@ data and safe starting commands.
 
 ## Inside the case
 
-The bundle contains 123 physical executables (122 on `powerpc` and `powerpc64`, which get no
+The bundle contains 135 physical executables (134 on `powerpc` and `powerpc64`, which get no
 Go tools) plus BusyBox, Dropbear, kmod and iptables multi-call links, decompressor links such as `unxz`,
 Nmap runtime data, checksums, an SPDX SBOM and upstream license texts.
 
@@ -160,7 +161,10 @@ Nmap runtime data, checksums, an SPDX SBOM and upstream license texts.
 | Legacy firewalls | `iptables-legacy`, `ip6tables-legacy` (with `-save` and `-restore`), `ebtables-legacy`, `arptables-legacy` | x_tables rules on kernels and firmware without nf_tables |
 | Reachability and path | `ping`, `ping6`, `arping`, `tracepath`, `traceroute`, `traceroute6`, `ndisc6`, `rdisc6`, `rltraceroute6`, `tcptraceroute6`, `mtr`, `mtr-packet` | Unprivileged ping, ARP, path MTU, TCP and UDP traceroute, and IPv6 neighbor and router discovery |
 | Discovery and packet diagnosis | `nmap`, `tcpdump`, `ngrep`, `dhcpdump`, `hping3`, `tcpreplay`, `tcpprep`, `tcprewrite`, `lldpd`, `lldpcli`, `iftop`, `nethogs`, `iperf3` | Services, captures, payload grep, DHCP, crafted probes, capture replay, LLDP neighbors, live bandwidth by host and process, and throughput |
-| HTTP, TLS, DNS and data | `curl`, `openssl`, `testssl.sh`, `drill`, `jq` | Protocol checks, TLS server audits and structured output |
+| HTTP, TLS, DNS and data | `curl`, `openssl`, `testssl.sh`, `drill`, `jq` | Protocol checks, SFTP and SCP transfers, TLS server audits and structured output |
+| Network shares | `mount.cifs`, `mount.nfs`, `mount.nfs4`, `umount.nfs`, `showmount` | Mount SMB/CIFS and NFS shares and list NFS exports |
+| Imaging and multicast | `partclone.ext4`, `partclone.vfat`, `partclone.dd`, `partclone.restore`, `partclone.chkimg`, `partclone.info`, `udp-sender`, `udp-receiver` | Image ext and FAT partitions by used blocks, raw-copy any other, and send one image to many machines at once |
+| Checksums | `xxhsum` | Fast checksums to confirm a large copy arrived intact |
 | Compression and archives | `zstd`, `xz`, `bzip2`, `pigz`, `bsdtar`, `bsdcpio`, plus `unzstd`, `zstdcat`, `unxz`, `xzcat`, `bunzip2`, `bzcat`, `unpigz` | Compress and unpack streams; create and extract tar, cpio, zip, 7z and ISO images, and read RAR |
 | Pipe transfer | `pv`, `mbuffer` | Progress, rate limits and buffering for data piped over SSH or a socket |
 | Serial console and transfer | `picocom`, `sz`, `rz`, `ser2net` | Serial consoles, ZMODEM file transfer over a serial or terminal session, and a serial port shared over TCP |
@@ -180,7 +184,8 @@ The extra archive adds:
 | Area | Outputs | What they are for |
 |---|---|---|
 | TLS wrapping and VPN | `stunnel`, `openvpn` | TLS around plain TCP services, and OpenVPN client and server |
-| File transfer and sync | `rclone`, `croc` | Copy, sync and check against local disks, S3-compatible storage, SFTP, WebDAV and HTTP; send a file to another machine with a one-time code |
+| File transfer and sync | `rclone`, `croc`, `lftp`, `aria2c` | Copy, sync and check against local disks, S3-compatible storage, SFTP, WebDAV and HTTP; send a file to another machine with a one-time code; mirror trees over FTP, FTPS, SFTP and HTTP; resumable, segmented HTTP, FTP, BitTorrent and Metalink downloads |
+| Parity and repair | `par2` | Recovery data that repairs damaged or missing files |
 | Container runtimes | `crictl`, `ctr` | Pods, containers, logs, images and snapshots through the CRI and containerd sockets |
 
 `rclone` is trimmed to the backends and commands a field session needs, and
