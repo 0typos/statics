@@ -62,7 +62,7 @@ pinned_version() { awk -F '|' -v n="$1" '$1 == n { print $2 }' "$repo_root/sourc
 declare -A extra_smoke=(
     [stunnel]="stunnel $(pinned_version stunnel)|-version"
     [openvpn]="OpenVPN $(pinned_version openvpn)|--version"
-    [lftp]="LFTP | Version $(pinned_version lftp)|--version"
+    [lftp]="Version $(pinned_version lftp)|--version"
     [aria2c]="aria2 version $(pinned_version aria2)|-v"
     [par2]="par2cmdline version $(pinned_version par2cmdline)|-V"
 )
@@ -690,7 +690,7 @@ PY
     "${runner[@]}" "$output_dir/partclone.extfs" -q -c -s "$scratch/ext.img" \
         -o "$scratch/ext.pcl" -L "$scratch/partclone.log" >/dev/null 2>&1 ||
         failed "partclone.extfs clone"
-    "${runner[@]}" "$output_dir/partclone.chkimg" -q -s "$scratch/ext.pcl" \
+    "${runner[@]}" "$output_dir/partclone.chkimg" -s "$scratch/ext.pcl" \
         -L "$scratch/partclone.log" >/dev/null 2>&1 || failed "partclone.chkimg"
     "${runner[@]}" "$output_dir/partclone.restore" -q -W -s "$scratch/ext.pcl" \
         -o "$scratch/restored.img" -L "$scratch/partclone.log" >/dev/null 2>&1 ||

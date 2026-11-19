@@ -1,0 +1,77 @@
+partclone stores 32- and 64-bit checksums through pointers that are not
+aligned for them: checksum.c reads and writes the running checksum, an
+unsigned char array on main.c's stack, through uint32_t and XXH64_hash_t
+pointers, and write_image_desc passes the address of the crc member of
+the packed (#pragma pack(1)) image header to init_crc32. On
+strict-alignment targets these loads and stores fault: partclone.extfs
+died with SIGBUS under QEMU's MIPS emulation while writing an image.
+Copying through an aligned local variable gives the same bytes, in the
+same (native) byte order, on every target. Source only; nothing here runs
+at build time.
+
+--- a/src/checksum.c
++++ b/src/checksum.c
+@@ -142,11 +142,12 @@
+ 	switch(checksum_mode) {
+ 
+ 	case CSM_CRC32:
+-		init_crc32((uint32_t*)seed);
+-		break;
+-
+ 	case CSM_CRC32_0001:
+-		init_crc32((uint32_t*)seed);
++		{
++			uint32_t crc;
++			init_crc32(&crc);
++			memcpy(seed, &crc, sizeof(crc));
++		}
+ 		break;
+ 
+ #ifdef HAVE_XXHASH
+@@ -220,11 +221,16 @@
+ 	switch(cs_mode)
+ 	{
+ 	case CSM_CRC32:
+-		*(uint32_t*)checksum = pc_crc32(*(uint32_t*)checksum, (unsigned char*)buf, size);
+-		break;
+-
+ 	case CSM_CRC32_0001:
+-		*(uint32_t*)checksum = crc32_0001(*(uint32_t*)checksum, (unsigned char*)buf, size);
++		{
++			uint32_t crc;
++			memcpy(&crc, checksum, sizeof(crc));
++			if (cs_mode == CSM_CRC32)
++				crc = pc_crc32(crc, (unsigned char*)buf, size);
++			else
++				crc = crc32_0001(crc, (unsigned char*)buf, size);
++			memcpy(checksum, &crc, sizeof(crc));
++		}
+ 		break;
+ 
+ #ifdef HAVE_XXHASH
+@@ -251,7 +257,10 @@
+ 	{
+ #ifdef HAVE_XXHASH
+ 	case CSM_XXH64:
+-		*(XXH64_hash_t*)checksum = XXH64_digest(xxh64_state);
++		{
++			XXH64_hash_t hash = XXH64_digest(xxh64_state);
++			memcpy(checksum, &hash, sizeof(hash));
++		}
+ 		break;
+ 
+ 	case CSM_XXH128:
+--- a/src/partclone.c
++++ b/src/partclone.c
+@@ -1160,8 +1160,9 @@
+ 	memcpy(&buf_v2.fs_info, &fs_info, sizeof(file_system_info));
+ 	memcpy(&buf_v2.options, &img_opt, sizeof(image_options));
+ 
+-	init_crc32(&buf_v2.crc);
+-	buf_v2.crc = pc_crc32(buf_v2.crc, &buf_v2, sizeof(image_desc_v2) - CRC32_SIZE);
++	uint32_t crc;
++	init_crc32(&crc);
++	buf_v2.crc = pc_crc32(crc, &buf_v2, sizeof(image_desc_v2) - CRC32_SIZE);
+ 
+ 	if (write_all(ret, (char*)&buf_v2, sizeof(image_desc_v2), opt) != sizeof(image_desc_v2))
+ 		log_mesg(0, 1, 1, opt->debug, "error writing image header to image: %s\n", strerror(errno));

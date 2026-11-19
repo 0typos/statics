@@ -5,6 +5,8 @@ build_partclone() {
     (
         cd "$WORK_DIR/partclone" || exit
         local e2fs=$WORK_DIR/e2fsprogs xxh=$WORK_DIR/xxhash
+        # Checksums through aligned copies, for strict-alignment targets.
+        patch -s -p1 < "$REPO_ROOT/patches/partclone-alignment.patch"
         # A tag archive: generate the build system, without gettext, whose
         # autoconf macros the builder lacks (and NLS is off everywhere).
         sed -i -e '/^AM_GNU_GETTEXT/d' -e '\|po/Makefile.in|d' configure.ac

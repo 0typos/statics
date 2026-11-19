@@ -4,13 +4,14 @@ build_libtirpc() {
     echo "==> building libtirpc (static, for mount.nfs and showmount)"
     (
         cd "$WORK_DIR/libtirpc" || exit
-        # No GSSAPI (Kerberos), AUTH_DES, or symbol versioning. Its own
+        # RPC clients without /etc/netconfig or /etc/services (the patch).
+        patch -s -p1 < "$REPO_ROOT/patches/libtirpc-without-etc-files.patch"
+        # No GSSAPI (Kerberos), AUTH_DES, or symbol versioning; its own
         # /etc/rpc lookups (getrpcbynumber), which musl lacks and
-        # nfs-utils' configure requires. It installs
-        # into its own tree, apart from DEPS_PREFIX, so no other builder
-        # finds it by accident. musl has no <sys/queue.h>; libevent's
-        # compat copy (BSD) supplies the TAILQ macros, and its notice goes
-        # with libtirpc's.
+        # nfs-utils' configure requires. musl has no <sys/queue.h>:
+        # libevent's compat copy (BSD) supplies the TAILQ macros, and its
+        # notice goes with libtirpc's. It installs into its own tree, apart
+        # from DEPS_PREFIX, so no other builder finds it by accident.
         CC="$CC" AR="$AR" RANLIB="$RANLIB" ./configure \
             --host="$AUTOCONF_HOST" \
             --prefix="$WORK_DIR/libtirpc/install" \
