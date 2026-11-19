@@ -88,7 +88,7 @@ bash|5.2.37|9599b22ecd1d5787ad7d3b7bf0c59f312b3396d1e281175dd1f8a4014da621ff|htt
 testssl.sh|3.2.5|23bb53d50ae093b89631e9fff547c087f632bf35f7a3d7dc78dd4ffff56cd779|https://github.com/testssl/testssl.sh/archive/refs/tags/v3.2.5.tar.gz
 libssh2|1.11.1|9954cb54c4f548198a7cbebad248bdc87dd64bd26185708a294b2b50771e3769|https://libssh2.org/download/libssh2-1.11.1.tar.xz
 readline|8.2.13|0e5be4d2937e8bd9b7cd60d46721ce79f88a33415dd68c2d738fb5924638f656|https://ftp.gnu.org/gnu/readline/readline-8.2.13.tar.gz
-lftp|4.9.3|96e7199d7935be33cf6b1161e955b2aab40ab77ecdf2a19cea4fc1193f457edc|https://lftp.yar.ru/ftp/lftp-4.9.3.tar.xz
+lftp|4.9.3|68116cc184ab660a78a4cef323491e89909e5643b59c7b5f0a14f7c2b20e0a29|https://github.com/lavv17/lftp/releases/download/v4.9.3/lftp-4.9.3.tar.gz
 expat|2.10.0|c624ba2998fc65df1163a49641ff3f9ab73138b11641d92c86bee0fb01b1bc7f|https://github.com/libexpat/libexpat/releases/download/R_2_10_0/expat-2.10.0.tar.xz
 aria2|1.37.0|60a420ad7085eb616cb6e2bdf0a7206d68ff3d37fb5a956dc44242eb2f79b66b|https://github.com/aria2/aria2/releases/download/release-1.37.0/aria2-1.37.0.tar.xz
 cifs-utils|7.9|9f3750f402520b15c2c8eb52fd485df6ea77e5e66fe5e39ce8ac4386c32c0296|https://download.samba.org/pub/linux-cifs/cifs-utils/cifs-utils-7.9.tar.bz2

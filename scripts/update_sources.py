@@ -861,10 +861,12 @@ def latest_readline() -> tuple[str, str]:
 
 
 def latest_lftp() -> tuple[str, str]:
-    return latest_from_index(
-        "https://lftp.yar.ru/ftp/",
-        r"lftp-(\d+\.\d+\.\d+)\.tar\.xz\"",
-        "https://lftp.yar.ru/ftp/lftp-{version}.tar.xz",
+    # Upstream's GitHub release, the same archive as lftp.yar.ru's, which
+    # CircleCI could not reach.
+    return latest_from_github_release(
+        "lavv17/lftp",
+        r"v(\d+\.\d+\.\d+)",
+        "https://github.com/lavv17/lftp/releases/download/v{version}/lftp-{version}.tar.gz",
     )
 
 
