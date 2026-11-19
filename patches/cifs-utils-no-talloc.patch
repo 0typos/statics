@@ -1,0 +1,51 @@
+mount.cifs without talloc. Upstream links talloc only for the CLDAP ping
+that, when a DFS domain name resolves to several domain controllers, asks
+Active Directory for the client's site and lists that site's controllers
+first. Without it mount.cifs passes the kernel every address the name
+resolved to, as it does for any other host. configure stops requiring
+talloc, and the builder runs autoreconf. Source only; nothing here runs
+at build time.
+
+--- a/configure.ac
++++ b/configure.ac
+@@ -133,9 +133,6 @@
+ AC_CHECK_HEADERS([sys/fsuid.h])
+ AC_CHECK_FUNC(setfsuid, , [AC_MSG_ERROR([System does not support setfsuid()])])
+ 
+-# libtalloc
+-AC_CHECK_HEADERS([talloc.h], ,[AC_MSG_ERROR([talloc.h not found, consider installing libtalloc-devel.])])
+-AC_CHECK_LIB(talloc, talloc_init, ,[AC_MSG_ERROR([talloc.h not found, consider installing libtalloc-devel.])])
+ 
+ # FIXME: add test(s) to autodisable these flags when compiler/linker don't support it
+ if test $enable_pie != "no"; then
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -28,8 +28,8 @@
+ bin_SCRIPTS =
+ sbin_PROGRAMS =
+ 
+-resolve_hosts_SOURCES = data_blob.c asn1.c cldap_ping.c resolve_host.c
+-resolve_hosts_LDADD = -ltalloc -lresolv
++resolve_hosts_SOURCES = resolve_host.c
++resolve_hosts_LDADD = -lresolv
+ 
+ if CONFIG_CIFSUPCALL
+ sbin_PROGRAMS += cifs.upcall
+--- a/resolve_host.c
++++ b/resolve_host.c
+@@ -113,6 +113,7 @@
+ 	}
+ 
+ 
++#ifdef HAVE_TALLOC_H
+ 	// Is this a DFS domain where we need to do a cldap ping to find the closest node?
+ 	if (count_v4 > 1 || count_v6 > 1) {
+ 		int res;
+@@ -298,6 +299,7 @@
+ 			strlcat(addrstr, tmpbuf, MAX_ADDR_LIST_LEN);
+ 		}
+ 	}
++#endif /* HAVE_TALLOC_H */
+ 
+ resolve_host_out:
+ 	freeaddrinfo(addrlist);

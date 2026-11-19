@@ -49,6 +49,7 @@ copy_license libcap-ng COPYING.LIB
 copy_license libnftnl COPYING
 copy_license nftables COPYING
 copy_license tcpdump LICENSE
+copy_license libssh2 COPYING
 copy_license curl COPYING
 copy_license iperf3 LICENSE
 copy_license ethtool COPYING
@@ -180,6 +181,21 @@ copy_license ser2net COPYING
 copy_license bash COPYING
 copy_license testssl.sh LICENSE
 copy_license testssl.sh TESTSSL-NOTICES
+copy_license readline COPYING
+copy_license lftp COPYING
+copy_license expat COPYING
+copy_license aria2 COPYING
+copy_license aria2 LICENSE.OpenSSL
+copy_license cifs-utils COPYING
+copy_license libtirpc COPYING
+copy_license libtirpc LIBTIRPC-NOTICES
+copy_license nfs-utils COPYING
+copy_license nfs-utils NFS-UTILS-NOTICES
+copy_license udpcast COPYING
+copy_license partclone COPYING
+copy_license xxhash LICENSE
+copy_license xxhash cli/COPYING
+copy_license par2cmdline COPYING
 copy_license wireguard-go LICENSE
 copy_license rclone COPYING
 copy_license croc LICENSE
@@ -201,6 +217,12 @@ if [[ $active == *" testssl.sh "* ]]; then
     install -D -m 0644 \
         "$source_root/containerd/vendor/github.com/cyphar/filepath-securejoin/LICENSE.MPL-2.0" \
         "$license_root/testssl.sh/MPL-2.0"
+fi
+
+# udpcast's COPYING states the GPL 2.0 without its text; xxHash's CLI
+# carries it verbatim.
+if [[ $active == *" udpcast "* ]]; then
+    install -D -m 0644 "$source_root/xxhash/cli/COPYING" "$license_root/udpcast/GPL-2.0"
 fi
 
 # Go's runtime and standard library come from the toolchain that linked them.
