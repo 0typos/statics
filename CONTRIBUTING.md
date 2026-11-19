@@ -155,8 +155,8 @@ git diff -- sources.lock
 ```
 
 The updater downloads the proposed archive to compute its SHA-256, and for
-rclone, croc, and zstd rejects it unless the release's own checksum file lists
-that digest. Check rclone's PGP-signed `SHA256SUMS` with
+rclone, croc, zstd, and nfs-utils (kernel.org's signed `sha256sums.asc`)
+rejects it unless the release's own checksum file lists that digest. Check rclone's PGP-signed `SHA256SUMS` with
 `gpg --verify SHA256SUMS` against the key published at
 <https://rclone.org/KEYS>, and the signed tags of rclone and containerd.
 stunnel's release must also match its published `.sha256`. Verify the
@@ -164,8 +164,15 @@ detached PGP signatures upstream publishes for libevent (Nick Mathewson,
 `7A02B3521DC75C542BA015456AFEE6D49E92B601`), stunnel (Michał Trojnara,
 `2BC7E4E67E3CC0C1BEA72F8C2EFC7FF0D416E014`), OpenVPN (security@openvpn.net,
 `33DA8C9EAE0EAE8C73172C10822F6DF096D04874`), dnsmasq (Simon Kelley,
-`D6EACBD6EE46B834248D111215CDDA6AE19135A2`), and bash (Chet Ramey,
-`7C0135FB088AAF6C66C650B9BB5869F064EA74AB`), for example with keys
+`D6EACBD6EE46B834248D111215CDDA6AE19135A2`), bash and readline (Chet Ramey,
+`7C0135FB088AAF6C66C650B9BB5869F064EA74AB`), libssh2 (Daniel Stenberg,
+`27EDEAF22F3ABCEB50DB9A125CC908FDB71E12C2`), lftp (Alexander V. Lukyanov,
+`C027FA3148652A5513036413A824BB69F2A99A18`), expat (Sebastian Pipping,
+`CB8DE70A90CFBF6C3BF5CC5696262ACFFBD3AEC6`), cifs-utils (its distribution
+verification key, `C699981A31F338706C817650DF5BA9D30642D5A0`), nfs-utils
+(Steve Dickson, `FEFAD1BB14447F4968C1971095D24347967C393E`; the signature
+covers the uncompressed tar), and par2cmdline (Ike Devolder,
+`DB2277BCD500AA3825610BDDDB323392796CA067`), for example with keys
 fetched from `hkps://keyserver.ubuntu.com`. Review
 upstream release notes, published checksums, signatures when available,
 license changes, and archive provenance. Then run the relevant builds and

@@ -183,6 +183,18 @@ sources=(
     ser2net
     bash
     testssl.sh
+    libssh2
+    readline
+    lftp
+    expat
+    aria2
+    cifs-utils
+    libtirpc
+    nfs-utils
+    udpcast
+    partclone
+    xxhash
+    par2cmdline
 )
 
 # STATICS_ONLY_DEPS builds just the shared libraries (the Dockerfile's deps
@@ -272,7 +284,9 @@ dag=$WORK_DIR/dag.mk
         kmod kexec-tools libelf bpftool iputils traceroute ndisc6 lldpd \
         ipset iptables ebtables arptables ngrep hping3 ncurses iftop nethogs \
         tcpreplay dhcpdump libevent tmux stunnel openvpn microsocks tinyproxy \
-        dnsmasq libyaml gensio ser2net bash testssl; do
+        dnsmasq libyaml gensio ser2net bash testssl libssh2 readline lftp \
+        expat aria2 cifs-utils libtirpc nfs-utils udpcast xxhash partclone \
+        par2cmdline; do
         printf ' $(S)/%s' "$c"
     done
     if [[ $go_env != none ]]; then
@@ -294,7 +308,8 @@ dag=$WORK_DIR/dag.mk
     emit nftables nftables build_nftables libnftnl
     emit strace strace build_strace
     emit tcpdump tcpdump build_tcpdump deps
-    emit curl curl build_curl deps
+    emit libssh2 curl build_libssh2 deps zlib
+    emit curl curl build_curl deps libssh2 zlib
     emit iperf3 iperf3 build_iperf3 deps
     emit ethtool ethtool build_ethtool deps
     emit jq jq build_jq
@@ -368,6 +383,17 @@ dag=$WORK_DIR/dag.mk
     emit ser2net ser2net build_ser2net libyaml gensio
     emit bash bash build_bash ncurses
     emit testssl testssl build_testssl
+    emit readline lftp build_readline ncurses
+    emit expat aria2 build_expat
+    emit lftp lftp build_lftp deps zlib ncurses readline expat
+    emit aria2 aria2 build_aria2 deps zlib expat
+    emit cifs-utils cifs-utils build_cifs_utils deps
+    emit libtirpc nfs-utils build_libtirpc
+    emit nfs-utils nfs-utils build_nfs_utils libtirpc libnl util-linux
+    emit udpcast udpcast build_udpcast
+    emit xxhash xxhash build_xxhash
+    emit partclone partclone build_partclone deps e2fsprogs xxhash
+    emit par2cmdline par2cmdline build_par2cmdline
     emit wireguard-go wireguard-go build_wireguard_go
     emit rclone rclone build_rclone
     emit croc croc build_croc

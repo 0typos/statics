@@ -1,7 +1,7 @@
 # Toolkit guide
 
-The default bundle is a compact Linux troubleshooting kit: 123 physical
-executables (122 on `powerpc` and `powerpc64`, which have no Go tools),
+The default bundle is a compact Linux troubleshooting kit: 135 physical
+executables (134 on `powerpc` and `powerpc64`, which have no Go tools),
 BusyBox applet links, Dropbear, kmod, and iptables multi-call links, decompressor links, Nmap runtime
 data, license texts, checksums, and build metadata. Static linking removes the
 dependency on a target's installed libc; it does not replace kernel features,
@@ -33,7 +33,10 @@ Nmap data, notices, and licenses remain available.
 | Reachability and path | `ping`, `arping`, `tracepath`, `traceroute`, `ndisc6`, `rdisc6`, `rltraceroute6`, `tcptraceroute6`, `mtr`, `mtr-packet`; `ping6`, `traceroute6` | ICMP (unprivileged where allowed), ARP, path MTU, UDP/ICMP/TCP traceroute, and IPv6 neighbor and router discovery |
 | Discovery and packet diagnosis | `nmap`, `tcpdump`, `ngrep`, `dhcpdump`, `hping3`, `tcpreplay`, `tcpprep`, `tcprewrite`, `lldpd`, `lldpcli`, `iperf3` | Host/service discovery, capture, payload grep, DHCP decoding, crafted probes, capture replay, LLDP/CDP neighbors, and throughput |
 | Live traffic | `iftop`, `nethogs` | Bandwidth by host pair and by process, interactively |
-| Protocol and data checks | `curl`, `openssl`, `drill`, `jq`, `rsync` | HTTP, TLS, DNS, structured output, and efficient file transfer |
+| Protocol and data checks | `curl`, `openssl`, `drill`, `jq`, `rsync` | HTTP, TLS, DNS, SFTP and SCP (curl), structured output, and efficient file transfer |
+| Network shares | `mount.cifs`, `mount.nfs`, `showmount`; `mount.nfs4`, `umount.nfs`, `umount.nfs4` | Mount SMB/CIFS and NFS shares, and list an NFS server's exports |
+| Imaging and multicast | `partclone.extfs`, `partclone.fat`, `partclone.dd`, `partclone.restore`, `partclone.chkimg`, `partclone.info`, `udp-sender`, `udp-receiver`; `partclone.ext2`, `partclone.ext3`, `partclone.ext4`, `partclone.vfat`, `partclone.fat12`, `partclone.fat16`, `partclone.fat32` | Used-block images of ext and FAT filesystems, raw partition images, and one stream sent to many machines by multicast |
+| Checksums | `xxhsum` | Fast xxHash checksums (XXH32, XXH64, XXH3, XXH128) to create and check |
 | Compression and archives | `zstd`, `xz`, `bzip2`, `pigz`, `bsdtar`, `bsdcpio`; `unzstd`, `zstdcat`, `unxz`, `xzcat`, `bunzip2`, `bzcat`, `unpigz` | Stream compression, and tar, cpio, zip, 7z, ISO 9660, and ar archives; RAR read-only |
 | Pipe transfer | `pv`, `mbuffer` | Progress and rate limits on a pipe, and a large buffer that keeps a stream moving across stalls |
 | Serial console and transfer | `picocom`, `sz`, `rz`, `ser2net` | Serial terminal sessions, XMODEM/YMODEM/ZMODEM file transfer, and a serial port shared over TCP or RFC 2217 |
@@ -53,22 +56,24 @@ Nmap data, notices, and licenses remain available.
 
 Entries after a semicolon are symbolic links to a multi-call binary (BusyBox,
 Dropbear, e2fsck, mke2fs, kmod, xtables-legacy-multi) or to a program that
-picks its mode from its name (a compressor, `ping6`, `traceroute6`); they do
+picks its mode from its name (a compressor, `ping6`, `traceroute6`,
+`mount.nfs`, partclone, `par2`); they do
 not add separate binary payloads. `ping`, `arping`, and `traceroute` are the
 iputils and traceroute.sourceforge.net programs, not BusyBox applets;
 `busybox ping` still reaches the applet.
 
-Six larger tools ship separately in `statics-extra-<arch>.tar.xz`:
-`stunnel` and `openvpn`, which each link their own copy of OpenSSL, on every
-architecture, and four Go tools on every architecture with Go (not
-`powerpc` or `powerpc64`). It extracts to `<arch>-extra/` with its own
+Nine larger tools ship separately in `statics-extra-<arch>.tar.xz`:
+`stunnel`, `openvpn`, `lftp`, and `aria2c`, which each link their own copy
+of OpenSSL, and `par2`, on every architecture, and four Go tools on every
+architecture with Go (not `powerpc` or `powerpc64`). It extracts to `<arch>-extra/` with its own
 notices, SBOM, and checksums; see
 [the extra archive](#extra-archive-rclone-croc-crictl-and-ctr).
 
 | Area | Executables | Primary use |
 | --- | --- | --- |
 | TLS wrapping and VPN | `stunnel`, `openvpn` | TLS around plain TCP services, and OpenVPN clients and servers |
-| File transfer and sync | `rclone`, `croc` | Copy and sync with S3, SFTP, WebDAV, and HTTP; hand a file to another machine with a one-time code |
+| File transfer and sync | `rclone`, `croc`, `lftp`, `aria2c` | Copy and sync with S3, SFTP, WebDAV, and HTTP; hand a file to another machine with a one-time code; mirror trees over FTP, FTPS, SFTP, and HTTP; segmented, resumable HTTP, FTP, BitTorrent, and Metalink downloads |
+| Parity and repair | `par2`; `par2create`, `par2verify`, `par2repair` | Recovery data that repairs damaged or missing files |
 | Container runtimes | `crictl`, `ctr` | Inspect pods, containers, images, logs, and snapshots through the CRI and containerd sockets |
 
 ## License boundary
@@ -263,6 +268,140 @@ bsdtar -cf - -C /srv data | zstd -T0 | mbuffer -q -m 256M | ncat --send-only 192
 `mbuffer -I 9000` and `mbuffer -O 192.0.2.20:9000` do the same without
 `ncat`. Use `pv -L 5m` to cap a transfer at 5 MiB/s on a shared link, and
 `pv -s SIZE` for a percentage and ETA when the size is known.
+
+### SFTP and SCP with curl
+
+`curl` links libssh2, so it speaks `sftp://` and `scp://` to any SSH server,
+the bundle's `dropbear` included. It asks for the password when `-u` gives
+only a user name, or authenticates with an OpenSSH-format private key given
+with `--key`:
+
+```console
+curl -u operator sftp://192.0.2.20/var/log/messages -o messages
+curl -u operator --key ~/.ssh/id_ed25519 -T capture.pcap sftp://192.0.2.20/srv/incident/
+curl -u operator sftp://192.0.2.20/srv/incident/
+curl -u operator scp://192.0.2.20/etc/os-release
+```
+
+A trailing `/` lists a directory. curl checks the host key against
+`~/.ssh/known_hosts`; when the target has none, compare the key's SHA-256
+fingerprint with `--hostpubsha256` rather than skipping the check with
+`--insecure`. `scp://` runs `scp` on the far end, which must be on that
+user's `PATH` there; `sftp://` needs only the server's SFTP subsystem.
+
+### Mirror a tree with lftp
+
+`lftp` (extra archive) mirrors whole directories over FTP, FTPS, SFTP, HTTP,
+and HTTPS, resuming and in parallel. For SFTP it runs an SSH client, so
+point it at the bundle's `dbclient`; `-y` accepts and records a host key it
+has not seen, after printing its fingerprint:
+
+```console
+lftp -c 'set sftp:connect-program "dbclient -y"; open -u operator sftp://192.0.2.20; mirror --continue /var/log /srv/incident/logs'
+lftp -c 'open -u operator ftps://192.0.2.20; mirror --reverse --parallel=4 /srv/outgoing /incoming'
+lftp -c 'open https://mirror.example/pub/; mirror --parallel=4 images/ ./images'
+```
+
+`mirror --reverse` uploads. It asks for passwords itself when `-u` names
+only a user. FTPS and HTTPS use the same CA bundle path as `curl`; set
+`ssl:ca-file` when the target lacks one.
+
+### Resume a download with aria2c
+
+`aria2c` (extra archive) splits a download across connections and picks up
+where it stopped. Interrupt it, or lose the link, and run the same command
+with `-c`; it continues from its `.aria2` control file with HTTP range
+requests:
+
+```console
+aria2c -x4 -s4 https://mirror.example/images/rescue.img
+aria2c -c -x4 -s4 https://mirror.example/images/rescue.img
+aria2c --checksum=sha-256=<hex digest> https://mirror.example/images/rescue.img
+aria2c --seed-time=0 rescue.img.torrent
+aria2c rescue.img.metalink
+```
+
+It also reads `ftp://`, BitTorrent (with DHT), and Metalink, which lists
+mirrors and checksums for a file. Its CA bundle defaults to
+`/etc/ssl/certs/ca-certificates.crt`; use `--ca-certificate` elsewhere.
+
+### Mount SMB and NFS shares
+
+`mount.cifs`, `mount.nfs`, and `mount.nfs4` mount a share themselves; the
+bundle's `mount` does not run them for `-t cifs` or `-t nfs`, because it
+looks for helpers only under `/sbin`. They need root and the kernel's `cifs`
+or `nfs` client, which the bundle's `modprobe` can load:
+
+```console
+mount.cifs //192.0.2.30/share /mnt/share -o username=operator,vers=3.0
+mount.nfs4 192.0.2.30:/srv/export /mnt/nfs
+mount.nfs 192.0.2.30:/srv/export /mnt/nfs -o vers=3,nolock
+showmount -e 192.0.2.30
+umount.nfs /mnt/nfs
+umount /mnt/share
+```
+
+`mount.cifs` asks for the password, or reads it from `PASSWD` or a
+`credentials=` file. It has no Kerberos (`sec=krb5`) or multiuser mounts,
+which need the `cifs.upcall` and `cifscreds` helpers left out of the bundle.
+NFSv3 file locking needs `rpc.statd`, which is not bundled: mount with
+`nolock`, or use NFSv4, which needs neither it nor `rpcbind`. `showmount`
+asks an NFSv3 server's `rpcbind` and `mountd`.
+
+### Image partitions and multicast them
+
+`partclone` copies only the used blocks of an ext2, ext3, or ext4
+(`partclone.ext4`) or FAT (`partclone.vfat`) filesystem into an image, and
+`partclone.dd` copies any partition whole. `partclone.restore` writes an
+image back, `partclone.chkimg` checks one, and `partclone.info` describes
+it. Unmount the filesystem first. partclone logs to
+`/var/log/partclone.log` and stops when it cannot write there, so on a
+rescue system name a writable log with `-L`:
+
+```console
+partclone.ext4 -L /tmp/partclone.log -c -s /dev/sda2 -o - | zstd -T0 -3 >sda2.pcl.zst
+zstd -dc sda2.pcl.zst | partclone.chkimg -L /tmp/partclone.log -s -
+zstd -dc sda2.pcl.zst | partclone.restore -L /tmp/partclone.log -s - -o /dev/sda2
+```
+
+`udp-sender` sends one stream to any number of `udp-receiver`s on the same
+LAN at once, by multicast, so a lab or rack of identical machines can be
+imaged together. Start a receiver on each target (booted into a rescue
+system with the kit), then the sender; it waits for `--min-receivers`, or
+for a key press without `--nokbd`:
+
+```console
+# Each target
+udp-receiver --nokbd --pipe 'zstd -dc' | partclone.restore -L /tmp/partclone.log -s - -o /dev/sda2
+# Source
+partclone.ext4 -L /tmp/partclone.log -c -s /dev/sda2 -o - | udp-sender --nokbd --min-receivers 3 --pipe 'zstd -c'
+```
+
+Name the interface with `--interface` on hosts with more than one. The
+receivers find the sender by broadcast, so the interface needs a broadcast
+address (`ip address add 192.0.2.5/24 brd + dev eth0`). partclone writes
+images in the creating machine's byte order: restore an image from a
+big-endian target (`mips`, the PowerPC targets other than `powerpc64le`,
+and `s390x`) on a big-endian machine, and one from a little-endian target
+on a little-endian machine.
+
+### Verify a copy with xxhsum and par2
+
+`xxhsum` checksums large files at memory speed, so it suits images and
+archives before and after a transfer; BusyBox's `sha256sum` remains for
+when a cryptographic hash is required. `par2` (extra archive) adds recovery
+data, here 10%, that repairs damaged or missing parts of the files later:
+
+```console
+xxhsum -H3 sda2.pcl.zst >sda2.xxh3
+xxhsum -c sda2.xxh3
+par2 create -r10 sda2.par2 sda2.pcl.zst
+par2 verify sda2.par2
+par2 repair sda2.par2
+```
+
+`par2create`, `par2verify`, and `par2repair` are links that run the matching
+mode.
 
 ## Kernel and boot
 
@@ -1190,6 +1329,59 @@ left out, and the two tools that link OpenSSL use the bundle's static
   for an HTTP/2 client and load generator. Linking the C library alone into
   `curl` (`--http2`) would be the cheap way to add an HTTP/2 client.
 
+### File movement tools
+
+These favor size too. The main archive's share adds about 360 KB to it on
+`x86_64` (420 KB on `mips`), libssh2 in `curl` about 100 KB of that. `lftp`
+and `aria2c` are about 1.9 MB of xz each, much of it their own OpenSSL,
+and `par2` (210 KB) repairs only what parity data was made for in advance,
+so all three are in the extra archive.
+
+- `curl` links libssh2 1.11 (OpenSSL crypto, zlib for SSH compression), so
+  it gains `sftp://` and `scp://`, and the zlib it links also gives
+  `--compressed`. libssh2 reads OpenSSH-format and PEM keys, and Ed25519,
+  ECDSA, and RSA host keys.
+- `mount.cifs` is the only cifs-utils program: no `cifs.upcall` or
+  `cifscreds` (Kerberos and keyutils), `cifs.idmap`, ACL tools, `smbinfo`,
+  or PAM module. Without talloc, it leaves out the Active Directory site
+  lookup (a CLDAP ping) that orders a DFS domain's controllers by site; it
+  passes the kernel every address the name resolves to, as for any other
+  server (`patches/cifs-utils-no-talloc.patch`). It links libcap-ng to drop
+  capabilities.
+- `mount.nfs` (also `mount.nfs4`, `umount.nfs`, and `umount.nfs4`) and
+  `showmount` link libtirpc. No NFS server, `rpc.statd`, `rpcbind`, ID
+  mapping, GSS or Kerberos (`sec=krb5`), or libmount. libtirpc is patched
+  to work without `/etc/netconfig` and `/etc/services`, which minimal
+  systems lack (`patches/libtirpc-without-etc-files.patch`). nfs-utils
+  3.2.1 still reports itself as 3.1.1, the version its `configure.ac`
+  names.
+- `udp-sender` and `udp-receiver` are upstream's, with forward error
+  correction; it reports 20230924, as the 20250223 release still does.
+- partclone builds only ext2/3/4 (with e2fsprogs' libext2fs), FAT, and raw
+  `dd` images, and the restore, check, and info tools. Not built: btrfs
+  (its bundled btrfs-progs code alone is about 280 KB of xz), XFS (liburcu
+  and a copy of libxfs), NTFS (ntfs-3g), and the others upstream supports.
+  It hashes torrent pieces with OpenSSL's SHA-1 alone, not the EVP layer,
+  and copies checksums through aligned variables, which strict-alignment
+  targets need (`patches/partclone-alignment.patch`). Its images keep the
+  creating machine's byte order.
+- `xxhsum` is the scalar and SSE2/NEON build, without the AVX2 and
+  AVX-512 code or the dispatcher.
+- No `b3sum`: BLAKE3's C implementation has no command-line program
+  upstream (only an example that hashes standard input), and the `b3sum`
+  that exists is Rust.
+- `lftp` uses OpenSSL (not GnuTLS), zlib, expat for WebDAV listings, and
+  GNU readline 8.2 on the bundle's ncurses, which it requires. No NLS,
+  libidn2, SOCKS, or loadable modules. Its SFTP and FISH run an external
+  SSH client, such as `dbclient`.
+- `aria2c` uses OpenSSL and zlib, and expat for Metalink and XML-RPC. No
+  GnuTLS, nettle, or libgcrypt, no libxml2, SQLite (browser cookie stores),
+  c-ares (asynchronous DNS), libssh2 (`sftp://`), or WebSocket RPC.
+- `par2` runs on one thread: Zig ships no OpenMP runtime.
+- `lftp` and `aria2c` keep their assertions, as upstream builds them: Zig
+  defines `NDEBUG` when optimizing, and one of aria2's adds a node to a
+  split DHT bucket.
+
 ### Connection tracking: conntrack
 
 `conntrack` comes from conntrack-tools with libnetfilter_conntrack,
@@ -1274,6 +1466,9 @@ archive's, kept apart only because each carries a static OpenSSL (about 4 MB
 uncompressed). See [TLS wrapping](#tls-wrapping-stunnel) and
 [VPN](#vpn-openvpn) for their use and
 [the profile](#tunnel-session-and-service-tools) for how they are built.
+`lftp` and `aria2c`, which link OpenSSL too, and `par2` are there for the
+same reason, on every target; see [moving data](#moving-data) for their use
+and [the profile](#file-movement-tools) for how they are built.
 
 The Go tools are several times the size of anything in the main archive, so
 they are packaged apart. Each is a static Go binary built with cgo disabled,
@@ -1419,6 +1614,8 @@ Exact rules vary by kernel and security policy, but these are common:
 | Read I²C/SPI devices or CAN interfaces | suitable device/interface permissions and drivers |
 | Inspect, repair, format, or manage block devices | usually root, device access, and the matching kernel driver |
 | Mount, unmount, or attach loop devices | root or `CAP_SYS_ADMIN` |
+| Mount SMB or NFS shares | root and the kernel's `cifs` or `nfs` client |
+| Image or restore a partition with partclone | root or read (and, to restore, write) access to the block device |
 | Read the kernel log | root or `CAP_SYSLOG` when `kernel.dmesg_restrict=1` |
 | List or change connection tracking; scan or configure Wi-Fi | `CAP_NET_ADMIN` and the kernel's netlink support |
 | Read, erase, or write MTD flash or UBI volumes | root and the kernel's MTD/UBI devices |

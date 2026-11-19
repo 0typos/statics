@@ -1,0 +1,86 @@
+libtirpc on systems without /etc/netconfig or /etc/services, which
+BusyBox-based and other minimal systems often lack. Without either, every
+RPC client call failed with "RPC: Unknown host", so showmount and NFSv3
+mounts did not work there.
+
+- getnetconfig.c: when /etc/netconfig does not exist, read the default
+  entries libtirpc ships as doc/netconfig from memory. An existing
+  /etc/netconfig still wins.
+- rpcb_clnt.c, clnt_bcast.c: ask getaddrinfo for rpcbind's port as "111",
+  its fixed assignment (RFC 1833), rather than the name "sunrpc", which
+  musl looks up in /etc/services.
+
+Source only; nothing here runs at build time.
+
+--- a/src/clnt_bcast.c
++++ b/src/clnt_bcast.c
+@@ -137,7 +137,7 @@
+ 	hints.ai_protocol = proto;
+ 	hints.ai_socktype = socktype;
+ 
+-	if (getaddrinfo(NULL, "sunrpc", &hints, &res) != 0)
++	if (getaddrinfo(NULL, "111", &hints, &res) != 0)
+ 		return 0;
+ 
+ 	for (ifap = ifp; ifap != NULL; ifap = ifap->ifa_next) {
+--- a/src/getnetconfig.c
++++ b/src/getnetconfig.c
+@@ -123,6 +123,29 @@
+ 
+ #define MAXNETCONFIGLINE    1000
+ 
++/*
++ * Without /etc/netconfig, which minimal systems often lack, use the
++ * entries libtirpc ships as doc/netconfig.
++ */
++static char default_netconfig[] =
++    "udp        tpi_clts      v     inet     udp     -       -\n"
++    "tcp        tpi_cots_ord  v     inet     tcp     -       -\n"
++    "udp6       tpi_clts      v     inet6    udp     -       -\n"
++    "tcp6       tpi_cots_ord  v     inet6    tcp     -       -\n"
++    "rawip      tpi_raw       -     inet      -      -       -\n"
++    "local      tpi_cots_ord  -     loopback  -      -       -\n"
++    "unix       tpi_cots_ord  -     loopback  -      -       -\n";
++
++static FILE *
++open_netconfig(void)
++{
++    FILE *file = fopen(NETCONFIG, "r");
++
++    if (file == NULL && errno == ENOENT)
++	file = fmemopen(default_netconfig, sizeof(default_netconfig) - 1, "r");
++    return file;
++}
++
+ static int *
+ __nc_error()
+ {
+@@ -194,7 +217,7 @@
+      */
+     mutex_lock(&nc_db_lock);
+     ni.ref++;
+-    if ((nc_file != NULL) || (nc_file = fopen(NETCONFIG, "r")) != NULL) {
++    if ((nc_file != NULL) || (nc_file = open_netconfig()) != NULL) {
+ 	nc_vars->valid = NC_VALID;
+ 	nc_vars->flag = 0;
+ 	nc_vars->nc_configs = ni.head;
+@@ -460,7 +483,7 @@
+     }
+     mutex_unlock(&nc_db_lock);
+ 
+-    if ((file = fopen(NETCONFIG, "r")) == NULL) {
++    if ((file = open_netconfig()) == NULL) {
+ 	nc_error = NC_NONETCONFIG;
+ 	return (NULL);
+     }
+--- a/src/rpcb_clnt.c
++++ b/src/rpcb_clnt.c
+@@ -436,7 +436,7 @@
+ 			return (client);
+ 		}
+ 	} else {
+-		if (getaddrinfo(host, "sunrpc", &hints, &res) != 0) {
++		if (getaddrinfo(host, "111", &hints, &res) != 0) {
+ 			rpc_createerr.cf_stat = RPC_UNKNOWNHOST;
+ 			assert(client == NULL);
+ 			goto out_err;

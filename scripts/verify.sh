@@ -42,6 +42,9 @@ required_binaries=(
     ebtables-legacy arptables-legacy ngrep hping3 iftop nethogs
     tcpreplay tcpprep tcprewrite dhcpdump
     tmux microsocks tinyproxy dnsmasq ser2net bash testssl.sh
+    mount.cifs mount.nfs showmount udp-sender udp-receiver
+    partclone.extfs partclone.fat partclone.dd partclone.restore
+    partclone.chkimg partclone.info xxhsum
 )
 # Executables that are scripts rather than static ELF programs.
 scripts=(testssl.sh)
@@ -59,6 +62,9 @@ pinned_version() { awk -F '|' -v n="$1" '$1 == n { print $2 }' "$repo_root/sourc
 declare -A extra_smoke=(
     [stunnel]="stunnel $(pinned_version stunnel)|-version"
     [openvpn]="OpenVPN $(pinned_version openvpn)|--version"
+    [lftp]="Version $(pinned_version lftp)|--version"
+    [aria2c]="aria2 version $(pinned_version aria2)|-v"
+    [par2]="par2cmdline version $(pinned_version par2cmdline)|-V"
 )
 if [[ $go_env != none ]]; then
     extra_smoke+=(
@@ -258,9 +264,17 @@ for link in nc netcat dropbear dbclient dropbearkey dropbearconvert scp tunpipe 
     unzstd zstdcat unxz xzcat bunzip2 bzcat unpigz \
     modinfo lsmod insmod rmmod modprobe depmod ping6 traceroute6 \
     iptables-legacy iptables-legacy-save iptables-legacy-restore \
-    ip6tables-legacy ip6tables-legacy-save ip6tables-legacy-restore; do
+    ip6tables-legacy ip6tables-legacy-save ip6tables-legacy-restore \
+    mount.nfs4 umount.nfs umount.nfs4 partclone.ext2 partclone.ext3 \
+    partclone.ext4 partclone.vfat partclone.fat12 partclone.fat16 partclone.fat32; do
     [[ -L $output_dir/$link ]] || {
         echo "missing applet link: $output_dir/$link" >&2
+        exit 1
+    }
+done
+for link in par2create par2verify par2repair; do
+    [[ -L $output_dir-extra/$link ]] || {
+        echo "missing link: $output_dir-extra/$link" >&2
         exit 1
     }
 done
@@ -319,7 +333,8 @@ if [[ ${SKIP_QEMU:-0} != 1 ]]; then
     fi
     check_output OpenSSL "$output_dir/openssl" version
     check_output tcpdump "$output_dir/tcpdump" --version
-    check_output curl "$output_dir/curl" --version
+    check_output "libssh2/$(pinned_version libssh2)" "$output_dir/curl" --version
+    check_output " scp sftp " "$output_dir/curl" --version
     check_output iperf "$output_dir/iperf3" --version
     check_output ethtool "$output_dir/ethtool" --version
     check_output strace "$output_dir/strace" --version
@@ -642,9 +657,66 @@ PY
     if [[ -z $emulated ]]; then
         check_output "testssl.sh version $(pinned_version testssl.sh)" env COLOR=0 "$output_dir/testssl.sh" --version
     fi
+    # mount.cifs prints its version only to root; otherwise it says why
+    # user mounts are unsupported, which also proves it started.
+    cifs_output=$("${runner[@]}" "$output_dir/mount.cifs" -V 2>&1) || true
+    [[ $cifs_output == *"mount.cifs version: $(pinned_version cifs-utils)"* ||
+        $cifs_output == *"not installed setuid root"* ]] || {
+        echo "unexpected output from mount.cifs -V: $cifs_output" >&2
+        exit 1
+    }
+    # nfs-utils 3.2.1 still reports the 3.1.1 of its configure.ac.
+    check_output "(linux nfs-utils " "$output_dir/mount.nfs" -V
+    check_output "showmount for " "$output_dir/showmount" -v
+    # udpcast has no version option; its usage proves each started.
+    for program in udp-sender udp-receiver; do
+        program_output=$("${runner[@]}" "$output_dir/$program" --statics-usage 2>&1) || true
+        [[ $program_output == *"[--file file]"* ]] || {
+            echo "unexpected output from $program: $program_output" >&2
+            exit 1
+        }
+    done
+    # --version runs xxhsum's known-answer self-test of every algorithm.
+    check_output "xxhsum $(pinned_version xxhash)" "$output_dir/xxhsum" --version
+    # partclone clones an ext4 image made by the bundled mke2fs, checks
+    # the image, and restores it to a new raw file, which must match: the
+    # image format's byte order and libext2fs on every target.
+    truncate -s 8M "$scratch/ext.img"
+    "${runner[@]}" "$output_dir/mke2fs" -q -F -t ext4 -d "$output_dir/licenses" "$scratch/ext.img" ||
+        failed "mke2fs for partclone"
+    for program in partclone.extfs partclone.restore partclone.info; do
+        check_output "Partclone : v$(pinned_version partclone)" "$output_dir/$program" -v
+    done
+    # With CRC32 (the default) and XXH64 checksums.
+    for mode in 1 2; do
+        rm -f "$scratch/ext.pcl" "$scratch/restored.img"
+        "${runner[@]}" "$output_dir/partclone.extfs" -q -c -a "$mode" -s "$scratch/ext.img" \
+            -o "$scratch/ext.pcl" -L "$scratch/partclone.log" >/dev/null 2>&1 ||
+            failed "partclone.extfs clone"
+        "${runner[@]}" "$output_dir/partclone.chkimg" -s "$scratch/ext.pcl" \
+            -L "$scratch/partclone.log" >/dev/null 2>&1 || failed "partclone.chkimg"
+        "${runner[@]}" "$output_dir/partclone.restore" -q -W -s "$scratch/ext.pcl" \
+            -o "$scratch/restored.img" -L "$scratch/partclone.log" >/dev/null 2>&1 ||
+            failed "partclone.restore"
+        cmp -s "$scratch/ext.img" "$scratch/restored.img" || failed "partclone"
+    done
     if [[ $go_env != none ]]; then
         check_output "wireguard-go v" "$output_dir/wireguard-go" --version
     fi
+    # par2 creates recovery data for a file, then repairs damage to it:
+    # its Reed-Solomon and MD5 code on every byte order.
+    mkdir "$scratch/par2"
+    cp "$sample" "$scratch/par2/data"
+    "${runner[@]}" "$output_dir-extra/par2" create -q -q -r20 -n1 \
+        "$scratch/par2/data.par2" "$scratch/par2/data" || failed "par2 create"
+    printf 'statics' | dd of="$scratch/par2/data" bs=1 seek=100 conv=notrunc 2>/dev/null
+    "${runner[@]}" "$output_dir-extra/par2" repair -q -q "$scratch/par2/data.par2" ||
+        failed "par2 repair"
+    cmp -s "$scratch/par2/data" "$sample" || failed "par2"
+    # lftp mirrors a directory through its file: protocol.
+    "${runner[@]}" "$output_dir-extra/lftp" -c \
+        "open file:$output_dir; mirror licenses $scratch/lftp-mirror" || failed "lftp mirror"
+    diff -r "$output_dir/licenses" "$scratch/lftp-mirror" >/dev/null || failed "lftp mirror"
     if [[ -d $output_dir-extra ]]; then
         while IFS= read -r binary; do
             [[ -n ${extra_smoke[$binary]:-} ]] || {

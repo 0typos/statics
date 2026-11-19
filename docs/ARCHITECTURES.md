@@ -29,7 +29,8 @@ runtime errors after choosing a target, see
 ## Go tools
 
 Go tools (`wireguard-go` in the main archive; `rclone`, `croc`, `crictl`, and
-`ctr` in the extra archive, beside the C tools `stunnel` and `openvpn`) are built by the pinned Go release with
+`ctr` in the extra archive, beside the C tools `stunnel`, `openvpn`, `lftp`,
+`aria2c`, and `par2`) are built by the pinned Go release with
 cgo disabled, so they do not link musl at all. Go has its own CPU and kernel
 floors, recorded as the last column of `architectures.tsv`:
 
@@ -53,7 +54,7 @@ Every Go tool also needs Linux 3.2 or later. Go statically links its own
 runtime instead of calling a libc, so the CPU floor can sit above a row's C
 baseline: on a POWER7 `powerpc64le` system or a pre-z13 `s390x`, the C tools
 run and the Go tools stop at startup. `powerpc` and `powerpc64` bundles ship
-without Go tools, and their extra archive holds only `stunnel` and `openvpn`;
+without Go tools, and their extra archive holds only the C tools;
 their `COMPONENTS.tsv` and SBOM say so. The floors are
 those of the Go release pinned in `sources.lock`, per Go's
 [minimum requirements](https://go.dev/wiki/MinimumRequirements).
@@ -142,7 +143,11 @@ ethtool, strace, jq, drill, mtr, i2c-tools, Nmap/Ncat, rsync, lsof, the
 util-linux tools, sftp-server, conntrack, ipmitool, iw, the MTD and UBI
 tools, kmod, kexec, bpftool, iputils, traceroute, ndisc6, lldpd, ipset, the
 legacy iptables, ebtables, and arptables, hping3, iftop, nethogs, stunnel,
-microsocks, tinyproxy, ser2net, and `wireguard-go`, runs zstd, xz, bzip2, pigz,
+microsocks, tinyproxy, ser2net, mount.cifs, mount.nfs, showmount, udpcast,
+aria2c, and `wireguard-go`, checks that curl lists its libssh2 protocols, runs
+xxhsum's known-answer self-test, has partclone clone, check, and restore an
+ext4 image made by `mke2fs` identically, has par2 repair a damaged file and
+lftp mirror a directory, runs zstd, xz, bzip2, pigz,
 bsdtar's filters, pv, and mbuffer through a compress-and-restore round trip,
 has `modinfo` read a module plain and gzip-, xz-, and zstd-compressed,
 has dhcpdump, ngrep, tcpprep, tcprewrite, and tcpdump decode and rewrite a

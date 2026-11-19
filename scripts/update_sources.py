@@ -843,6 +843,125 @@ def latest_testssl() -> tuple[str, str]:
     )
 
 
+def latest_libssh2() -> tuple[str, str]:
+    return latest_from_index(
+        "https://libssh2.org/download/",
+        r"libssh2-(\d+\.\d+\.\d+)\.tar\.xz\"",
+        "https://libssh2.org/download/libssh2-{version}.tar.xz",
+    )
+
+
+def latest_readline() -> tuple[str, str]:
+    # Rolled-up tarballs only (8.2.13), as for bash.
+    return latest_from_index(
+        "https://ftp.gnu.org/gnu/readline/",
+        r"readline-(\d+\.\d+\.\d+)\.tar\.gz\"",
+        "https://ftp.gnu.org/gnu/readline/readline-{version}.tar.gz",
+    )
+
+
+def latest_lftp() -> tuple[str, str]:
+    # Upstream's GitHub release, the same archive as lftp.yar.ru's, which
+    # CircleCI could not reach.
+    return latest_from_github_release(
+        "lavv17/lftp",
+        r"v(\d+\.\d+\.\d+)",
+        "https://github.com/lavv17/lftp/releases/download/v{version}/lftp-{version}.tar.gz",
+    )
+
+
+def latest_expat() -> tuple[str, str]:
+    # Tags spell the version with underscores: R_2_10_0.
+    release = json.loads(
+        text("https://api.github.com/repos/libexpat/libexpat/releases/latest")
+    )
+    match = re.fullmatch(r"R_(\d+)_(\d+)_(\d+)", release["tag_name"])
+    if match is None:
+        raise RuntimeError(f"unexpected expat release tag: {release['tag_name']}")
+    version = ".".join(match.groups())
+    return version, (
+        "https://github.com/libexpat/libexpat/releases/download/"
+        f"{release['tag_name']}/expat-{version}.tar.xz"
+    )
+
+
+def latest_aria2() -> tuple[str, str]:
+    return latest_from_github_release(
+        "aria2/aria2",
+        r"release-(\d+\.\d+\.\d+)",
+        (
+            "https://github.com/aria2/aria2/releases/download/"
+            "release-{version}/aria2-{version}.tar.xz"
+        ),
+    )
+
+
+def latest_cifs_utils() -> tuple[str, str]:
+    return latest_from_index(
+        "https://download.samba.org/pub/linux-cifs/cifs-utils/",
+        r"cifs-utils-(\d+\.\d+(?:\.\d+)?)\.tar\.bz2\"",
+        "https://download.samba.org/pub/linux-cifs/cifs-utils/cifs-utils-{version}.tar.bz2",
+    )
+
+
+def latest_libtirpc() -> tuple[str, str]:
+    return latest_from_index(
+        "https://sourceforge.net/projects/libtirpc/rss?path=/libtirpc",
+        r"libtirpc-(\d+\.\d+\.\d+)\.tar\.bz2",
+        (
+            "https://downloads.sourceforge.net/project/libtirpc/libtirpc/"
+            "{version}/libtirpc-{version}.tar.bz2"
+        ),
+    )
+
+
+def latest_nfs_utils() -> tuple[str, str]:
+    return latest_from_index(
+        "https://cdn.kernel.org/pub/linux/utils/nfs-utils/",
+        r'href="(\d+\.\d+\.\d+)/"',
+        (
+            "https://cdn.kernel.org/pub/linux/utils/nfs-utils/"
+            "{version}/nfs-utils-{version}.tar.xz"
+        ),
+    )
+
+
+def latest_udpcast() -> tuple[str, str]:
+    return latest_from_index(
+        "https://udpcast.linux.lu/downloads.html",
+        r"udpcast-(\d{8})\.tar\.gz",
+        "https://udpcast.linux.lu/download/udpcast-{version}.tar.gz",
+    )
+
+
+def latest_partclone() -> tuple[str, str]:
+    # Release tags are bare versions; it publishes no release archive.
+    return latest_from_github_tags(
+        "Thomas-Tsai/partclone",
+        r"(\d+\.\d+\.\d+)",
+        "https://github.com/Thomas-Tsai/partclone/archive/refs/tags/{version}.tar.gz",
+    )
+
+
+def latest_xxhash() -> tuple[str, str]:
+    return latest_from_github_tags(
+        "Cyan4973/xxHash",
+        r"v(\d+\.\d+\.\d+)",
+        "https://github.com/Cyan4973/xxHash/archive/refs/tags/v{version}.tar.gz",
+    )
+
+
+def latest_par2cmdline() -> tuple[str, str]:
+    return latest_from_github_release(
+        "Parchive/par2cmdline",
+        r"v(\d+\.\d+\.\d+)",
+        (
+            "https://github.com/Parchive/par2cmdline/releases/download/"
+            "v{version}/par2cmdline-{version}.tar.gz"
+        ),
+    )
+
+
 def latest_zig(host: str) -> tuple[str, str]:
     index = json.loads(text("https://ziglang.org/download/index.json"))
     stable = [key for key in index if re.fullmatch(r"\d+\.\d+\.\d+", key)]
@@ -940,6 +1059,7 @@ PUBLISHED_SHA256: dict[str, str] = {
         "v{version}/croc_v{version}_checksums.txt"
     ),
     "stunnel": "https://www.stunnel.org/downloads/stunnel-{version}.tar.gz.sha256",
+    "nfs-utils": "https://cdn.kernel.org/pub/linux/utils/nfs-utils/{version}/sha256sums.asc",
 }
 
 
@@ -1022,6 +1142,18 @@ DISCOVERERS: dict[str, Callable[[], tuple[str, str]]] = {
     "ser2net": lambda: latest_cminyard("ser2net"),
     "bash": latest_bash,
     "testssl.sh": latest_testssl,
+    "libssh2": latest_libssh2,
+    "readline": latest_readline,
+    "lftp": latest_lftp,
+    "expat": latest_expat,
+    "aria2": latest_aria2,
+    "cifs-utils": latest_cifs_utils,
+    "libtirpc": latest_libtirpc,
+    "nfs-utils": latest_nfs_utils,
+    "udpcast": latest_udpcast,
+    "partclone": latest_partclone,
+    "xxhash": latest_xxhash,
+    "par2cmdline": latest_par2cmdline,
     "zig-x86_64": lambda: latest_zig("x86_64-linux"),
     "zig-aarch64": lambda: latest_zig("aarch64-linux"),
     "go-x86_64": lambda: latest_go("amd64"),
