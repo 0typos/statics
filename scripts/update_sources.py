@@ -1001,6 +1001,51 @@ def latest_wireguard_go() -> tuple[str, str]:
     )
 
 
+def latest_sqlite() -> tuple[str, str]:
+    # The download page lists each product in a comment for scripts; the
+    # autoconf amalgamation's URL carries the release year and an encoded
+    # version (3.54.1 is 3540100).
+    index = text("https://sqlite.org/download.html")
+    match = re.search(
+        r"PRODUCT,(\d+\.\d+\.\d+),(\d{4}/sqlite-autoconf-\d+\.tar\.gz),", index
+    )
+    if match is None:
+        raise RuntimeError("no sqlite-autoconf release found")
+    return match.group(1), f"https://sqlite.org/{match.group(2)}"
+
+
+def latest_quickjs() -> tuple[str, str]:
+    return latest_from_github_tags(
+        "quickjs-ng/quickjs",
+        r"v(\d+\.\d+\.\d+)",
+        "https://github.com/quickjs-ng/quickjs/archive/refs/tags/v{version}.tar.gz",
+    )
+
+
+def latest_lua() -> tuple[str, str]:
+    return latest_from_index(
+        "https://www.lua.org/ftp/",
+        r"lua-(\d+\.\d+\.\d+)\.tar\.gz",
+        "https://www.lua.org/ftp/lua-{version}.tar.gz",
+    )
+
+
+def latest_htop() -> tuple[str, str]:
+    return latest_from_github_release(
+        "htop-dev/htop",
+        r"(\d+\.\d+\.\d+)",
+        "https://github.com/htop-dev/htop/releases/download/{version}/htop-{version}.tar.xz",
+    )
+
+
+def latest_make() -> tuple[str, str]:
+    return latest_from_index(
+        "https://ftp.gnu.org/gnu/make/",
+        r"make-(\d+\.\d+(?:\.\d+)?)\.tar\.gz\"",
+        "https://ftp.gnu.org/gnu/make/make-{version}.tar.gz",
+    )
+
+
 def latest_rclone() -> tuple[str, str]:
     return latest_from_github_release(
         "rclone/rclone",
@@ -1154,6 +1199,11 @@ DISCOVERERS: dict[str, Callable[[], tuple[str, str]]] = {
     "partclone": latest_partclone,
     "xxhash": latest_xxhash,
     "par2cmdline": latest_par2cmdline,
+    "sqlite": latest_sqlite,
+    "quickjs": latest_quickjs,
+    "lua": latest_lua,
+    "htop": latest_htop,
+    "make": latest_make,
     "zig-x86_64": lambda: latest_zig("x86_64-linux"),
     "zig-aarch64": lambda: latest_zig("aarch64-linux"),
     "go-x86_64": lambda: latest_go("amd64"),

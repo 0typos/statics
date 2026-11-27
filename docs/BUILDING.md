@@ -163,7 +163,7 @@ terms are indexed by `COMPONENTS.tsv` and packaged under `licenses/`.
 Large tools go in a second archive, `statics-extra-<arch>.tar.xz`, so the
 main kit stays small. `components.tsv` assigns each component to `main` or
 `extra`, or to `both` for a library linked into tools in each archive (OpenSSL,
-libcap-ng, zlib, and ncurses), whose notices and SBOM entry then appear in each. The extra archive has the same layout and metadata as the main one,
+libcap-ng, zlib, ncurses, and readline), whose notices and SBOM entry then appear in each. The extra archive has the same layout and metadata as the main one,
 under a top-level `<arch>-extra/` directory, with its own `SHA256SUMS`,
 `COMPONENTS.tsv`, notices, and SBOM (`statics-extra-<arch>.spdx.json`). It
 exists only for an architecture that builds at least one extra tool: today

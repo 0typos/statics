@@ -66,7 +66,7 @@ arptables|GPL-2.0-or-later|arptables-legacy|main|-
 ngrep|LicenseRef-ngrep AND GPL-2.0-or-later|ngrep with bundled GNU regex 0.12|main|-
 hping3|GPL-2.0-only AND BSD-4-Clause-UC AND BSD-3-Clause|hping3 without Tcl scripting|main|-
 hping3-debian|GPL-2.0-only|Debian's patch set for hping3, applied to it|main|-
-ncurses|X11-distribute-modifications-variant|narrow-character libncurses with compiled-in terminal descriptions, statically linked into iftop, nethogs, tmux, and bash, and in the extra archive into lftp|both|-
+ncurses|X11-distribute-modifications-variant|narrow-character libncurses with compiled-in terminal descriptions, statically linked into iftop, nethogs, tmux, bash, htop, and sqlite3, and in the extra archive into lftp|both|-
 iftop|GPL-2.0-or-later|iftop|main|-
 nethogs|GPL-2.0-or-later|nethogs|main|-
 tcpreplay|GPL-3.0-only AND BSD-4-Clause-UC AND BSD-3-Clause AND BSD-2-Clause AND (LGPL-3.0-or-later OR BSD-3-Clause)|tcpreplay, tcpprep, and tcprewrite with bundled libopts|main|-
@@ -83,7 +83,7 @@ gensio|LGPL-2.1-only|libgensio with the network, serial, pty, telnet (RFC 2217),
 ser2net|GPL-2.0-only|ser2net without PAM|main|-
 bash|GPL-3.0-or-later|bash with bundled readline, using ncurses; no NLS, programmable completion, or help builtin|main|-
 testssl.sh|GPL-2.0-only AND MPL-2.0 AND CC-BY-3.0-US|testssl.sh with a wrapper that runs it with the bundled bash and openssl, and Mozilla's trust store only (share/testssl/)|main|-
-readline|GPL-3.0-or-later|statically linked into lftp|extra|-
+readline|GPL-3.0-or-later|statically linked into sqlite3, and in the extra archive into lftp|both|-
 lftp|GPL-3.0-or-later|lftp with OpenSSL, readline, and expat; no GnuTLS, NLS, or libidn2|extra|-
 expat|MIT|statically linked into aria2 and lftp|extra|-
 aria2|GPL-2.0-or-later|aria2c with OpenSSL, zlib, and expat (Metalink); no SQLite, c-ares, libssh2, or WebSocket RPC; upstream also grants an OpenSSL linking exception|extra|-
@@ -94,6 +94,11 @@ udpcast|GPL-2.0-or-later AND BSD-2-Clause|udp-sender and udp-receiver|main|-
 partclone|GPL-2.0-or-later|partclone.extfs (with ext2, ext3, and ext4 links), partclone.fat (with vfat, fat12, fat16, and fat32 links), partclone.dd, partclone.restore, partclone.chkimg, and partclone.info; no btrfs, XFS, or NTFS|main|-
 xxhash|BSD-2-Clause AND GPL-2.0-or-later|xxhsum (GPL-2.0-or-later); libxxhash (BSD-2-Clause) statically linked into partclone|main|-
 par2cmdline|GPL-2.0-or-later|par2 with par2create, par2verify, and par2repair links|extra|-
+sqlite|blessing|sqlite3 shell with FTS4, FTS5, R-Tree, Geopoly, sessions, carray, dbpage, and dbstat, linking readline and ncurses; no loadable extensions or zlib|main|-
+quickjs|MIT|qjs (QuickJS-ng) with the std, os, and bjson modules; its REPL, standalone loader, and three JavaScript builtins compiled from source at run time|main|-
+lua|MIT|lua, the interpreter only; no C modules, readline, or luac|main|-
+htop|GPL-2.0-or-later|htop on narrow-character ncurses; no Unicode, sensors, capabilities, delay accounting, hwloc, or backtraces|main|-
+make|GPL-3.0-or-later AND LGPL-2.0-or-later AND LGPL-2.1-or-later|GNU make with bundled gnulib (glob and fnmatch, LGPL-2.0-or-later; findprog and concat-filename, LGPL-2.1-or-later); no Guile, NLS, or load|main|-
 rclone|MIT|rclone, trimmed to the local, s3, sftp, http, and webdav backends and 12 commands, with the Go modules listed in licenses/rclone/go-modules.tsv|extra|./cmd/statics
 croc|MIT|croc, relay-only (upstream's croc_no_tailcat tag), with the Go modules listed in licenses/croc/go-modules.tsv|extra|-tags=croc_no_tailcat .
 cri-tools|Apache-2.0|crictl only, with the Go modules listed in licenses/cri-tools/go-modules.tsv|extra|./cmd/crictl

@@ -42,7 +42,7 @@ user-mode emulation proves that non-native outputs can actually start.
 
 | 🧰 Carry it | 🐧 Run it | 🔐 Trust it |
 |---|---|---|
-| 135 physical executables, plus BusyBox, Dropbear, kmod, iptables and decompressor links, and nine larger tools (four in Go) in an optional extra archive | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
+| 140 physical executables, plus BusyBox, Dropbear, kmod, iptables and decompressor links, and nine larger tools (four in Go) in an optional extra archive | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
 | Network, process, namespace, storage and hardware diagnosis | Static musl builds avoid a dependency on the target's libc | Deterministic archives, QEMU smoke tests and release attestations |
 
 ## Get a kit
@@ -82,19 +82,19 @@ Archive sizes for the current pins:
 
 | target | main archive | extra archive |
 |---|---|---|
-| `x86_64` | 19.9 MiB | 21.5 MiB |
-| `i686` | 19.7 MiB | 19.5 MiB |
-| `aarch64` | 18.2 MiB | 17.8 MiB |
-| `armv6-hardfloat` | 17.4 MiB | 17.7 MiB |
-| `armv7-hardfloat` | 17.3 MiB | 17.7 MiB |
-| `armv7-softfloat` | 17.2 MiB | 17.7 MiB |
-| `mips` | 21.3 MiB | 17.6 MiB |
-| `mipsel` | 21.7 MiB | 18.1 MiB |
-| `powerpc` | 19.2 MiB | 3.5 MiB |
-| `powerpc64` | 19.7 MiB | 3.7 MiB |
-| `powerpc64le` | 21.0 MiB | 18.9 MiB |
-| `riscv64` | 19.6 MiB | 19.8 MiB |
-| `s390x` | 19.7 MiB | 19.5 MiB |
+| `x86_64` | 21.7 MiB | 21.5 MiB |
+| `i686` | 21.6 MiB | 19.5 MiB |
+| `aarch64` | 19.9 MiB | 17.8 MiB |
+| `armv6-hardfloat` | 18.6 MiB | 17.7 MiB |
+| `armv7-hardfloat` | 18.5 MiB | 17.7 MiB |
+| `armv7-softfloat` | 18.4 MiB | 17.7 MiB |
+| `mips` | 22.6 MiB | 17.6 MiB |
+| `mipsel` | 23.1 MiB | 18.1 MiB |
+| `powerpc` | 20.5 MiB | 3.5 MiB |
+| `powerpc64` | 21.0 MiB | 3.7 MiB |
+| `powerpc64le` | 22.4 MiB | 18.9 MiB |
+| `riscv64` | 21.4 MiB | 19.8 MiB |
+| `s390x` | 21.0 MiB | 19.5 MiB |
 
 The extra archive is compressed with `xz -9` and needs about 65 MiB of memory
 to unpack; on a smaller device, unpack it elsewhere and copy the directory.
@@ -149,7 +149,7 @@ data and safe starting commands.
 
 ## Inside the case
 
-The bundle contains 135 physical executables (134 on `powerpc` and `powerpc64`, which get no
+The bundle contains 140 physical executables (139 on `powerpc` and `powerpc64`, which get no
 Go tools) plus BusyBox, Dropbear, kmod and iptables multi-call links, decompressor links such as `unxz`,
 Nmap runtime data, checksums, an SPDX SBOM and upstream license texts.
 
@@ -169,9 +169,10 @@ Nmap runtime data, checksums, an SPDX SBOM and upstream license texts.
 | Pipe transfer | `pv`, `mbuffer` | Progress, rate limits and buffering for data piped over SSH or a socket |
 | Serial console and transfer | `picocom`, `sz`, `rz`, `ser2net` | Serial consoles, ZMODEM file transfer over a serial or terminal session, and a serial port shared over TCP |
 | Sessions and shells | `tmux`, `bash` | Sessions that survive a dropped SSH connection, and a full bash |
+| Scripting, data and builds | `sqlite3`, `qjs`, `lua`, `make` | SQLite databases, JavaScript and Lua scripts where the target has no interpreter, and GNU make |
 | Quick proxies | `microsocks`, `tinyproxy` | SOCKS5 and HTTP/HTTPS proxies |
 | Netboot and DHCP rescue | `dnsmasq` | DHCP, DNS and TFTP for an isolated link or a network boot |
-| Process and storage diagnosis | `strace`, `lsof`, `gdbserver`, `e2fsck`, `dumpe2fs`, `tune2fs`, `mke2fs`, `smartctl`, `nvme` | Syscalls, open files, remote debugging, filesystems and device health |
+| Process and storage diagnosis | `htop`, `strace`, `lsof`, `gdbserver`, `e2fsck`, `dumpe2fs`, `tune2fs`, `mke2fs`, `smartctl`, `nvme` | Live process view, syscalls, open files, remote debugging, filesystems and device health |
 | Disks, mounts and kernel log | `lsblk`, `blkid`, `sfdisk`, `losetup`, `mount`, `umount`, `dmesg` | Block devices, partition tables, loop devices, mounts and kernel messages |
 | Kernel modules, boot and BPF | `kmod`, `modinfo`, `lsmod`, `insmod`, `rmmod`, `modprobe`, `depmod`, `kexec`, `bpftool` | Find and load drivers (compressed modules too), boot straight into a rescue kernel (so far tested only to start), and list eBPF programs and maps |
 | Flash and out-of-band management | `flash_erase`, `flashcp`, `nanddump`, `nandwrite`, `mtdinfo`, `ubi*`, `ipmitool` | Raw NOR/NAND flash, UBI volumes and BMCs over IPMI |
