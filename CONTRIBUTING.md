@@ -158,7 +158,8 @@ The updater downloads the proposed archive to compute its SHA-256, and for
 rclone, croc, zstd, and nfs-utils (kernel.org's signed `sha256sums.asc`)
 rejects it unless the release's own checksum file lists that digest. Check rclone's PGP-signed `SHA256SUMS` with
 `gpg --verify SHA256SUMS` against the key published at
-<https://rclone.org/KEYS>, and the signed tags of rclone and containerd.
+<https://rclone.org/KEYS>, and the signed tags of rclone, containerd, caddy, and yq (age's tags are
+not signed).
 stunnel's release must also match its published `.sha256`. Verify the
 detached PGP signatures upstream publishes for libevent (Nick Mathewson,
 `7A02B3521DC75C542BA015456AFEE6D49E92B601`), stunnel (Michał Trojnara,

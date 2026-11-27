@@ -109,3 +109,6 @@ quickjs|0.18.0|28bcd89aa3683fd2a946537e5ce3f11cc46b5cbf3383c7561aaef3df5ff9f1dd|
 lua|5.5.1|1c4b4068d67061f2a2231ad2b5422e77acea1487ea9890f6320af614f4373dce|https://www.lua.org/ftp/lua-5.5.1.tar.gz
 htop|3.5.3|a8b164386494cb85bb255a415a3f5f80afe7a0c4491da5d113b3a0f951087e65|https://github.com/htop-dev/htop/releases/download/3.5.3/htop-3.5.3.tar.xz
 make|4.4.1|dd16fb1d67bfab79a72f5e8390735c49e3e8e70b4945a15ab1f81ddb78658fb3|https://ftp.gnu.org/gnu/make/make-4.4.1.tar.gz
+caddy|2.11.9|fefbe1f72b7a7e244f348c20eba377bb1e6964f51594229d2f38c49eaa2aa9a4|https://github.com/caddyserver/caddy/archive/refs/tags/v2.11.9.tar.gz
+yq|4.54.3|93143d49b2a3bd6cb723477f585366b29f70c636af4653191d61b49b0c47de7f|https://github.com/mikefarah/yq/archive/refs/tags/v4.54.3.tar.gz
+age|1.3.2|b07c28c6c4bdafa272073a310b75bc22c49da8904585a89c30e5ca4233e63843|https://github.com/FiloSottile/age/archive/refs/tags/v1.3.2.tar.gz

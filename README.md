@@ -42,7 +42,7 @@ user-mode emulation proves that non-native outputs can actually start.
 
 | 🧰 Carry it | 🐧 Run it | 🔐 Trust it |
 |---|---|---|
-| 140 physical executables, plus BusyBox, Dropbear, kmod, iptables and decompressor links, and nine larger tools (four in Go) in an optional extra archive | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
+| 140 physical executables, plus BusyBox, Dropbear, kmod, iptables and decompressor links, and thirteen larger tools (eight in Go) in an optional extra archive | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
 | Network, process, namespace, storage and hardware diagnosis | Static musl builds avoid a dependency on the target's libc | Deterministic archives, QEMU smoke tests and release attestations |
 
 ## Get a kit
@@ -66,9 +66,10 @@ Not sure which archive fits the device? Start with the
 
 Each architecture has two archives. **`statics-<arch>.tar.xz` is the kit**:
 every tool below, and it is all most sessions need.
-**`statics-extra-<arch>.tar.xz` is optional** and holds nine larger tools:
+**`statics-extra-<arch>.tar.xz` is optional** and holds thirteen larger tools:
 `stunnel`, `openvpn`, `lftp` and `aria2c`, which each carry their own copy of
-OpenSSL, `par2`, and four Go tools, `rclone`, `croc`, `crictl` and `ctr`.
+OpenSSL, `par2`, and eight Go tools: `rclone`, `croc`, `crictl`, `ctr`, `caddy`,
+`yq`, `age` and `age-keygen`.
 Splitting them out keeps the main kit small enough for routers and other
 cramped devices; take the extra archive when you need TLS wrapping or a VPN,
 to mirror directory trees, resume large downloads, repair files from parity
@@ -82,19 +83,19 @@ Archive sizes for the current pins:
 
 | target | main archive | extra archive |
 |---|---|---|
-| `x86_64` | 21.7 MiB | 21.5 MiB |
-| `i686` | 21.6 MiB | 19.5 MiB |
-| `aarch64` | 19.9 MiB | 17.8 MiB |
-| `armv6-hardfloat` | 18.6 MiB | 17.7 MiB |
-| `armv7-hardfloat` | 18.5 MiB | 17.7 MiB |
-| `armv7-softfloat` | 18.4 MiB | 17.7 MiB |
-| `mips` | 22.6 MiB | 17.6 MiB |
-| `mipsel` | 23.1 MiB | 18.1 MiB |
+| `x86_64` | 21.7 MiB | 34.0 MiB |
+| `i686` | 21.6 MiB | 32.1 MiB |
+| `aarch64` | 19.9 MiB | 29.5 MiB |
+| `armv6-hardfloat` | 18.6 MiB | 29.5 MiB |
+| `armv7-hardfloat` | 18.5 MiB | 29.5 MiB |
+| `armv7-softfloat` | 18.4 MiB | 29.5 MiB |
+| `mips` | 22.6 MiB | 27.5 MiB |
+| `mipsel` | 23.0 MiB | 28.2 MiB |
 | `powerpc` | 20.5 MiB | 3.5 MiB |
 | `powerpc64` | 21.0 MiB | 3.7 MiB |
-| `powerpc64le` | 22.4 MiB | 18.9 MiB |
-| `riscv64` | 21.4 MiB | 19.8 MiB |
-| `s390x` | 21.0 MiB | 19.5 MiB |
+| `powerpc64le` | 22.4 MiB | 29.6 MiB |
+| `riscv64` | 21.4 MiB | 32.7 MiB |
+| `s390x` | 21.1 MiB | 30.9 MiB |
 
 The extra archive is compressed with `xz -9` and needs about 65 MiB of memory
 to unpack; on a smaller device, unpack it elsewhere and copy the directory.
@@ -188,6 +189,8 @@ The extra archive adds:
 | File transfer and sync | `rclone`, `croc`, `lftp`, `aria2c` | Copy, sync and check against local disks, S3-compatible storage, SFTP, WebDAV and HTTP; send a file to another machine with a one-time code; mirror trees over FTP, FTPS, SFTP and HTTP; resumable, segmented HTTP, FTP, BitTorrent and Metalink downloads |
 | Parity and repair | `par2` | Recovery data that repairs damaged or missing files |
 | Container runtimes | `crictl`, `ctr` | Pods, containers, logs, images and snapshots through the CRI and containerd sockets |
+| Web server and reverse proxy | `caddy` | Reverse proxy, static file server and TLS termination from one command or a Caddyfile |
+| Data and encryption | `yq`, `age`, `age-keygen` | Query and convert YAML, JSON, XML, TOML and CSV; encrypt files to a key, an SSH key or a passphrase |
 
 `rclone` is trimmed to the backends and commands a field session needs, and
 `croc` uses a public relay run by its author unless you point it at your own;

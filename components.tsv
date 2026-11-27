@@ -103,4 +103,7 @@ rclone|MIT|rclone, trimmed to the local, s3, sftp, http, and webdav backends and
 croc|MIT|croc, relay-only (upstream's croc_no_tailcat tag), with the Go modules listed in licenses/croc/go-modules.tsv|extra|-tags=croc_no_tailcat .
 cri-tools|Apache-2.0|crictl only, with the Go modules listed in licenses/cri-tools/go-modules.tsv|extra|./cmd/crictl
 containerd|Apache-2.0|ctr only, with the Go modules listed in licenses/containerd/go-modules.tsv|extra|./cmd/ctr
+caddy|Apache-2.0 AND BSD-3-Clause AND MIT|caddy with its standard modules (upstream's nobadger, nomysql, and nopgx tags); code adapted from Go (BSD-3-Clause), FrankenPHP, httpgzip, and goech, and embedded Tabler icons (MIT), with the Go modules listed in licenses/caddy/go-modules.tsv|extra|-tags=nobadger,nomysql,nopgx ./cmd/caddy
+yq|MIT|yq (the Go one), with the Go modules listed in licenses/yq/go-modules.tsv|extra|.
+age|BSD-3-Clause AND MIT|age and age-keygen with their bundled bech32 (MIT), with the Go modules listed in licenses/age/go-modules.tsv|extra|./cmd/age ./cmd/age-keygen
 go|BSD-3-Clause|the Go runtime and standard library, statically linked into every Go tool in the same archive|any|runtime

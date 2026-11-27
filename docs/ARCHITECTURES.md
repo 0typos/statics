@@ -28,8 +28,8 @@ runtime errors after choosing a target, see
 
 ## Go tools
 
-Go tools (`wireguard-go` in the main archive; `rclone`, `croc`, `crictl`, and
-`ctr` in the extra archive, beside the C tools `stunnel`, `openvpn`, `lftp`,
+Go tools (`wireguard-go` in the main archive; `rclone`, `croc`, `crictl`,
+`ctr`, `caddy`, `yq`, `age`, and `age-keygen` in the extra archive, beside the C tools `stunnel`, `openvpn`, `lftp`,
 `aria2c`, and `par2`) are built by the pinned Go release with
 cgo disabled, so they do not link musl at all. Go has its own CPU and kernel
 floors, recorded as the last column of `architectures.tsv`:
@@ -157,7 +157,8 @@ DHCP and TFTP configuration, runs a bash script with arrays, regular
 expressions, and process substitution, has sqlite3 write a database with an
 FTS5 index and query it from a second process, runs a qjs script, its REPL,
 and a standalone program made by `qjs -c`, has lua catch an error, starts
-htop for its version, and runs a make recipe. The `testssl.sh` wrapper, a script
+htop for its version, runs a make recipe, and, where Go runs, has caddy adapt
+a Caddyfile, yq convert YAML, and age encrypt to a new key and decrypt. The `testssl.sh` wrapper, a script
 that starts the bundled `openssl` and BusyBox, runs only natively. Every
 other physical executable, including the CAN,
 ISO-TP, and SPI utilities, is checked for static linkage and the absence of a
