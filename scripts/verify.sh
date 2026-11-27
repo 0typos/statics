@@ -73,6 +73,10 @@ if [[ $go_env != none ]]; then
         [croc]="croc version $(pinned_version croc)|--version"
         [crictl]="crictl version v$(pinned_version cri-tools)|--version"
         [ctr]="ctr github.com/containerd/containerd/v2 v$(pinned_version containerd)|--version"
+        [caddy]="v$(pinned_version caddy)|version"
+        [yq]="version v$(pinned_version yq)|--version"
+        [age]="v$(pinned_version age)|--version"
+        [age-keygen]="v$(pinned_version age)|--version"
     )
 fi
 
@@ -601,6 +605,23 @@ PY
     done
     "${runner[@]}" "$output_dir/tmux" -S "$scratch/tmux" kill-server || true
     [[ $tmux_output == *statics-42* ]] || failed "tmux session"
+    if [[ $go_env != none ]]; then
+        # The Go tools beyond their versions: caddy adapts a Caddyfile to
+        # JSON, yq converts YAML, and age encrypts to a fresh key and
+        # decrypts on every byte order. None opens a socket.
+        printf ':8080 {\n\treverse_proxy 127.0.0.1:9000\n}\n' >"$scratch/Caddyfile"
+        check_output '"handler":"reverse_proxy","upstreams":[{"dial":"127.0.0.1:9000"}]' \
+            "$output_dir-extra/caddy" adapt --config "$scratch/Caddyfile" --adapter caddyfile
+        check_output '{"b":42}' "$output_dir-extra/yq" -o=json -I=0 .a <<<'a: {b: 42}'
+        "${runner[@]}" "$output_dir-extra/age-keygen" -o "$scratch/age.key" 2>/dev/null ||
+            failed "age-keygen"
+        age_recipient=$("${runner[@]}" "$output_dir-extra/age-keygen" -y "$scratch/age.key") ||
+            failed "age-keygen -y"
+        "${runner[@]}" "$output_dir-extra/age" -r "$age_recipient" -o "$scratch/age.out" "$sample" ||
+            failed "age encrypt"
+        "${runner[@]}" "$output_dir-extra/age" -d -i "$scratch/age.key" "$scratch/age.out" |
+            cmp -s - "$sample" || failed "age"
+    fi
     # A static key, then OpenVPN's own loopback encrypt and decrypt with
     # it: OpenSSL's ciphers and OpenVPN's packet code on every byte order.
     "${runner[@]}" "$output_dir-extra/openvpn" --genkey secret "$scratch/static.key" >/dev/null ||

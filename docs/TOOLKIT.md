@@ -63,9 +63,9 @@ not add separate binary payloads. `ping`, `arping`, and `traceroute` are the
 iputils and traceroute.sourceforge.net programs, not BusyBox applets;
 `busybox ping` still reaches the applet.
 
-Nine larger tools ship separately in `statics-extra-<arch>.tar.xz`:
+Thirteen larger tools ship separately in `statics-extra-<arch>.tar.xz`:
 `stunnel`, `openvpn`, `lftp`, and `aria2c`, which each link their own copy
-of OpenSSL, and `par2`, on every architecture, and four Go tools on every
+of OpenSSL, and `par2`, on every architecture, and eight Go tools on every
 architecture with Go (not `powerpc` or `powerpc64`). It extracts to `<arch>-extra/` with its own
 notices, SBOM, and checksums; see
 [the extra archive](#extra-archive-rclone-croc-crictl-and-ctr).
@@ -76,6 +76,8 @@ notices, SBOM, and checksums; see
 | File transfer and sync | `rclone`, `croc`, `lftp`, `aria2c` | Copy and sync with S3, SFTP, WebDAV, and HTTP; hand a file to another machine with a one-time code; mirror trees over FTP, FTPS, SFTP, and HTTP; segmented, resumable HTTP, FTP, BitTorrent, and Metalink downloads |
 | Parity and repair | `par2`; `par2create`, `par2verify`, `par2repair` | Recovery data that repairs damaged or missing files |
 | Container runtimes | `crictl`, `ctr` | Inspect pods, containers, images, logs, and snapshots through the CRI and containerd sockets |
+| Web server and reverse proxy | `caddy` | Reverse proxy, static file server, and TLS termination, from one command or a Caddyfile |
+| Data and encryption | `yq`, `age`, `age-keygen` | Query and convert YAML, JSON, XML, TOML, CSV, and properties files; encrypt files to a key, an SSH key, or a passphrase |
 
 ## License boundary
 
@@ -1577,7 +1579,7 @@ export PATH="/tmp/statics/aarch64:/tmp/statics/aarch64-extra:$PATH"
 
 Every module each tool links is listed in
 `licenses/<source>/go-modules.tsv` (`rclone`, `croc`, `cri-tools`,
-`containerd`), with its license files beside it.
+`containerd`, `caddy`, `yq`, `age`), with its license files beside it.
 
 ### rclone, trimmed
 
@@ -1687,6 +1689,70 @@ are not bundled. containerd's build tags (`no_btrfs`, `no_devmapper`,
 `no_zfs`, `no_cri`, `no_rdt`, `no_systemd`, `no_tracing`) only remove
 daemon plugins that `ctr` does not link, so building with them leaves its
 size unchanged and none is used; `no_grpc` does not build.
+
+### caddy: reverse proxy and file server
+
+> [!IMPORTANT]
+> Given a public host name, `caddy` requests a certificate for it from
+> Let's Encrypt or ZeroSSL over the Internet, and binds ports 80 and 443.
+> Use an address such as `:8080` or `http://`, or `tls internal`, where that
+> is not wanted.
+
+One command, no configuration file:
+
+```console
+caddy reverse-proxy --from :8080 --to 127.0.0.1:9000
+caddy file-server --listen 127.0.0.1:8000 --root /srv/www --browse
+caddy reverse-proxy --from https://192.0.2.10:8443 --to 127.0.0.1:9000 --internal-certs --disable-redirects
+```
+
+Or a Caddyfile, checked before it is run:
+
+```console
+caddy adapt --config Caddyfile --pretty
+caddy validate --config Caddyfile
+caddy run --config Caddyfile
+```
+
+It is upstream's standard build: every standard module, no plugins.
+
+- **Ports.** Serving HTTPS, `caddy` also binds port 80 to redirect HTTP,
+  unless `--disable-redirects` (or `auto_https disable_redirects` in a
+  Caddyfile) is given. Ports below 1024 need root or `CAP_NET_BIND_SERVICE`.
+- **Its own CA.** With `tls internal` or `--internal-certs` it creates a
+  certificate authority and tries to install the root into the system trust
+  store, asking for `sudo`. Only a Caddyfile can stop that, with the global
+  option `skip_install_trust`; the one-line commands have no such flag.
+- **Files it writes.** Certificates and the CA go under
+  `$XDG_DATA_HOME/caddy`, else `$HOME/.local/share/caddy`, and `caddy run`
+  saves its last configuration under `$XDG_CONFIG_HOME/caddy`, else
+  `$HOME/.config/caddy`. With neither variable set, both are `./caddy` in
+  the working directory. `caddy validate` is not read-only: for a
+  configuration that uses the internal CA it creates the CA's keys.
+- **Admin API.** `caddy run` and `caddy start` serve an unauthenticated
+  admin API on `localhost:2019` (`admin off` disables it); `reverse-proxy`
+  and `file-server` do not.
+- **Self-replacement.** `caddy upgrade`, `caddy add-package`, and
+  `caddy remove-package` download a replacement binary from caddyserver.com,
+  which is not this static build: do not use them.
+
+### yq and age
+
+```console
+yq '.spec.containers[].image' pod.yaml
+yq -o=json '.' config.yaml | jq .
+yq -p=xml -o=yaml '.' settings.xml
+age-keygen -o key.txt
+bsdtar -cf - /etc | age -r age1example... -o etc.tar.age
+age -d -i key.txt etc.tar.age | bsdtar -tf -
+```
+
+`yq` is Mike Farah's Go program, with `jq`-like expressions over YAML, JSON,
+XML, TOML, CSV, and properties files; it is not the Python wrapper around
+`jq` of the same name. `age` encrypts to `age1...` recipients, to SSH public
+keys (`-R ~/.ssh/authorized_keys`), or to a passphrase (`-p`, which needs a
+terminal). `age-inspect` and plugins are not packaged; a plugin found on
+`PATH` as `age-plugin-NAME` is still run.
 
 ## Privilege guide
 

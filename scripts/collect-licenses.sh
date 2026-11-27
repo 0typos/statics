@@ -207,6 +207,12 @@ copy_license croc LICENSE
 copy_license cri-tools LICENSE
 copy_license containerd LICENSE
 copy_license containerd NOTICE
+copy_license caddy LICENSE
+copy_license caddy CADDY-NOTICES
+copy_license yq LICENSE
+copy_license age LICENSE
+# The MIT notice of the bundled bech32.
+copy_license age internal/bech32/bech32.go
 
 # glibc's elf.h, in kexec-tools (LGPL-2.0-or-later) and elfutils
 # (LGPL-2.1-or-later), comes without the LGPL text. kmod's COPYING is the

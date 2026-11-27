@@ -143,6 +143,9 @@ sources=(
     croc
     cri-tools
     containerd
+    caddy
+    yq
+    age
     zlib
     bzip2
     xz
@@ -295,7 +298,7 @@ dag=$WORK_DIR/dag.mk
         printf ' $(S)/%s' "$c"
     done
     if [[ $go_env != none ]]; then
-        printf ' $(S)/%s' wireguard-go rclone croc crictl ctr
+        printf ' $(S)/%s' wireguard-go rclone croc crictl ctr caddy yq age
     fi
     printf '\n\n'
 
@@ -409,6 +412,9 @@ dag=$WORK_DIR/dag.mk
     emit croc croc build_croc
     emit crictl cri-tools build_crictl
     emit ctr containerd build_ctr
+    emit caddy caddy build_caddy
+    emit yq yq build_yq
+    emit age age build_age
 } > "$dag"
 
 if ! make -f "$dag" -j"$JOBS" --output-sync=target "$goal"; then

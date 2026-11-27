@@ -14,8 +14,8 @@ TLS server auditing, SFTP and SCP with curl, SMB and NFS mounts, partition
 imaging and multicast, fast checksums, SQLite databases, JavaScript and Lua
 scripts, GNU make, and an interactive process view. The optional extra archive adds
 object-storage and SFTP sync, directory mirroring, resumable segmented
-downloads, parity repair, code-phrase file transfer, and container runtime
-inspection.
+downloads, parity repair, code-phrase file transfer, container runtime
+inspection, a reverse proxy and web server, YAML processing, and file encryption.
 
 This page records candidates, not commitments. The executable contract is in
 the [toolkit guide](TOOLKIT.md), and implementation proposals should follow
@@ -54,7 +54,7 @@ the [contribution checklist](../CONTRIBUTING.md).
 | Embedded buses | selected `can-utils`, `i2c-tools`, and `spi-tools` programs |
 
 The extra archive adds `stunnel`, `openvpn`, `lftp`, and `aria2c` (each with
-its own OpenSSL) and `par2` on every target, and `rclone` (trimmed), `croc`, `crictl`, and `ctr` where Go
+its own OpenSSL) and `par2` on every target, and `rclone` (trimmed), `croc`, `crictl`, `ctr`, `caddy`, `yq`, `age`, and `age-keygen` where Go
 runs.
 Further rclone backends and commands are requests against its trimmed main
 rather than new tools; see the [toolkit guide](TOOLKIT.md#rclone-trimmed).
@@ -73,6 +73,7 @@ disruptive.
 | 2 | partclone btrfs, XFS, and NTFS | Image the filesystems of most Linux servers and Windows disks | btrfs alone is about 280 KB of xz; XFS needs liburcu, NTFS ntfs-3g; probably the extra archive |
 | 3 | `stress-ng` | CPU, memory, scheduler, and system stress | Large surface and intentionally disruptive workloads |
 | 3 | `tcpflow` | Reassemble TCP streams into files | Needs Boost (C++ headers), a large build dependency for one tool |
+| 3 | `fzf` | Fuzzy search over any list | Go, but its unaligned 64-bit loads fault on `mips` and `mipsel` (SIGBUS under QEMU 10); needs an upstream fix or a patch |
 | 3 | `b3sum` | BLAKE3 checksums | Upstream's only CLI is Rust; a C `b3sum` would be new code over the C library |
 | 3 | `nghttp`, `h2load` | HTTP/2 client and load generator | C++23 with libev, c-ares, and zlib, and two more static copies of OpenSSL: about 3 MB of archive; libnghttp2 in `curl` is the cheap alternative |
 

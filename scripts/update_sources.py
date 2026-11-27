@@ -1090,6 +1090,34 @@ def latest_containerd() -> tuple[str, str]:
     )
 
 
+def latest_caddy() -> tuple[str, str]:
+    # Stable tags only; the tag archive, as the build takes modules from
+    # go.sum rather than a vendored release archive.
+    return latest_from_github_tags(
+        "caddyserver/caddy",
+        r"v(\d+\.\d+\.\d+)",
+        "https://github.com/caddyserver/caddy/archive/refs/tags/v{version}.tar.gz",
+    )
+
+
+def latest_yq() -> tuple[str, str]:
+    # Stable tags only.
+    return latest_from_github_tags(
+        "mikefarah/yq",
+        r"v(\d+\.\d+\.\d+)",
+        "https://github.com/mikefarah/yq/archive/refs/tags/v{version}.tar.gz",
+    )
+
+
+def latest_age() -> tuple[str, str]:
+    # Stable tags only.
+    return latest_from_github_tags(
+        "FiloSottile/age",
+        r"v(\d+\.\d+\.\d+)",
+        "https://github.com/FiloSottile/age/archive/refs/tags/v{version}.tar.gz",
+    )
+
+
 # Checksum files published beside a release: a candidate archive whose
 # SHA-256 is not listed there is rejected. rclone's file is also PGP-signed;
 # reviewers check that signature (CONTRIBUTING.md).
@@ -1212,6 +1240,9 @@ DISCOVERERS: dict[str, Callable[[], tuple[str, str]]] = {
     "wireguard-go": latest_wireguard_go,
     "rclone": latest_rclone,
     "croc": latest_croc,
+    "caddy": latest_caddy,
+    "yq": latest_yq,
+    "age": latest_age,
     "cri-tools": latest_cri_tools,
     "containerd": latest_containerd,
 }

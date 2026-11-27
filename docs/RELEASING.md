@@ -30,7 +30,8 @@ The release contains, for every architecture:
 
 Every architecture has an extra archive: `stunnel`, `openvpn`, `lftp`,
 `aria2c`, and `par2` everywhere,
-plus `rclone`, `croc`, `crictl`, and `ctr` where Go runs (not `powerpc` or
+plus `rclone`, `croc`, `crictl`, `ctr`, `caddy`, `yq`, `age`, and
+`age-keygen` where Go runs (not `powerpc` or
 `powerpc64`). The build, cache, reproducibility, and publish steps handle
 each archive that exists, and would skip an extra archive that did not.
 

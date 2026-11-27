@@ -168,7 +168,7 @@ under a top-level `<arch>-extra/` directory, with its own `SHA256SUMS`,
 `COMPONENTS.tsv`, notices, and SBOM (`statics-extra-<arch>.spdx.json`). It
 exists only for an architecture that builds at least one extra tool: today
 `stunnel`, `openvpn`, `lftp`, `aria2c`, and `par2` on every target, and
-`rclone`, `croc`, `crictl`, and `ctr` on every target with Go. A C tool's builder installs with
+`rclone`, `croc`, `crictl`, `ctr`, `caddy`, `yq`, `age`, and `age-keygen` on every target with Go. A C tool's builder installs with
 `install_component_binary`, which, like `go_build`, puts it in the archive
 `components.tsv` names. It is
 compressed with `xz -9` rather than the main archive's `-6`: the 64 MiB
@@ -262,7 +262,8 @@ GOPROXY=file:///tmp/sources/go-modules GOFLAGS=-mod=readonly \
 The module tree holds only what the bundled tools link, so build the same
 packages with the same flags: rclone's `./cmd/statics` after copying in
 `patches/go-mains/rclone/`, croc with `-tags=croc_no_tailcat`, `./cmd/crictl`,
-and `./cmd/ctr`, adding the `-X` version flags from `scripts/builders/` for
+`./cmd/ctr`, caddy's `./cmd/caddy` with `-tags=nobadger,nomysql,nopgx`, yq's
+root package, and age's `./cmd/age` and `./cmd/age-keygen`, adding the `-X` version flags from `scripts/builders/` for
 the same version strings. Upstream's full rclone build needs modules that are
 not in the bundle.
 
