@@ -42,7 +42,7 @@ user-mode emulation proves that non-native outputs can actually start.
 
 | 🧰 Carry it | 🐧 Run it | 🔐 Trust it |
 |---|---|---|
-| 140 physical executables, plus BusyBox, Dropbear, kmod, iptables and decompressor links, and thirteen larger tools (eight in Go) in an optional extra archive | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
+| 140 physical executables, plus BusyBox, Dropbear, kmod, iptables and decompressor links, and fourteen larger tools (eight in Go) in an optional extra archive | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
 | Network, process, namespace, storage and hardware diagnosis | Static musl builds avoid a dependency on the target's libc | Deterministic archives, QEMU smoke tests and release attestations |
 
 ## Get a kit
@@ -66,9 +66,9 @@ Not sure which archive fits the device? Start with the
 
 Each architecture has two archives. **`statics-<arch>.tar.xz` is the kit**:
 every tool below, and it is all most sessions need.
-**`statics-extra-<arch>.tar.xz` is optional** and holds thirteen larger tools:
+**`statics-extra-<arch>.tar.xz` is optional** and holds fourteen larger tools:
 `stunnel`, `openvpn`, `lftp` and `aria2c`, which each carry their own copy of
-OpenSSL, `par2`, and eight Go tools: `rclone`, `croc`, `crictl`, `ctr`, `caddy`,
+OpenSSL, `par2`, `python3` with its standard library, and eight Go tools: `rclone`, `croc`, `crictl`, `ctr`, `caddy`,
 `yq`, `age` and `age-keygen`.
 Splitting them out keeps the main kit small enough for routers and other
 cramped devices; take the extra archive when you need TLS wrapping or a VPN,
@@ -76,7 +76,7 @@ to mirror directory trees, resume large downloads, repair files from parity
 data, sync with object storage, hand files across machines, or inspect a
 container runtime. It extracts beside the main kit as `<arch>-extra/`, with
 its own checksums, SBOM and notices. On `powerpc` and `powerpc64`, where Go
-does not run, it holds only the five C tools (see the
+does not run, it holds only the six C tools (see the
 [architecture guide](docs/ARCHITECTURES.md#go-tools)).
 
 Archive sizes for the current pins:
@@ -189,6 +189,7 @@ The extra archive adds:
 | File transfer and sync | `rclone`, `croc`, `lftp`, `aria2c` | Copy, sync and check against local disks, S3-compatible storage, SFTP, WebDAV and HTTP; send a file to another machine with a one-time code; mirror trees over FTP, FTPS, SFTP and HTTP; resumable, segmented HTTP, FTP, BitTorrent and Metalink downloads |
 | Parity and repair | `par2` | Recovery data that repairs damaged or missing files |
 | Container runtimes | `crictl`, `ctr` | Pods, containers, logs, images and snapshots through the CRI and containerd sockets |
+| Python | `python3` | CPython with its standard library, SQLite, TLS and compression modules built in, for scripts on a target with no interpreter |
 | Web server and reverse proxy | `caddy` | Reverse proxy, static file server and TLS termination from one command or a Caddyfile |
 | Data and encryption | `yq`, `age`, `age-keygen` | Query and convert YAML, JSON, XML, TOML and CSV; encrypt files to a key, an SSH key or a passphrase |
 

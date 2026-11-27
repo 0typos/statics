@@ -53,6 +53,7 @@ workflow artifacts.
 | `docker/Dockerfile` | Clean toolchain, source, build, test, and export stages |
 | `scripts/build.sh` | Target environment, including the hermetic Go settings, and build orchestration |
 | `scripts/components.sh` | The components that belong in one archive of one target |
+| `scripts/python-stdlib-zip.py` | Packs CPython's standard library and bytecode into `lib/python3XY.zip` |
 | `scripts/fetch-go-modules.sh` | Downloads the Go modules the Go tools import, against each `go.sum` |
 | `scripts/builders/` | One source-oriented recipe per component |
 | `scripts/lib/build-common.sh` | Shared cross-build, install, and link helpers |
@@ -174,7 +175,10 @@ verification key, `C699981A31F338706C817650DF5BA9D30642D5A0`), nfs-utils
 (Steve Dickson, `FEFAD1BB14447F4968C1971095D24347967C393E`; the signature
 covers the uncompressed tar), and par2cmdline (Ike Devolder,
 `DB2277BCD500AA3825610BDDDB323392796CA067`), for example with keys
-fetched from `hkps://keyserver.ubuntu.com`. Review
+fetched from `hkps://keyserver.ubuntu.com`. Python publishes a Sigstore
+bundle beside each archive (`Python-<version>.tar.xz.sigstore`): verify it
+against the release manager's identity for that series, listed at
+<https://www.python.org/downloads/metadata/sigstore/>. Review
 upstream release notes, published checksums, signatures when available,
 license changes, and archive provenance. Then run the relevant builds and
 verification. A new digest is not evidence by itself that an update is safe.

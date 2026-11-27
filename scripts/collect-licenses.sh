@@ -201,6 +201,11 @@ copy_license quickjs LICENSE
 copy_license lua LUA-LICENSE
 copy_license htop COPYING
 copy_license make COPYING
+# license.rst holds the notices of the code CPython incorporates.
+copy_license python LICENSE
+copy_license python Doc/license.rst
+# HACL*'s MIT notice is only in its sources.
+copy_license python Modules/_hacl/Hacl_Hash_SHA2.h
 copy_license wireguard-go LICENSE
 copy_license rclone COPYING
 copy_license croc LICENSE

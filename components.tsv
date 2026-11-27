@@ -5,7 +5,7 @@ dropbear|MIT AND Unlicense|dropbearmulti and applet links, including the reposit
 iproute2|GPL-2.0-only|ip, ss, bridge, tc, nstat, devlink, and rdma|main|-
 wireguard-tools|GPL-2.0-only|wg|main|-
 wireguard-go|MIT|wireguard-go, the userspace WireGuard daemon, with the Go modules listed in licenses/wireguard-go/go-modules.tsv|main|.
-openssl|Apache-2.0|openssl; statically linked into curl (and its libssh2), iperf3, drill, nmap, ncat, socat, and ipmitool, SHA-1 only into partclone, and in the extra archive into stunnel, openvpn, lftp, and aria2|both|-
+openssl|Apache-2.0|openssl; statically linked into curl (and its libssh2), iperf3, drill, nmap, ncat, socat, and ipmitool, SHA-1 only into partclone, and in the extra archive into stunnel, openvpn, lftp, aria2, and python3 (a threaded build of its own on 32-bit targets)|both|-
 libpcap|BSD-3-Clause|statically linked into tcpdump, nmap, ncat, ngrep, hping3, iftop, nethogs, tcpreplay, tcpprep, tcprewrite, and dhcpdump|main|-
 libmnl|LGPL-2.1-or-later|statically linked into iproute2, ethtool, libnftnl, nft, conntrack, and ipset|main|-
 libcap-ng|LGPL-2.1-or-later|statically linked into util-linux setpriv and mount.cifs, and in the extra archive into openvpn|both|-
@@ -43,10 +43,10 @@ ipmitool|BSD-3-Clause|ipmitool|main|-
 mtd-utils|GPL-2.0-only AND GPL-2.0-or-later AND BSD-3-Clause|selected MTD and UBI tools|main|-
 libnl|LGPL-2.1-only|libnl-3 and libnl-genl-3, statically linked into iw|main|-
 iw|ISC|iw|main|-
-zlib|Zlib|statically linked into pigz, bsdtar, bsdcpio, kmod, kexec, bpftool, and curl (through libssh2 too), and in the extra archive into lftp and aria2|both|-
-bzip2|bzip2-1.0.6|bzip2 with bunzip2 and bzcat links; libbz2 statically linked into bsdtar and bsdcpio|main|-
-xz|0BSD|xz with unxz and xzcat links; liblzma statically linked into bsdtar, bsdcpio, and kmod|main|-
-zstd|BSD-3-Clause OR GPL-2.0-only|zstd with unzstd and zstdcat links; libzstd statically linked into bsdtar, bsdcpio, and kmod|main|-
+zlib|Zlib|statically linked into pigz, bsdtar, bsdcpio, kmod, kexec, bpftool, and curl (through libssh2 too), and in the extra archive into lftp, aria2, and python3|both|-
+bzip2|bzip2-1.0.6|bzip2 with bunzip2 and bzcat links; libbz2 statically linked into bsdtar and bsdcpio; in the extra archive libbz2 is statically linked into python3|both|-
+xz|0BSD|xz with unxz and xzcat links; liblzma statically linked into bsdtar, bsdcpio, and kmod; in the extra archive liblzma is statically linked into python3|both|-
+zstd|BSD-3-Clause OR GPL-2.0-only|zstd with unzstd and zstdcat links; libzstd statically linked into bsdtar, bsdcpio, and kmod; in the extra archive libzstd is statically linked into python3|both|-
 pigz|Zlib|pigz and unpigz, without Zopfli|main|-
 pv|GPL-3.0-or-later|pv|main|-
 mbuffer|GPL-3.0-or-later|mbuffer|main|-
@@ -85,7 +85,7 @@ bash|GPL-3.0-or-later|bash with bundled readline, using ncurses; no NLS, program
 testssl.sh|GPL-2.0-only AND MPL-2.0 AND CC-BY-3.0-US|testssl.sh with a wrapper that runs it with the bundled bash and openssl, and Mozilla's trust store only (share/testssl/)|main|-
 readline|GPL-3.0-or-later|statically linked into sqlite3, and in the extra archive into lftp|both|-
 lftp|GPL-3.0-or-later|lftp with OpenSSL, readline, and expat; no GnuTLS, NLS, or libidn2|extra|-
-expat|MIT|statically linked into aria2 and lftp|extra|-
+expat|MIT|statically linked into aria2, lftp, and python3|extra|-
 aria2|GPL-2.0-or-later|aria2c with OpenSSL, zlib, and expat (Metalink); no SQLite, c-ares, libssh2, or WebSocket RPC; upstream also grants an OpenSSL linking exception|extra|-
 cifs-utils|GPL-3.0-or-later|mount.cifs only, linking libcap-ng; no cifs.upcall, cifscreds, cifs.idmap, or ACL tools|main|-
 libtirpc|BSD-3-Clause|statically linked into mount.nfs and showmount|main|-
@@ -94,7 +94,7 @@ udpcast|GPL-2.0-or-later AND BSD-2-Clause|udp-sender and udp-receiver|main|-
 partclone|GPL-2.0-or-later|partclone.extfs (with ext2, ext3, and ext4 links), partclone.fat (with vfat, fat12, fat16, and fat32 links), partclone.dd, partclone.restore, partclone.chkimg, and partclone.info; no btrfs, XFS, or NTFS|main|-
 xxhash|BSD-2-Clause AND GPL-2.0-or-later|xxhsum (GPL-2.0-or-later); libxxhash (BSD-2-Clause) statically linked into partclone|main|-
 par2cmdline|GPL-2.0-or-later|par2 with par2create, par2verify, and par2repair links|extra|-
-sqlite|blessing|sqlite3 shell with FTS4, FTS5, R-Tree, Geopoly, sessions, carray, dbpage, and dbstat, linking readline and ncurses; no loadable extensions or zlib|main|-
+sqlite|blessing|sqlite3 shell with FTS4, FTS5, R-Tree, Geopoly, sessions, carray, dbpage, and dbstat, linking readline and ncurses; no loadable extensions or zlib; in the extra archive the library is statically linked into python3|both|-
 quickjs|MIT|qjs (QuickJS-ng) with the std, os, and bjson modules; its REPL, standalone loader, and three JavaScript builtins compiled from source at run time|main|-
 lua|MIT|lua, the interpreter only; no C modules, readline, or luac|main|-
 htop|GPL-2.0-or-later|htop on narrow-character ncurses; no Unicode, sensors, capabilities, delay accounting, hwloc, or backtraces|main|-
@@ -103,6 +103,7 @@ rclone|MIT|rclone, trimmed to the local, s3, sftp, http, and webdav backends and
 croc|MIT|croc, relay-only (upstream's croc_no_tailcat tag), with the Go modules listed in licenses/croc/go-modules.tsv|extra|-tags=croc_no_tailcat .
 cri-tools|Apache-2.0|crictl only, with the Go modules listed in licenses/cri-tools/go-modules.tsv|extra|./cmd/crictl
 containerd|Apache-2.0|ctr only, with the Go modules listed in licenses/containerd/go-modules.tsv|extra|./cmd/ctr
+python|Python-2.0 AND 0BSD AND MIT AND BSD-2-Clause AND BSD-3-Clause AND HPND AND dtoa AND Unicode-3.0 AND Apache-2.0 AND ISC AND Zlib AND CC0-1.0|python3 (CPython) with every extension module built in and its standard library in lib/pythonXY.zip, linking OpenSSL (a threaded build of its own on 32-bit targets), zlib, libbz2, liblzma, libzstd, SQLite, and expat; bundled HACL*, mimalloc, and the code listed in Doc/license.rst; no ctypes, _decimal, readline, curses, tkinter, _dbm, _gdbm, _uuid, or pip|extra|-
 caddy|Apache-2.0 AND BSD-3-Clause AND MIT|caddy with its standard modules (upstream's nobadger, nomysql, and nopgx tags); code adapted from Go (BSD-3-Clause), FrankenPHP, httpgzip, and goech, and embedded Tabler icons (MIT), with the Go modules listed in licenses/caddy/go-modules.tsv|extra|-tags=nobadger,nomysql,nopgx ./cmd/caddy
 yq|MIT|yq (the Go one), with the Go modules listed in licenses/yq/go-modules.tsv|extra|.
 age|BSD-3-Clause AND MIT|age and age-keygen with their bundled bech32 (MIT), with the Go modules listed in licenses/age/go-modules.tsv|extra|./cmd/age ./cmd/age-keygen

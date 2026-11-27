@@ -98,6 +98,24 @@ RUN --mount=type=cache,id=statics-source-archives,target=/var/cache/statics \
          --extract /src \
          --bundle /archives
 
+# CPython cannot be cross-compiled without an interpreter of the same X.Y to
+# freeze modules and write sysconfig data, and Debian's is older. Build one
+# natively from the pinned source, with its dependency-free modules built in:
+# used by scripts/builders/python.sh and never shipped. Its own stage, so it
+# is compiled outside each architecture's component timeout and jobserver,
+# and reused wherever the layer cache has it. Objects are removed: the
+# builder needs the interpreter and the tree's layout, and every megabyte
+# copied there lands in each architecture's layer.
+FROM sources AS build-python
+RUN --network=none mkdir /opt/build-python \
+    && cd /opt/build-python \
+    && /src/python/configure --without-ensurepip --disable-test-modules \
+        --with-pkg-config=no MODULE_BUILDTYPE=static >/dev/null \
+    && make -s -j"$(nproc)" python \
+    && find . \( -name '*.o' -o -name '*.a' \) -delete \
+    && rm -f Programs/_freeze_module _bootstrap_python \
+    && ./python -c 'import sys, struct, compileall; print(sys.version)'
+
 # The only network access Go gets: the modules the Go tools import, checked
 # against each upstream go.sum, for the offline build and the source bundle.
 # Its own stage, so the manifests that choose the modules do not invalidate
@@ -142,13 +160,14 @@ ARG COMPONENT_TIMEOUT
 # Only what the build reads. Anything else in the context (CI config, docs,
 # verify.sh, dev tooling) must not invalidate every architecture's compile.
 COPY --from=go-modules /src/go-modules/ /src/go-modules/
+COPY --from=build-python /opt/build-python/ /opt/build-python/
 COPY LICENSE architectures.tsv components.tsv ./
 COPY configs/ configs/
 COPY patches/ patches/
 COPY tunpipe/ tunpipe/
 COPY scripts/build.sh scripts/run-builder.sh scripts/merge-kconfig.sh \
      scripts/collect-licenses.sh scripts/generate-sbom.py scripts/components.sh \
-     scripts/
+     scripts/python-stdlib-zip.py scripts/
 COPY scripts/lib/ scripts/lib/
 COPY scripts/builders/ scripts/builders/
 COPY scripts/toolchain/ scripts/toolchain/

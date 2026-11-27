@@ -163,11 +163,11 @@ terms are indexed by `COMPONENTS.tsv` and packaged under `licenses/`.
 Large tools go in a second archive, `statics-extra-<arch>.tar.xz`, so the
 main kit stays small. `components.tsv` assigns each component to `main` or
 `extra`, or to `both` for a library linked into tools in each archive (OpenSSL,
-libcap-ng, zlib, ncurses, and readline), whose notices and SBOM entry then appear in each. The extra archive has the same layout and metadata as the main one,
+libcap-ng, zlib, bzip2, xz, zstd, SQLite, ncurses, and readline), whose notices and SBOM entry then appear in each. The extra archive has the same layout and metadata as the main one,
 under a top-level `<arch>-extra/` directory, with its own `SHA256SUMS`,
 `COMPONENTS.tsv`, notices, and SBOM (`statics-extra-<arch>.spdx.json`). It
 exists only for an architecture that builds at least one extra tool: today
-`stunnel`, `openvpn`, `lftp`, `aria2c`, and `par2` on every target, and
+`stunnel`, `openvpn`, `lftp`, `aria2c`, `par2`, and `python3` on every target, and
 `rclone`, `croc`, `crictl`, `ctr`, `caddy`, `yq`, `age`, and `age-keygen` on every target with Go. A C tool's builder installs with
 `install_component_binary`, which, like `go_build`, puts it in the archive
 `components.tsv` names. It is
@@ -299,8 +299,11 @@ CLIs are not part of the current compatibility contract.
 
 `scripts/build.sh` is the internal build orchestrator. Calling it directly
 requires the pinned Zig and Go releases, all build dependencies, every
-extracted source tree under `/src` (or `SOURCES_DIR`), and the Go module
-cache that `scripts/fetch-go-modules.sh` writes there. It is intentionally not the
+extracted source tree under `/src` (or `SOURCES_DIR`), the Go module
+cache that `scripts/fetch-go-modules.sh` writes there, and a CPython of the
+pinned series built natively from the same source, as the Dockerfile's
+`build-python` stage does, at `/opt/build-python/python` (or
+`STATICS_BUILD_PYTHON`). It is intentionally not the
 recommended host setup.
 
 If a command fails, start with the

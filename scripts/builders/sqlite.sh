@@ -24,8 +24,9 @@ build_sqlite() {
             CC="$CC" \
             CFLAGS="$STATIC_CFLAGS" \
             LDFLAGS="$STATIC_LDFLAGS"
-        run_make sqlite3
-        install_component_binary sqlite sqlite3 sqlite3
+        # libsqlite3.a stays in the tree for python's sqlite3 module.
+        run_make sqlite3 libsqlite3.a
+        install_binary sqlite3 sqlite3
         # The archive has no license file: SQLite is in the public domain,
         # and each source file opens with this blessing instead.
         awk '/The author disclaims copyright/ { on = 1 }
