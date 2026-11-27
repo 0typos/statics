@@ -1,7 +1,7 @@
 # Toolkit guide
 
-The default bundle is a compact Linux troubleshooting kit: 135 physical
-executables (134 on `powerpc` and `powerpc64`, which have no Go tools),
+The default bundle is a compact Linux troubleshooting kit: 140 physical
+executables (139 on `powerpc` and `powerpc64`, which have no Go tools),
 BusyBox applet links, Dropbear, kmod, and iptables multi-call links, decompressor links, Nmap runtime
 data, license texts, checksums, and build metadata. Static linking removes the
 dependency on a target's installed libc; it does not replace kernel features,
@@ -41,10 +41,11 @@ Nmap data, notices, and licenses remain available.
 | Pipe transfer | `pv`, `mbuffer` | Progress and rate limits on a pipe, and a large buffer that keeps a stream moving across stalls |
 | Serial console and transfer | `picocom`, `sz`, `rz`, `ser2net` | Serial terminal sessions, XMODEM/YMODEM/ZMODEM file transfer, and a serial port shared over TCP or RFC 2217 |
 | Sessions and shells | `tmux`, `bash` | Sessions that survive a dropped connection, and bash for scripts and interactive use |
+| Scripting, data, and builds | `sqlite3`, `qjs`, `lua`, `make` | Open, query, repair, and create SQLite databases; run JavaScript and Lua scripts; run makefiles |
 | Quick proxies | `microsocks`, `tinyproxy` | SOCKS5 and HTTP/HTTPS proxies |
 | Netboot and DHCP rescue | `dnsmasq` | DHCP, DNS, and TFTP for an isolated link or a network boot |
 | TLS auditing | `testssl.sh` | Protocols, ciphers, certificates, and known TLS vulnerabilities of a server (a script; see below) |
-| Process diagnosis | `strace`, `lsof`, `gdbserver` | System-call tracing, process/file/socket correlation, and remote debugging with a host GDB |
+| Process diagnosis | `htop`, `strace`, `lsof`, `gdbserver` | Interactive process, CPU, and memory view; system-call tracing, process/file/socket correlation, and remote debugging with a host GDB |
 | Filesystems and storage | `lsblk`, `blkid`, `sfdisk`, `losetup`, `mount`, `umount`, `e2fsck`, `dumpe2fs`, `tune2fs`, `mke2fs`; `fsck.ext2`, `fsck.ext3`, `fsck.ext4`, `mkfs.ext4`; `smartctl`, `nvme` | Block-device and partition inventory, loop devices, mounts, ext filesystem inspection and repair, drive health, and NVMe diagnosis |
 | Kernel log | `dmesg` | Kernel ring buffer with levels, facilities, and readable timestamps |
 | Kernel modules, boot, and BPF | `kmod`, `kexec`, `bpftool`; `modinfo`, `lsmod`, `insmod`, `rmmod`, `modprobe`, `depmod` | Find and load drivers, including xz-, zstd-, and gzip-compressed modules; boot straight into another kernel; list loaded eBPF programs, maps, and attachments |
@@ -858,6 +859,69 @@ The bundle has no HTTP/2 client: `nghttp` and `h2load` are not included
 without nghttp2. `openssl s_client -alpn h2 -connect example.com:443` shows
 whether a server negotiates HTTP/2.
 
+## Scripting, data, and builds
+
+A target with only BusyBox `ash` still gets a database shell, two script
+interpreters, and GNU make. None of them can load native extensions: a
+static program has no `dlopen`.
+
+### SQLite databases: sqlite3
+
+Open an application's database read-only, so a diagnosis cannot change it,
+and check it:
+
+```console
+sqlite3 -readonly /var/lib/app/state.db '.tables'
+sqlite3 -readonly /var/lib/app/state.db 'pragma integrity_check;'
+sqlite3 -readonly -json /var/lib/app/state.db 'select * from events limit 5;' | jq .
+```
+
+Take a consistent copy of a database that is in use, and salvage what a
+corrupt one still holds into a new file:
+
+```console
+sqlite3 /var/lib/app/state.db ".backup '/tmp/state-copy.db'"
+sqlite3 /var/lib/app/corrupt.db .recover | sqlite3 /tmp/recovered.db
+```
+
+Without `-readonly`, opening a database in WAL mode writes its `-wal` and
+`-shm` files, and any statement may change it. The interactive prompt has
+line editing and history; `.help` lists the dot-commands.
+
+### JavaScript and Lua: qjs and lua
+
+```console
+qjs -e 'console.log(JSON.stringify({pid: 1 + 1}))'
+qjs --std script.js
+qjs -c script.js -o script-standalone
+lua -e 'print(#arg, os.time())'
+lua script.lua
+```
+
+`qjs` is QuickJS-ng: current ECMAScript with modules, BigInt, and async, but not
+Node.js. There is no `require`, `npm`, `fetch`, or `node:` module; files,
+processes, and the environment come from its own `qjs:std`, `qjs:os`, and
+`qjs:bjson` modules, which `--std` also makes global. `qjs -c` writes a
+copy of itself with the script appended, which runs on a target of the same
+architecture without the kit. `qjs -i` (or no argument) is a prompt with
+line editing; leave it with `.quit` or `C-d`. To run a script from a pipe,
+name it: `qjs /dev/stdin`. With piped input and no file, `qjs` starts the
+prompt and does not exit at end of input.
+
+`lua` runs pure-Lua scripts and modules found through `package.path`. Its
+prompt has no line editing.
+
+### GNU make
+
+```console
+make -C /srv/project -n
+make -j"$(nproc)"
+```
+
+`make` runs recipes with `/bin/sh` unless the makefile sets `SHELL`;
+`make SHELL="$TOOLKIT/bash"` uses the bundled bash. The kit has no
+compiler.
+
 ## Default profile and intentional omissions
 
 The recipes favor broad static portability over enabling every optional
@@ -1328,6 +1392,33 @@ left out, and the two tools that link OpenSSL use the bundle's static
   uncompressed as `stunnel` shows, for roughly 3 MB more in the archive
   for an HTTP/2 client and load generator. Linking the C library alone into
   `curl` (`--http2`) would be the cheap way to add an HTTP/2 client.
+
+### Scripting, data, and build tools
+
+- `sqlite3` is the shell with the library compiled in, built from the
+  autoconf amalgamation with FTS4, FTS5, R-Tree, Geopoly, sessions, carray,
+  and the `dbpage` and `dbstat` tables, besides the default JSON and math functions.
+  It links the bundle's GNU readline (GPL-3.0-or-later; SQLite itself is in
+  the public domain) and ncurses. No loadable extensions (`.load`), and no
+  zlib, so no `.archive` or `zipfile`; ICU is not linked. `sqlite3_rsync`,
+  `sqldiff`, and `sqlite3_analyzer` are not in that source archive.
+- `qjs` is QuickJS-ng with its `std`, `os`, and `bjson` modules; no `qjsc`.
+  Upstream ships the REPL, the standalone loader, and three builtins
+  (`Array.fromAsync`, `Iterator.zip`, and `Iterator.zipKeyed`) as bytecode
+  generated on a little-endian host, which fails its checksum on `mips`,
+  `powerpc`, `powerpc64`, and `s390x`. `patches/quickjs-source-repl.patch`
+  embeds all five as source instead, compiled on first use, on every target
+  alike; `toString()` of those three builtins therefore shows JavaScript. Bytecode written by `bjson.write` or `qjs -c` is in
+  the byte order of the machine that wrote it.
+- `lua` is the interpreter only: no `luac`, C modules (`require` of a `.so`),
+  or readline.
+- `htop` uses the bundle's narrow-character ncurses, so meters and the
+  process tree are drawn in ASCII and it needs one of the compiled-in
+  `TERM` descriptions, as `tmux` does. No libsensors temperatures,
+  capability display, delay accounting, hwloc, or backtraces. It reads
+  `/proc`; other users' I/O and environment need root.
+- `make` is GNU make without Guile, NLS, or the `load` directive; the gnulib
+  replacements it compiles for musl are LGPL.
 
 ### File movement tools
 

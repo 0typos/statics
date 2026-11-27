@@ -104,3 +104,8 @@ rclone|1.76.0|fa2b2e4ae56c4f1b91102285b736596e2a028be77cb2aaa5a0df53f3a7fc5902|h
 croc|11.6.5|cba72f3d58a687a6fe8633c212568071ce7a8e9d9ec544ff9f75aa201f873b6a|https://github.com/schollz/croc/releases/download/v11.6.5/croc_v11.6.5_src.tar.gz
 cri-tools|1.37.0|ef81c240412a5b77b164ae6570857b7a0f347770031a697764ba5167389842d8|https://github.com/kubernetes-sigs/cri-tools/archive/refs/tags/v1.37.0.tar.gz
 containerd|2.4.2|02cbbecd0ef78a521d124afa791b843ba5458ef206e1f7f017999ff45c80c0b4|https://github.com/containerd/containerd/archive/refs/tags/v2.4.2.tar.gz
+sqlite|3.54.1|926ef8d3eab93fbf6e06011901273eec076b25594a4e1cdadd50c987f4f6d64e|https://sqlite.org/2026/sqlite-autoconf-3540100.tar.gz
+quickjs|0.18.0|28bcd89aa3683fd2a946537e5ce3f11cc46b5cbf3383c7561aaef3df5ff9f1dd|https://github.com/quickjs-ng/quickjs/archive/refs/tags/v0.18.0.tar.gz
+lua|5.5.1|1c4b4068d67061f2a2231ad2b5422e77acea1487ea9890f6320af614f4373dce|https://www.lua.org/ftp/lua-5.5.1.tar.gz
+htop|3.5.3|a8b164386494cb85bb255a415a3f5f80afe7a0c4491da5d113b3a0f951087e65|https://github.com/htop-dev/htop/releases/download/3.5.3/htop-3.5.3.tar.xz
+make|4.4.1|dd16fb1d67bfab79a72f5e8390735c49e3e8e70b4945a15ab1f81ddb78658fb3|https://ftp.gnu.org/gnu/make/make-4.4.1.tar.gz

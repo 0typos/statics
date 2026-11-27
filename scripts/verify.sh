@@ -45,6 +45,7 @@ required_binaries=(
     mount.cifs mount.nfs showmount udp-sender udp-receiver
     partclone.extfs partclone.fat partclone.dd partclone.restore
     partclone.chkimg partclone.info xxhsum
+    sqlite3 qjs lua htop make
 )
 # Executables that are scripts rather than static ELF programs.
 scripts=(testssl.sh)
@@ -651,6 +652,35 @@ PY
     # shellcheck disable=SC2016  # expanded by the bash under test
     check_output "statics-42" "$output_dir/bash" -c \
         'a=(statics 42); [[ ${a[1]} =~ ^4 ]] && cat <(printf "%s-%s\n" "${a[@]}")'
+    check_output "$(pinned_version sqlite) " "$output_dir/sqlite3" --version
+    # A database file written, then read back by a second process: JSON,
+    # math, and an FTS5 index.
+    "${runner[@]}" "$output_dir/sqlite3" -noinit "$scratch/smoke.db" \
+        "create table t(a, b); insert into t values('statics', json_extract('{\"n\":42}', '\$.n')); create virtual table f using fts5(x); insert into f values('static musl kit');" ||
+        failed "sqlite3 create"
+    check_output "statics|42|4.0|static musl kit" "$output_dir/sqlite3" -noinit "$scratch/smoke.db" \
+        "select a, b, sqrt(16), (select x from f where f match 'musl') from t;"
+    check_output "$(pinned_version quickjs)" "$output_dir/qjs" --version
+    check_output 'statics-42 18446744073709551616 {"a":true}' "$output_dir/qjs" -e \
+        'console.log("statics-" + [1, 2, 3].map(x => x * 14).at(-1), 2n ** 64n, JSON.stringify({a: /x/v.test("x")}))'
+    # The scripts upstream ships as little-endian bytecode are compiled from
+    # embedded source instead (the quickjs patch), on either byte order:
+    # three builtins, the REPL, and the loader behind -c.
+    check_output 'function [[1,3],[2,4]] [{"a":1,"b":2}]' "$output_dir/qjs" -e \
+        'console.log(typeof Array.fromAsync, JSON.stringify([...Iterator.zip([[1, 2], [3, 4]])]), JSON.stringify([...Iterator.zipKeyed({a: [1], b: [2]})]))'
+    check_output "repl 42" "$output_dir/qjs" --std -i <<<'console.log("repl", 6 * 7); std.exit(0)'
+    echo 'console.log("standalone", 6 * 7)' >"$scratch/smoke.js"
+    "${runner[@]}" "$output_dir/qjs" -c "$scratch/smoke.js" -o "$scratch/smoke-js" ||
+        failed "qjs -c"
+    check_output "standalone 42" "$scratch/smoke-js"
+    check_output "Lua $(pinned_version lua)" "$output_dir/lua" -v
+    # pcall catches the error through setjmp and longjmp.
+    check_output "statics-42 false" "$output_dir/lua" -E -e \
+        'print(("statics-%d %s"):format(6 * 7, tostring(pcall(error, "x"))))'
+    check_output "htop $(pinned_version htop)" "$output_dir/htop" --version
+    check_output "GNU Make $(pinned_version make)" "$output_dir/make" --version
+    # A make function, in a recipe that needs /bin/sh (the `;`).
+    check_output "statics-3" "$output_dir/make" -f - <<<$'all:\n\t@echo statics-$(words a b c); :'
     # testssl.sh runs the bundled openssl and BusyBox applets, which under
     # emulation only binfmt_misc could start, so natively only; it is the
     # same script on every target, and bash is checked above.

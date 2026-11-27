@@ -153,8 +153,11 @@ has `modinfo` read a module plain and gzip-, xz-, and zstd-compressed,
 has dhcpdump, ngrep, tcpprep, tcprewrite, and tcpdump decode and rewrite a
 generated capture, starts a tmux session and reads its pane back, runs
 OpenVPN's crypto self-test with a fresh static key, has dnsmasq check a
-DHCP and TFTP configuration, and runs a bash script with arrays, regular
-expressions, and process substitution. The `testssl.sh` wrapper, a script
+DHCP and TFTP configuration, runs a bash script with arrays, regular
+expressions, and process substitution, has sqlite3 write a database with an
+FTS5 index and query it from a second process, runs a qjs script, its REPL,
+and a standalone program made by `qjs -c`, has lua catch an error, starts
+htop for its version, and runs a make recipe. The `testssl.sh` wrapper, a script
 that starts the bundled `openssl` and BusyBox, runs only natively. Every
 other physical executable, including the CAN,
 ISO-TP, and SPI utilities, is checked for static linkage and the absence of a

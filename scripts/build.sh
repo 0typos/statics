@@ -195,6 +195,11 @@ sources=(
     partclone
     xxhash
     par2cmdline
+    sqlite
+    quickjs
+    lua
+    htop
+    make
 )
 
 # STATICS_ONLY_DEPS builds just the shared libraries (the Dockerfile's deps
@@ -286,7 +291,7 @@ dag=$WORK_DIR/dag.mk
         tcpreplay dhcpdump libevent tmux stunnel openvpn microsocks tinyproxy \
         dnsmasq libyaml gensio ser2net bash testssl libssh2 readline lftp \
         expat aria2 cifs-utils libtirpc nfs-utils udpcast xxhash partclone \
-        par2cmdline; do
+        par2cmdline sqlite quickjs lua htop make; do
         printf ' $(S)/%s' "$c"
     done
     if [[ $go_env != none ]]; then
@@ -394,6 +399,11 @@ dag=$WORK_DIR/dag.mk
     emit xxhash xxhash build_xxhash
     emit partclone partclone build_partclone deps e2fsprogs xxhash
     emit par2cmdline par2cmdline build_par2cmdline
+    emit sqlite sqlite build_sqlite ncurses readline
+    emit quickjs quickjs build_quickjs
+    emit lua lua build_lua
+    emit htop htop build_htop ncurses
+    emit make make build_make
     emit wireguard-go wireguard-go build_wireguard_go
     emit rclone rclone build_rclone
     emit croc croc build_croc

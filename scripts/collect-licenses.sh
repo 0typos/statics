@@ -196,6 +196,11 @@ copy_license partclone COPYING
 copy_license xxhash LICENSE
 copy_license xxhash cli/COPYING
 copy_license par2cmdline COPYING
+copy_license sqlite SQLITE-BLESSING
+copy_license quickjs LICENSE
+copy_license lua LUA-LICENSE
+copy_license htop COPYING
+copy_license make COPYING
 copy_license wireguard-go LICENSE
 copy_license rclone COPYING
 copy_license croc LICENSE

@@ -1,0 +1,97 @@
+quickjs-ng ships five scripts as bytecode generated on a little-endian host:
+its REPL and standalone loader (gen/repl.c, gen/standalone.c) and the
+builtins Array.fromAsync, Iterator.zip, and Iterator.zipKeyed (builtin-*.h).
+Its bytecode keeps operands and its checksum in host byte order, so on the
+big-endian targets `qjs -i`, `qjs -c`, and any use or enumeration of those
+builtins fail with "SyntaxError: checksum error". Regenerating the bytecode
+would mean running a target qjsc during the build. Instead, embed all five
+as source text (C23 #embed) and compile them at run time, on every target
+alike; gen/ and builtin-*.h are no longer compiled. The three builtins are
+therefore not source-stripped: their toString() shows their JavaScript.
+A REPL that fails to start now exits 1, as upstream's loader did. No target
+code runs at build time.
+
+--- a/qjs.c
++++ b/qjs.c
+@@ -83,7 +83,8 @@
+ {
+     JSModuleDef *m;
+     JSValue obj, val;
+-    obj = JS_ReadObject(ctx, qjsc_standalone, qjsc_standalone_size, JS_READ_OBJ_BYTECODE);
++    obj = JS_Eval(ctx, (const char *)qjsc_standalone, qjsc_standalone_size,
++                  "<standalone>", JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY);
+     if (JS_IsException(obj))
+         goto exception;
+     assert(JS_VALUE_GET_TAG(obj) == JS_TAG_MODULE);
+@@ -717,7 +718,8 @@
+         }
+         if (interactive) {
+             JS_SetHostPromiseRejectionTracker(rt, NULL, NULL);
+-            js_std_eval_binary(ctx, qjsc_repl, qjsc_repl_size, 0);
++            if (eval_buf(ctx, qjsc_repl, qjsc_repl_size, "<repl>", JS_EVAL_TYPE_MODULE))
++                goto fail;
+         }
+         if (standalone || compile_file) {
+             if (JS_IsException(ret)) {
+--- a/quickjs.c
++++ b/quickjs.c
+@@ -8939,9 +8939,20 @@
+     return JS_OrdinaryIsInstanceOf(ctx, val, obj);
+ }
+ 
+-#include "builtin-array-fromasync.h"
+-#include "builtin-iterator-zip-keyed.h"
+-#include "builtin-iterator-zip.h"
++/* The builtins written in JavaScript, as NUL-terminated source text for
++   js_bytecode_eval to compile on first use. */
++static const uint8_t qjsc_builtin_array_fromasync[] = {
++#embed "builtin-array-fromasync.js"
++    , 0
++};
++static const uint8_t qjsc_builtin_iterator_zip_keyed[] = {
++#embed "builtin-iterator-zip-keyed.js"
++    , 0
++};
++static const uint8_t qjsc_builtin_iterator_zip[] = {
++#embed "builtin-iterator-zip.js"
++    , 0
++};
+ 
+ // like Function.prototype.call but monkey patch-proof
+ static JSValue js_call_function(JSContext *ctx, JSValueConst this_val,
+@@ -8984,13 +8995,12 @@
+ static JSValue js_bytecode_eval(JSContext *ctx, const uint8_t *bytecode,
+                                 size_t len, int argc, JSValue *argv)
+ {
+-    JSValue obj, fun, result;
++    JSValue fun, result;
+     int i;
+ 
+-    obj = JS_ReadObject(ctx, bytecode, len, JS_READ_OBJ_BYTECODE);
+-    if (JS_IsException(obj))
+-        return JS_EXCEPTION;
+-    fun = JS_EvalFunction(ctx, obj);
++    /* len counts the terminating NUL */
++    fun = JS_Eval(ctx, (const char *)bytecode, len - 1, "<builtin>",
++                  JS_EVAL_TYPE_GLOBAL);
+     if (JS_IsException(fun))
+         return JS_EXCEPTION;
+     assert(JS_IsFunction(ctx, fun));
+--- /dev/null
++++ b/embedded-js.c
+@@ -0,0 +1,15 @@
++/* repl.js and standalone.js as source text, for qjs.c to compile at run
++   time. NUL-terminated, as JS_Eval requires; the sizes exclude the NUL. */
++#include <stdint.h>
++
++const uint8_t qjsc_repl[] = {
++#embed "repl.js"
++    , 0
++};
++const uint32_t qjsc_repl_size = sizeof(qjsc_repl) - 1;
++
++const uint8_t qjsc_standalone[] = {
++#embed "standalone.js"
++    , 0
++};
++const uint32_t qjsc_standalone_size = sizeof(qjsc_standalone) - 1;

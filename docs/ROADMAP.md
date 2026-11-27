@@ -11,7 +11,8 @@ buffered pipe transfer, JSON processing, common IoT field buses, persistent
 terminal sessions and bash, TLS wrapping, OpenVPN, SOCKS5 and HTTP proxies,
 DHCP, DNS, and TFTP for netboot, serial ports shared over the network,
 TLS server auditing, SFTP and SCP with curl, SMB and NFS mounts, partition
-imaging and multicast, and fast checksums. The optional extra archive adds
+imaging and multicast, fast checksums, SQLite databases, JavaScript and Lua
+scripts, GNU make, and an interactive process view. The optional extra archive adds
 object-storage and SFTP sync, directory mirroring, resumable segmented
 downloads, parity repair, code-phrase file transfer, and container runtime
 inspection.
@@ -40,9 +41,10 @@ the [contribution checklist](../CONTRIBUTING.md).
 | TLS wrapping and proxies | `microsocks`, `tinyproxy`; `stunnel` in the extra archive |
 | DHCP, DNS, and netboot | `dnsmasq` |
 | Sessions and shells | `tmux`, `bash` |
+| Scripting, data, and builds | `sqlite3`, `qjs`, `lua`, `make` |
 | TLS auditing | `testssl.sh` |
 | Serial console and transfer | `picocom`, `sz`, `rz`, `ser2net` |
-| Process diagnosis | `strace`, `lsof`, `gdbserver` |
+| Process diagnosis | `htop`, `strace`, `lsof`, `gdbserver` |
 | Filesystems and storage | `lsblk`, `blkid`, `sfdisk`, `losetup`, `mount`, `umount`, `e2fsck`, `dumpe2fs`, `tune2fs`, `mke2fs`, `smartctl`, `nvme` |
 | Kernel log | `dmesg` |
 | Kernel modules, boot, and BPF | `kmod` (`modinfo`, `lsmod`, `insmod`, `rmmod`, `modprobe`, `depmod`), `kexec`, `bpftool` |

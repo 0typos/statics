@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 build_readline() {
-    echo "==> building readline (static, for lftp)"
+    echo "==> building readline (static, for lftp and sqlite3)"
     (
         cd "$WORK_DIR/readline" || exit
         local ncurses=$WORK_DIR/ncurses/install pic=
@@ -9,7 +9,7 @@ build_readline() {
         case $STATICS_ARCH in
             mips | mipsel) pic=-fPIC ;;
         esac
-        # lftp requires readline. Terminal handling comes from the static
+        # lftp requires readline, and sqlite3 uses it. Terminal handling comes from the static
         # ncurses. --build makes every target a cross build; the answers
         # are what its run-time probes find on Linux with musl. It installs
         # into its own tree, apart from DEPS_PREFIX.
