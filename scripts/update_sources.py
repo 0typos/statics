@@ -1046,6 +1046,22 @@ def latest_make() -> tuple[str, str]:
     )
 
 
+def latest_binutils() -> tuple[str, str]:
+    return latest_from_index(
+        "https://ftp.gnu.org/gnu/binutils/",
+        r'binutils-(\d+\.\d+(?:\.\d+)?)\.tar\.xz"',
+        "https://ftp.gnu.org/gnu/binutils/binutils-{version}.tar.xz",
+    )
+
+
+def latest_musl() -> tuple[str, str]:
+    return latest_from_index(
+        "https://musl.libc.org/releases.html",
+        r'musl-(\d+\.\d+\.\d+)\.tar\.gz"',
+        "https://musl.libc.org/releases/musl-{version}.tar.gz",
+    )
+
+
 def latest_rclone() -> tuple[str, str]:
     return latest_from_github_release(
         "rclone/rclone",
@@ -1252,6 +1268,10 @@ DISCOVERERS: dict[str, Callable[[], tuple[str, str]]] = {
     "rclone": latest_rclone,
     "croc": latest_croc,
     "python": latest_python,
+    "binutils": latest_binutils,
+    "musl": latest_musl,
+    # tcc has no entry: its pin is a commit of the mob branch, which anyone
+    # may push to, so it is repinned by hand after reading the commits.
     "caddy": latest_caddy,
     "yq": latest_yq,
     "age": latest_age,

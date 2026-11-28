@@ -32,11 +32,12 @@ awk -F '|' '
 
 awk -F '|' '
     /^#/ || NF == 0 { next }
-    NF != 6 { print FNR ": malformed architecture record"; bad=1; next }
+    NF != 7 { print FNR ": malformed architecture record"; bad=1; next }
     seen[$1]++ { print FNR ": duplicate architecture " $1; bad=1 }
     $6 != "none" && $6 !~ /^GOARCH=[a-z0-9]+( GO[A-Z0-9]+=[a-z0-9.,]+)*$/ {
         print FNR ": Go environment must be none or GOARCH=... first"; bad=1
     }
+    $7 !~ /^[a-z0-9_]+$/ { print FNR ": tcc cpu must be none or a configure --cpu name"; bad=1 }
     END { exit bad }
 ' "$repo_root/architectures.tsv"
 

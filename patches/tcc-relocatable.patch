@@ -1,0 +1,32 @@
+tcc looks for its runtime (libtcc1.a, its own headers, and here the musl
+headers and libraries) in a directory fixed at build time, unless every
+command line names one with -B. This kit is unpacked wherever there is
+room, so take lib/tcc beside the executable instead, and fall back to the
+compiled-in directory only where /proc is not mounted. The lookup happens
+when tcc runs, so nothing about the build host or the cross build enters
+it; the tcc built for the builder itself is always given -B.
+
+--- a/libtcc.c
++++ b/libtcc.c
+@@ -909,7 +909,20 @@
+     /* might be used in error() before preprocess_start() */
+     s->include_stack_ptr = s->include_stack;
+ 
+-    tcc_set_lib_path(s, CONFIG_TCCDIR);
++    {
++        /* statics: the kit runs from wherever it was unpacked, so prefer
++           lib/tcc beside the executable (what -B would name) to the
++           compiled-in directory. */
++        char path[4096], *slash;
++        size_t room = sizeof path - sizeof "/lib/tcc";
++        ssize_t n = readlink("/proc/self/exe", path, room);
++        /* n == room may be a truncated path. */
++        if (n > 0 && (size_t)n < room && (path[n] = 0, slash = strrchr(path, '/'))) {
++            strcpy(slash, "/lib/tcc");
++            tcc_set_lib_path(s, path);
++        } else
++            tcc_set_lib_path(s, CONFIG_TCCDIR);
++    }
+ #ifdef CONFIG_TCC_SWITCHES /* predefined options */
+     tcc_set_options(s, CONFIG_TCC_SWITCHES);
+ #endif

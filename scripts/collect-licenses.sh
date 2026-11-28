@@ -206,6 +206,22 @@ copy_license python LICENSE
 copy_license python Doc/license.rst
 # HACL*'s MIT notice is only in its sources.
 copy_license python Modules/_hacl/Hacl_Hash_SHA2.h
+copy_license binutils COPYING
+copy_license binutils COPYING3
+copy_license binutils COPYING.LIB
+copy_license binutils libiberty/COPYING.LIB
+copy_license binutils LIBIBERTY-BSD-NOTICES
+copy_license musl COPYRIGHT
+copy_license musl MUSL-BSD-NOTICES
+copy_license tcc COPYING
+# Most of tcc is also offered under the MIT terms recorded here.
+copy_license tcc RELICENSING
+# libtcc1.a, linked into every program tcc builds, has parts under other
+# terms; the GPL and exception texts come from binutils and configs/.
+copy_license tcc TCC-RUNTIME-NOTICES
+copy_license tcc COPYING.GPL-2.0
+copy_license tcc COPYING.GPL-3.0
+copy_license tcc COPYING.GCC-exception-3.1
 copy_license wireguard-go LICENSE
 copy_license rclone COPYING
 copy_license croc LICENSE

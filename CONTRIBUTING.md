@@ -47,7 +47,7 @@ workflow artifacts.
 
 | Path | Responsibility |
 | --- | --- |
-| `architectures.tsv` | Target name, Zig triple/CPU, QEMU runner, description, and Go environment (or `none`) |
+| `architectures.tsv` | Target name, Zig triple/CPU, QEMU runner, description, Go environment (or `none`), and tcc cpu (or `none`) |
 | `sources.lock` | Pinned upstream/toolchain version, SHA-256, and URL |
 | `components.tsv` | Component license expression, role, archive (`main`, `extra`, or `both` for a library linked into each), and Go main packages with any build flags |
 | `docker/Dockerfile` | Clean toolchain, source, build, test, and export stages |
@@ -126,6 +126,8 @@ Add one record to `architectures.tsv` only after confirming:
 - Zig supports the target triple and intended minimum CPU;
 - the ABI names word size, endianness, and float behavior unambiguously;
 - a QEMU user-mode runner exists for smoke checks;
+- whether tcc has a code generator for it that needs no instruction the
+  baseline lacks, for the last column (`none` otherwise);
 - every component cross-compiles without running target probes;
 - the complete artifact passes static inspection and QEMU checks;
 - the new target's limitations are documented in
@@ -174,8 +176,16 @@ detached PGP signatures upstream publishes for libevent (Nick Mathewson,
 verification key, `C699981A31F338706C817650DF5BA9D30642D5A0`), nfs-utils
 (Steve Dickson, `FEFAD1BB14447F4968C1971095D24347967C393E`; the signature
 covers the uncompressed tar), and par2cmdline (Ike Devolder,
-`DB2277BCD500AA3825610BDDDB323392796CA067`), for example with keys
-fetched from `hkps://keyserver.ubuntu.com`. Python publishes a Sigstore
+`DB2277BCD500AA3825610BDDDB323392796CA067`), and binutils (Nick Clifton,
+`3A24BC1E8FB409FA9F14371813FCEF89DD9E3C4F`), for example with keys
+fetched from `hkps://keyserver.ubuntu.com`. musl signs each release
+(`musl-<version>.tar.gz.asc`) with the key it publishes at
+<https://musl.libc.org/musl.pub>
+(`836489290BB6B70F99FFDA0556BCDB593020450F`). tcc is pinned to a commit of
+its `mob` branch, which carries no signature and which anyone may push to,
+so `make update-sources` leaves it alone: repin it by hand, read the
+commits between the old pin and the new one, and expect
+`patches/tcc-*.patch` to need rebasing. Python publishes a Sigstore
 bundle beside each archive (`Python-<version>.tar.xz.sigstore`): verify it
 against the release manager's identity for that series, listed at
 <https://www.python.org/downloads/metadata/sigstore/>. Review

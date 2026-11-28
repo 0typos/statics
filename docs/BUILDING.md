@@ -167,7 +167,8 @@ libcap-ng, zlib, bzip2, xz, zstd, SQLite, ncurses, and readline), whose notices 
 under a top-level `<arch>-extra/` directory, with its own `SHA256SUMS`,
 `COMPONENTS.tsv`, notices, and SBOM (`statics-extra-<arch>.spdx.json`). It
 exists only for an architecture that builds at least one extra tool: today
-`stunnel`, `openvpn`, `lftp`, `aria2c`, `par2`, and `python3` on every target, and
+`stunnel`, `openvpn`, `lftp`, `aria2c`, `par2`, `python3`, and the binutils programs on every target,
+`tcc` where `architectures.tsv` names a tcc cpu, and
 `rclone`, `croc`, `crictl`, `ctr`, `caddy`, `yq`, `age`, and `age-keygen` on every target with Go. A C tool's builder installs with
 `install_component_binary`, which, like `go_build`, puts it in the archive
 `components.tsv` names. It is

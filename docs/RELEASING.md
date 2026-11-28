@@ -29,7 +29,8 @@ The release contains, for every architecture:
   `statics-extra-<arch>.tar.xz`, which has its own SBOM and checksums.
 
 Every architecture has an extra archive: `stunnel`, `openvpn`, `lftp`,
-`aria2c`, `par2`, and `python3` everywhere,
+`aria2c`, `par2`, `python3`, and the binutils programs everywhere,
+`tcc` on the six targets it generates code for,
 plus `rclone`, `croc`, `crictl`, `ctr`, `caddy`, `yq`, `age`, and
 `age-keygen` where Go runs (not `powerpc` or
 `powerpc64`). The build, cache, reproducibility, and publish steps handle
