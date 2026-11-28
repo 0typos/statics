@@ -203,6 +203,7 @@ sources=(
     lua
     htop
     make
+    python
 )
 
 # STATICS_ONLY_DEPS builds just the shared libraries (the Dockerfile's deps
@@ -294,7 +295,7 @@ dag=$WORK_DIR/dag.mk
         tcpreplay dhcpdump libevent tmux stunnel openvpn microsocks tinyproxy \
         dnsmasq libyaml gensio ser2net bash testssl libssh2 readline lftp \
         expat aria2 cifs-utils libtirpc nfs-utils udpcast xxhash partclone \
-        par2cmdline sqlite quickjs lua htop make; do
+        par2cmdline sqlite quickjs lua htop make python; do
         printf ' $(S)/%s' "$c"
     done
     if [[ $go_env != none ]]; then
@@ -407,6 +408,7 @@ dag=$WORK_DIR/dag.mk
     emit lua lua build_lua
     emit htop htop build_htop ncurses
     emit make make build_make
+    emit python python build_python deps zlib bzip2 xz zstd expat sqlite
     emit wireguard-go wireguard-go build_wireguard_go
     emit rclone rclone build_rclone
     emit croc croc build_croc
@@ -463,7 +465,8 @@ finish_archive() { # directory archive
     (
         cd "$dir"
         find . -type f \
-            \( -perm /111 -o -path './share/nmap/*' -o -path './share/testssl/*' \) \
+            \( -perm /111 -o -path './share/nmap/*' -o -path './share/testssl/*' \
+                -o -path './lib/python*' \) \
             -printf '%P\n' |
             LC_ALL=C sort |
             xargs -r sha256sum > SHA256SUMS

@@ -66,6 +66,7 @@ declare -A extra_smoke=(
     [lftp]="Version $(pinned_version lftp)|--version"
     [aria2c]="aria2 version $(pinned_version aria2)|-v"
     [par2]="par2cmdline version $(pinned_version par2cmdline)|-V"
+    [python3]="Python $(pinned_version python)|--version"
 )
 if [[ $go_env != none ]]; then
     extra_smoke+=(
@@ -253,6 +254,17 @@ for testssl_data in testssl.sh etc/Mozilla.pem etc/ca_hashes.txt etc/cipher-mapp
     etc/client-simulation.txt etc/common-primes.txt etc/openssl.cnf etc/tls_data.txt; do
     [[ -s $output_dir/share/testssl/$testssl_data ]] || {
         echo "missing testssl.sh runtime data: $testssl_data" >&2
+        exit 1
+    }
+done
+
+# python3's standard library and the directory CPython takes as its
+# installation's marker, on every target.
+python_series=$(pinned_version python)
+python_series=${python_series%.*}
+for python_data in "lib/python${python_series/./}.zip" "lib/python$python_series/lib-dynload/README"; do
+    [[ -s $output_dir-extra/$python_data ]] || {
+        echo "missing python3 runtime data: $python_data" >&2
         exit 1
     }
 done
@@ -605,6 +617,37 @@ PY
     done
     "${runner[@]}" "$output_dir/tmux" -S "$scratch/tmux" kill-server || true
     [[ $tmux_output == *statics-42* ]] || failed "tmux session"
+    # python3 finds its standard library in lib/pythonXY.zip with nothing set
+    # in the environment and nothing on stderr, then uses each library it
+    # links: zlib, bz2, lzma, zstd, OpenSSL (a hash through hashlib and a
+    # TLS context), SQLite, and expat; packs integers and floats; and runs
+    # a host command.
+    python_output=$(env -i PATH="$PATH" "${runner[@]}" "$output_dir-extra/python3" -c '
+import bz2, hashlib, json, lzma, sqlite3, ssl, struct, subprocess, sys, zlib
+import xml.etree.ElementTree as ET
+from compression import zstd
+data = b"statics" * 1000
+for codec in (zlib, bz2, lzma, zstd):
+    assert codec.decompress(codec.compress(data)) == data, codec
+assert hashlib.new("sha256", b"x").hexdigest().startswith("2d711642")
+assert ssl.create_default_context().minimum_version >= ssl.TLSVersion.TLSv1_2
+db = sqlite3.connect(":memory:")
+db.execute("create virtual table f using fts5(x)")
+db.execute("insert into f values (?)", ("static musl kit",))
+assert db.execute("select x from f where f match ?", ("musl",)).fetchone()
+assert ET.fromstring("<a><b>42</b></a>").findtext("b") == "42"
+assert struct.unpack("<dq", struct.pack("<dq", 0.1, -2)) == (0.1, -2)
+assert repr(0.1 + 0.2) == "0.30000000000000004"
+out = subprocess.run(["/bin/sh", "-c", "echo sub"], capture_output=True).stdout
+# Bytecode from the zip, not a recompile of the source beside it.
+assert struct.__spec__.origin.endswith(".pyc"), struct.__spec__.origin
+print(json.dumps({"ok": out.decode().strip(), "hash": sys.hash_info.algorithm,
+                  "zip": struct.__spec__.origin.split("/")[-2]}))
+' 2>&1) || { echo "$python_output" >&2; failed "python3"; }
+    [[ $python_output == "{\"ok\": \"sub\", \"hash\": \"siphash13\", \"zip\": \"python${python_series/./}.zip\"}" ]] || {
+        echo "unexpected output from python3: $python_output" >&2
+        exit 1
+    }
     if [[ $go_env != none ]]; then
         # The Go tools beyond their versions: caddy adapts a Caddyfile to
         # JSON, yq converts YAML, and age encrypts to a fresh key and

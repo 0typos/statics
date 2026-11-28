@@ -63,9 +63,9 @@ not add separate binary payloads. `ping`, `arping`, and `traceroute` are the
 iputils and traceroute.sourceforge.net programs, not BusyBox applets;
 `busybox ping` still reaches the applet.
 
-Thirteen larger tools ship separately in `statics-extra-<arch>.tar.xz`:
+Fourteen larger tools ship separately in `statics-extra-<arch>.tar.xz`:
 `stunnel`, `openvpn`, `lftp`, and `aria2c`, which each link their own copy
-of OpenSSL, and `par2`, on every architecture, and eight Go tools on every
+of OpenSSL, `par2`, and `python3`, on every architecture, and eight Go tools on every
 architecture with Go (not `powerpc` or `powerpc64`). It extracts to `<arch>-extra/` with its own
 notices, SBOM, and checksums; see
 [the extra archive](#extra-archive-rclone-croc-crictl-and-ctr).
@@ -76,6 +76,7 @@ notices, SBOM, and checksums; see
 | File transfer and sync | `rclone`, `croc`, `lftp`, `aria2c` | Copy and sync with S3, SFTP, WebDAV, and HTTP; hand a file to another machine with a one-time code; mirror trees over FTP, FTPS, SFTP, and HTTP; segmented, resumable HTTP, FTP, BitTorrent, and Metalink downloads |
 | Parity and repair | `par2`; `par2create`, `par2verify`, `par2repair` | Recovery data that repairs damaged or missing files |
 | Container runtimes | `crictl`, `ctr` | Inspect pods, containers, images, logs, and snapshots through the CRI and containerd sockets |
+| Python | `python3`; `lib/python3XY.zip` | CPython and its standard library, for scripts on a target with no interpreter |
 | Web server and reverse proxy | `caddy` | Reverse proxy, static file server, and TLS termination, from one command or a Caddyfile |
 | Data and encryption | `yq`, `age`, `age-keygen` | Query and convert YAML, JSON, XML, TOML, CSV, and properties files; encrypt files to a key, an SSH key, or a passphrase |
 
@@ -1422,6 +1423,30 @@ left out, and the two tools that link OpenSSL use the bundle's static
 - `make` is GNU make without Guile, NLS, or the `load` directive; the gnulib
   replacements it compiles for musl are LGPL.
 
+### Python
+
+- `python3` is CPython 3.15, cross-built with an interpreter of the same
+  version that the Docker build compiles natively from the same source
+  (CPython's configure refuses any other) and never ships. Every extension
+  module is built in. It links the bundle's zlib, libbz2, liblzma, libzstd,
+  SQLite, expat, and OpenSSL. On 32-bit targets, where the shared OpenSSL has
+  no thread support and CPython refuses it, `python3` links a second,
+  threaded build of the same OpenSSL source, with a four-line
+  `__atomic_is_lock_free` that Zig's compiler-rt lacks.
+- Answers to configure's run-time probes are given explicitly, so a cross
+  build does not fall back to weaker defaults: `str` hashing is SipHash on
+  every target, where an unanswered cross build would use FNV.
+- `lib/python3XY.zip` leaves out the test suites, IDLE, tkinter, turtle, and
+  ensurepip. Its bytecode is compiled by the build interpreter as unchecked
+  hash-based files. `lib/python3.XY/lib-dynload/` holds only a note: CPython
+  takes the directory as proof that it found its installation.
+- `sysconfig` reports the build's compiler and flags, with paths inside the
+  build container; the builder's own machine triple is replaced by
+  `build-linux-gnu`.
+- The updater follows the 3.15 series only. Moving to a new minor is a
+  reviewed change to `scripts/builders/python.sh`, `scripts/update_sources.py`,
+  and these notes.
+
 ### File movement tools
 
 These favor size too. The main archive's share adds about 360 KB to it on
@@ -1561,7 +1586,9 @@ uncompressed). See [TLS wrapping](#tls-wrapping-stunnel) and
 [the profile](#tunnel-session-and-service-tools) for how they are built.
 `lftp` and `aria2c`, which link OpenSSL too, and `par2` are there for the
 same reason, on every target; see [moving data](#moving-data) for their use
-and [the profile](#file-movement-tools) for how they are built.
+and [the profile](#file-movement-tools) for how they are built. `python3`
+and its standard library are there on every target too; see
+[Python](#python-python3) and [its profile](#python).
 
 The Go tools are several times the size of anything in the main archive, so
 they are packaged apart. Each is a static Go binary built with cgo disabled,
@@ -1689,6 +1716,44 @@ are not bundled. containerd's build tags (`no_btrfs`, `no_devmapper`,
 `no_zfs`, `no_cri`, `no_rdt`, `no_systemd`, `no_tracing`) only remove
 daemon plugins that `ctr` does not link, so building with them leaves its
 size unchanged and none is used; `no_grpc` does not build.
+
+### Python: python3
+
+```console
+python3 --version
+python3 script.py
+python3 -m json.tool < data.json
+python3 -m sqlite3 /var/lib/app/state.db 'select count(*) from events'
+python3 -m http.server --bind 127.0.0.1 8000 --directory /srv/www
+python3 -c 'import ssl, sqlite3; print(ssl.OPENSSL_VERSION, sqlite3.sqlite_version)'
+```
+
+`python3` is CPython with every extension module compiled in, and it keeps
+its standard library in `lib/python3XY.zip` beside it: keep `python3` and
+`lib/` together, and nothing needs setting in the environment. The zip holds
+each module's source and its bytecode, so imports do not recompile and
+tracebacks still show source lines.
+
+- **No pip, and no compiled packages.** `ensurepip` is left out, and a
+  static program cannot load a wheel's `.so` files. Pure-Python packages
+  work from any directory or zip named in `PYTHONPATH`.
+- **Certificates.** HTTPS verification looks for `/etc/ssl/cert.pem` and
+  `/etc/ssl/certs`, as the bundled `openssl` does; on a target without
+  them, point `SSL_CERT_FILE` at a CA bundle. That is not the file `curl`
+  defaults to.
+- **Not built:** `ctypes`, `readline`, `curses`, `tkinter`, the ndbm and
+  gdbm backends of `dbm` (its SQLite and dumb backends work), the C helper
+  of `uuid`, and the C accelerator of `decimal`, which falls back to its
+  slower pure-Python implementation. The interactive prompt is CPython's own, with line
+  editing, history, and colour on a terminal it knows, and a plain prompt
+  otherwise.
+- **Keep it in a directory only you can write.** CPython reads a
+  `pyvenv.cfg` beside the executable or in the directory above it, which
+  can redirect where it loads its library from. Extracted as
+  `/tmp/statics/<arch>-extra/`, that is safe while `/tmp/statics` is yours;
+  do not unpack the archive straight into a shared directory such as `/tmp`.
+- **`python3 -m http.server`** serves the directory to anything that can
+  reach the address: bind to loopback or a link you control.
 
 ### caddy: reverse proxy and file server
 

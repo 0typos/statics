@@ -1090,6 +1090,17 @@ def latest_containerd() -> tuple[str, str]:
     )
 
 
+def latest_python() -> tuple[str, str]:
+    # The 3.15 series only. A new minor changes the modules, cache answers,
+    # and licence list in scripts/builders/python.sh, and the Dockerfile
+    # builds the matching interpreter: move to it by hand.
+    return latest_from_index(
+        "https://www.python.org/ftp/python/",
+        r'href="(3\.15\.\d+)/"',
+        "https://www.python.org/ftp/python/{version}/Python-{version}.tar.xz",
+    )
+
+
 def latest_caddy() -> tuple[str, str]:
     # Stable tags only; the tag archive, as the build takes modules from
     # go.sum rather than a vendored release archive.
@@ -1240,6 +1251,7 @@ DISCOVERERS: dict[str, Callable[[], tuple[str, str]]] = {
     "wireguard-go": latest_wireguard_go,
     "rclone": latest_rclone,
     "croc": latest_croc,
+    "python": latest_python,
     "caddy": latest_caddy,
     "yq": latest_yq,
     "age": latest_age,

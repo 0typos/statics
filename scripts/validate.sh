@@ -113,6 +113,7 @@ bash -n \
     "$repo_root"/scripts/toolchain/*
 python3 -m py_compile "$repo_root/scripts/update_sources.py"
 python3 -m py_compile "$repo_root/scripts/generate-sbom.py"
+python3 -m py_compile "$repo_root/scripts/python-stdlib-zip.py"
 python3 "$repo_root/scripts/check-docs.py"
 
 # Every CircleCI image needs a digest, except machine images such as

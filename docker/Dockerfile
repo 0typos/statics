@@ -2,13 +2,14 @@
 
 FROM docker.io/library/debian:bookworm-slim@sha256:734a72b3d6142a71993b4bc580ca01d8ca687f77a2c422d96a961d3376b179bc AS base
 
-# Only the Zig and Go toolchain records reach the toolchain stage, so
+# Only the Zig, Go, and Python records reach the toolchain stage, so
 # repinning any other upstream source leaves the toolchain layers cached.
 # Each toolchain gets its own file, so repinning Go keeps Zig's layer.
 FROM base AS toolchain-pin
 COPY sources.lock /tmp/sources.lock
 RUN grep '^zig-' /tmp/sources.lock >/zig.lock \
-    && grep '^go-' /tmp/sources.lock >/go.lock
+    && grep '^go-' /tmp/sources.lock >/go.lock \
+    && grep '^python|' /tmp/sources.lock >/python.lock
 
 FROM base AS toolchain
 
@@ -87,6 +88,28 @@ RUN case "$TARGETARCH" in \
     && rm /tmp/go.tar.gz
 ENV PATH=/opt/go/bin:/opt/zig:${PATH} \
     GOTOOLCHAIN=local
+# CPython cannot be cross-compiled without an interpreter of the same X.Y to
+# freeze modules and write sysconfig data, and Debian's is older. Build one
+# natively from the pinned source, with its dependency-free modules built in:
+# scripts/builders/python.sh uses it and it is never shipped. It is part of
+# the toolchain, keyed on the python pin alone, so the published image
+# carries it and it is compiled once per pin rather than in every build. Kept:
+# the interpreter, the build tree's layout, and the Lib it runs from, which it
+# finds through the relative source path it was configured with.
+COPY --from=toolchain-pin /python.lock /tmp/python.lock
+RUN SOURCES_LOCK=/tmp/python.lock ./scripts/fetch.sh python /tmp/python.tar.xz \
+    && mkdir -p /opt/build-python /opt/build-python-src \
+    && tar -xJf /tmp/python.tar.xz -C /opt/build-python-src --strip-components=1 \
+    && rm /tmp/python.tar.xz \
+    && cd /opt/build-python \
+    && ../build-python-src/configure --without-ensurepip --disable-test-modules \
+        --with-pkg-config=no MODULE_BUILDTYPE=static >/dev/null \
+    && make -s -j"$(nproc)" python \
+    && find . \( -name '*.o' -o -name '*.a' \) -delete \
+    && rm -f Programs/_freeze_module _bootstrap_python \
+    && find /opt/build-python-src -mindepth 1 -maxdepth 1 ! -name Lib -exec rm -rf {} + \
+    && rm -rf /opt/build-python-src/Lib/test \
+    && ./python -c 'import sys, struct, compileall; print(sys.version)'
 
 FROM toolchain AS sources
 COPY sources.lock ./
@@ -148,7 +171,7 @@ COPY patches/ patches/
 COPY tunpipe/ tunpipe/
 COPY scripts/build.sh scripts/run-builder.sh scripts/merge-kconfig.sh \
      scripts/collect-licenses.sh scripts/generate-sbom.py scripts/components.sh \
-     scripts/
+     scripts/python-stdlib-zip.py scripts/
 COPY scripts/lib/ scripts/lib/
 COPY scripts/builders/ scripts/builders/
 COPY scripts/toolchain/ scripts/toolchain/

@@ -15,7 +15,8 @@ imaging and multicast, fast checksums, SQLite databases, JavaScript and Lua
 scripts, GNU make, and an interactive process view. The optional extra archive adds
 object-storage and SFTP sync, directory mirroring, resumable segmented
 downloads, parity repair, code-phrase file transfer, container runtime
-inspection, a reverse proxy and web server, YAML processing, and file encryption.
+inspection, a reverse proxy and web server, YAML processing, file encryption, and
+Python.
 
 This page records candidates, not commitments. The executable contract is in
 the [toolkit guide](TOOLKIT.md), and implementation proposals should follow
@@ -54,7 +55,7 @@ the [contribution checklist](../CONTRIBUTING.md).
 | Embedded buses | selected `can-utils`, `i2c-tools`, and `spi-tools` programs |
 
 The extra archive adds `stunnel`, `openvpn`, `lftp`, and `aria2c` (each with
-its own OpenSSL) and `par2` on every target, and `rclone` (trimmed), `croc`, `crictl`, `ctr`, `caddy`, `yq`, `age`, and `age-keygen` where Go
+its own OpenSSL), `par2`, and `python3` on every target, and `rclone` (trimmed), `croc`, `crictl`, `ctr`, `caddy`, `yq`, `age`, and `age-keygen` where Go
 runs.
 Further rclone backends and commands are requests against its trimmed main
 rather than new tools; see the [toolkit guide](TOOLKIT.md#rclone-trimmed).
