@@ -18,7 +18,7 @@ record=$(awk -F '|' -v wanted="$arch" '
     exit 2
 }
 
-IFS='|' read -r _ zig_target zig_cpu _ _ go_env <<<"$record"
+IFS='|' read -r _ zig_target zig_cpu _ _ go_env tcc_cpu <<<"$record"
 
 export REPO_ROOT=$repo_root
 export SOURCES_DIR=${SOURCES_DIR:-/src}
@@ -57,6 +57,8 @@ if [[ -n $STATICS_COMPONENT_TIMEOUT && ! $STATICS_COMPONENT_TIMEOUT =~ ^[0-9]+$ 
     exit 2
 fi
 export STATICS_ARCH=$arch
+# tcc generates code for only some targets; architectures.tsv names its cpu.
+export STATICS_TCC_CPU=$tcc_cpu
 # Go tools build only where architectures.tsv gives a Go environment.
 # Everything that could reach the network or a host setting is pinned off:
 # modules come from the cache the go-modules stage filled (GOPROXY=off), go.sum
@@ -204,6 +206,9 @@ sources=(
     htop
     make
     python
+    binutils
+    musl
+    tcc
 )
 
 # STATICS_ONLY_DEPS builds just the shared libraries (the Dockerfile's deps
@@ -295,11 +300,14 @@ dag=$WORK_DIR/dag.mk
         tcpreplay dhcpdump libevent tmux stunnel openvpn microsocks tinyproxy \
         dnsmasq libyaml gensio ser2net bash testssl libssh2 readline lftp \
         expat aria2 cifs-utils libtirpc nfs-utils udpcast xxhash partclone \
-        par2cmdline sqlite quickjs lua htop make python; do
+        par2cmdline sqlite quickjs lua htop make python binutils; do
         printf ' $(S)/%s' "$c"
     done
     if [[ $go_env != none ]]; then
         printf ' $(S)/%s' wireguard-go rclone croc crictl ctr caddy yq age
+    fi
+    if [[ $tcc_cpu != none ]]; then
+        printf ' $(S)/%s' musl tcc
     fi
     printf '\n\n'
 
@@ -409,6 +417,9 @@ dag=$WORK_DIR/dag.mk
     emit htop htop build_htop ncurses
     emit make make build_make
     emit python python build_python deps zlib bzip2 xz zstd expat sqlite
+    emit binutils binutils build_binutils zlib zstd
+    emit musl tcc build_tcc_musl
+    emit tcc tcc build_tcc musl
     emit wireguard-go wireguard-go build_wireguard_go
     emit rclone rclone build_rclone
     emit croc croc build_croc
@@ -466,7 +477,7 @@ finish_archive() { # directory archive
         cd "$dir"
         find . -type f \
             \( -perm /111 -o -path './share/nmap/*' -o -path './share/testssl/*' \
-                -o -path './lib/python*' \) \
+                -o -path './lib/python*' -o -path './lib/tcc/*' \) \
             -printf '%P\n' |
             LC_ALL=C sort |
             xargs -r sha256sum > SHA256SUMS

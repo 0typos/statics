@@ -17,7 +17,7 @@ record=$(awk -F '|' -v wanted="$arch" '
     echo "unknown architecture: $arch" >&2
     exit 2
 }
-IFS='|' read -r _ _ _ qemu _ go_env <<<"$record"
+IFS='|' read -r _ _ _ qemu _ go_env tcc_cpu <<<"$record"
 
 required_binaries=(
     busybox socat dropbearmulti
@@ -68,6 +68,14 @@ declare -A extra_smoke=(
     [par2]="par2cmdline version $(pinned_version par2cmdline)|-V"
     [python3]="Python $(pinned_version python)|--version"
 )
+for binary in ar as ld nm objcopy objdump readelf strings strip; do
+    extra_smoke[$binary]="(GNU Binutils) $(pinned_version binutils)|--version"
+done
+# tcc only where architectures.tsv names a cpu for it. Its version is the
+# mob branch's, not the pinned commit.
+if [[ $tcc_cpu != none ]]; then
+    extra_smoke[tcc]="tcc version 0.9.|-v"
+fi
 if [[ $go_env != none ]]; then
     extra_smoke+=(
         [rclone]="rclone v$(pinned_version rclone)|version"
@@ -268,6 +276,21 @@ for python_data in "lib/python${python_series/./}.zip" "lib/python$python_series
         exit 1
     }
 done
+
+# tcc's runtime beside it: its own headers and libtcc1.a, and musl's
+# headers, start files, and libc.a.
+if [[ $tcc_cpu != none ]]; then
+    for tcc_data in libtcc1.a bt-exe.o bt-log.o include/stddef.h include/tccdefs.h \
+        musl/include/stdio.h musl/lib/libc.a musl/lib/crt1.o musl/lib/crti.o musl/lib/crtn.o; do
+        [[ -s $output_dir-extra/lib/tcc/$tcc_data ]] || {
+            echo "missing tcc runtime data: lib/tcc/$tcc_data" >&2
+            exit 1
+        }
+    done
+elif [[ -e $output_dir-extra/tcc || -e $output_dir-extra/lib/tcc ]]; then
+    echo "tcc is in $arch's extra archive, but architectures.tsv gives it no tcc cpu" >&2
+    exit 1
+fi
 
 for link in hexdump grep awk sed; do
     [[ -L $output_dir/share/testssl/bin/$link && -x $output_dir/share/testssl/bin/$link ]] || {
@@ -648,6 +671,115 @@ print(json.dumps({"ok": out.decode().strip(), "hash": sys.hash_info.algorithm,
         echo "unexpected output from python3: $python_output" >&2
         exit 1
     }
+    # binutils on a source every target's assembler accepts, a word of
+    # text and a labelled string: as assembles it, nm lists the symbol,
+    # readelf reports the word size, byte order, and machine the tools
+    # themselves are built for, ar archives the object, ld links it
+    # relocatably and then finally, objcopy extracts the section, strings
+    # and objdump find the text, objdump disassembles, and strip removes
+    # the symbols and nothing else.
+    binutils=$output_dir-extra
+    mkdir "$scratch/binutils"
+    printf '%s\n' '	.text' '	.globl _start' '_start:' '	.long 0' \
+        '	.data' '	.globl statics_marker' 'statics_marker:' '	.ascii "statics-binutils"' \
+        >"$scratch/binutils/marker.s"
+    # Each tool reports exactly the pinned release, not a dated snapshot.
+    for binary in ar as ld nm objcopy objdump readelf strings strip; do
+        version=$("${runner[@]}" "$binutils/$binary" --version) || failed "$binary --version"
+        # The first line; not `| head -n 1`, which can end the pipe early
+        # and fail the command under pipefail.
+        version=${version%%$'\n'*}
+        [[ $version == *"(GNU Binutils) $(pinned_version binutils)" ]] || {
+            echo "unexpected version from $binary: $version" >&2
+            exit 1
+        }
+    done
+    "${runner[@]}" "$binutils/as" -o "$scratch/binutils/marker.o" "$scratch/binutils/marker.s" ||
+        failed "as"
+    check_output "D statics_marker" "$binutils/nm" "$scratch/binutils/marker.o"
+    # Word size, byte order, and machine: mips and mipsel differ only in
+    # the second.
+    identity() { "${runner[@]}" "$binutils/readelf" -h "$1" | grep -E '^ +(Class|Data|Machine):'; }
+    machine=$(identity "$binutils/as") || failed "readelf"
+    [[ $(wc -l <<<"$machine") -eq 3 && $(identity "$scratch/binutils/marker.o") == "$machine" ]] ||
+        failed "readelf: as did not assemble for its own target, which"
+    "${runner[@]}" "$binutils/ar" rcs "$scratch/binutils/libmarker.a" "$scratch/binutils/marker.o" ||
+        failed "ar"
+    check_output marker.o "$binutils/ar" t "$scratch/binutils/libmarker.a"
+    "${runner[@]}" "$binutils/ld" -r -o "$scratch/binutils/linked.o" "$scratch/binutils/marker.o" ||
+        failed "ld -r"
+    "${runner[@]}" "$binutils/objcopy" -O binary -j .data "$scratch/binutils/linked.o" \
+        "$scratch/binutils/data.bin" || failed "objcopy"
+    [[ $(<"$scratch/binutils/data.bin") == statics-binutils ]] || failed "objcopy"
+    check_output statics-binutils "$binutils/strings" "$scratch/binutils/linked.o"
+    check_output "statics-binutils" "$binutils/objdump" -s -j .data "$scratch/binutils/linked.o"
+    # A final link with the default emulation, and the disassembler on it.
+    # -e because the default entry symbol is not _start everywhere (MIPS:
+    # __start). The object is what objdump disassembles: in the linked
+    # file MIPS labels the same address _ftext.
+    "${runner[@]}" "$binutils/ld" -e _start -o "$scratch/binutils/marker.elf" \
+        "$scratch/binutils/marker.o" || failed "ld"
+    [[ $(identity "$scratch/binutils/marker.elf") == "$machine" ]] || failed "ld emulation"
+    check_output "<_start>:" "$binutils/objdump" -d "$scratch/binutils/marker.o"
+    "${runner[@]}" "$binutils/strip" "$scratch/binutils/marker.elf" || failed "strip"
+    # Stripped, the file is still that executable, text intact, without
+    # its symbols.
+    [[ $(identity "$scratch/binutils/marker.elf") == "$machine" ]] || failed "strip"
+    check_output statics-binutils "$binutils/strings" "$scratch/binutils/marker.elf"
+    check_output "no symbols" "$binutils/nm" "$scratch/binutils/marker.elf"
+    if [[ $tcc_cpu != none ]]; then
+        # tcc finds lib/tcc beside itself with nothing set, compiles a
+        # program that needs libtcc1 (64-bit division on the 32-bit
+        # targets), musl's printf and strdup, and libm, and links it
+        # statically; the program runs. The same object then links with
+        # binutils' ld against the same musl, and objdump disassembles the
+        # result. -bt reports a fault's source line, and -run is refused.
+        tcc=$output_dir-extra/tcc
+        musl=$output_dir-extra/lib/tcc/musl/lib
+        mkdir "$scratch/tcc"
+        cat >"$scratch/tcc/hello.c" <<'C'
+#include <math.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+int main(int argc, char **argv)
+{
+    uint64_t big = 1000000007ULL * (uint64_t)(argc + 41);
+    char *copy = strdup("statics");
+    (void)argv;
+    printf("%s %llu %llu %.4f\n", copy, (unsigned long long)(big / 6),
+           (unsigned long long)(big % 1000), sqrt((double)(argc + 1)));
+    free(copy);
+    return 0;
+}
+C
+        echo 'int main(void) { int *p = 0; return *p; }' >"$scratch/tcc/fault.c"
+        env -i PATH="$PATH" "${runner[@]}" "$tcc" -Wall -Werror -o "$scratch/tcc/hello" \
+            "$scratch/tcc/hello.c" || failed "tcc"
+        file "$scratch/tcc/hello" | grep -q 'statically linked' || failed "tcc static link"
+        check_output "statics 7333333384 308 2.0000" "$scratch/tcc/hello" a b
+        "${runner[@]}" "$tcc" -c -o "$scratch/tcc/hello.o" "$scratch/tcc/hello.c" ||
+            failed "tcc -c"
+        "${runner[@]}" "$binutils/ld" -static -z noexecstack -o "$scratch/tcc/hello-ld" \
+            "$musl/crt1.o" "$musl/crti.o" "$scratch/tcc/hello.o" "$musl/libc.a" \
+            "$output_dir-extra/lib/tcc/libtcc1.a" "$musl/libc.a" "$musl/crtn.o" ||
+            failed "ld with tcc's musl"
+        check_output "statics 7333333384 308 2.0000" "$scratch/tcc/hello-ld" a b
+        check_output "<main>:" "$binutils/objdump" -d "$scratch/tcc/hello-ld"
+        "${runner[@]}" "$tcc" -bt -o "$scratch/tcc/fault" "$scratch/tcc/fault.c" ||
+            failed "tcc -bt"
+        tcc_output=$("${runner[@]}" "$scratch/tcc/fault" 2>&1) && failed "tcc -bt fault"
+        [[ $tcc_output == *"fault.c:1: at main: RUNTIME ERROR"* ]] || {
+            echo "unexpected output from a tcc -bt program: $tcc_output" >&2
+            exit 1
+        }
+        tcc_output=$("${runner[@]}" "$tcc" -run "$scratch/tcc/hello.c" 2>&1) && failed "tcc -run refusal"
+        [[ $tcc_output == *"-run is not available in this static tcc"* ]] || {
+            echo "unexpected output from tcc -run: $tcc_output" >&2
+            exit 1
+        }
+    fi
     if [[ $go_env != none ]]; then
         # The Go tools beyond their versions: caddy adapts a Caddyfile to
         # JSON, yq converts YAML, and age encrypts to a fresh key and

@@ -30,9 +30,9 @@ runtime errors after choosing a target, see
 
 Go tools (`wireguard-go` in the main archive; `rclone`, `croc`, `crictl`,
 `ctr`, `caddy`, `yq`, `age`, and `age-keygen` in the extra archive, beside the C tools `stunnel`, `openvpn`, `lftp`,
-`aria2c`, `par2`, and `python3`) are built by the pinned Go release with
+`aria2c`, `par2`, `python3`, the binutils programs, and `tcc`) are built by the pinned Go release with
 cgo disabled, so they do not link musl at all. Go has its own CPU and kernel
-floors, recorded as the last column of `architectures.tsv`:
+floors, recorded as the Go column of `architectures.tsv`:
 
 | Build name | Go settings | Go floor |
 | --- | --- | --- |
@@ -58,6 +58,27 @@ without Go tools, and their extra archive holds only the C tools;
 their `COMPONENTS.tsv` and SBOM say so. The floors are
 those of the Go release pinned in `sources.lock`, per Go's
 [minimum requirements](https://go.dev/wiki/MinimumRequirements).
+
+## tcc
+
+`tcc` (extra archive) has code generators for x86_64, i386, ARM, arm64, and
+riscv64 only. The last column of `architectures.tsv` gives the `--cpu` its
+configure takes, or `none`:
+
+| Build name | tcc cpu | Notes |
+| --- | --- | --- |
+| `x86_64` | `x86_64` | |
+| `i686` | `i386` | |
+| `aarch64` | `arm64` | |
+| `armv6-hardfloat` | `armv6l` | EABI hard float; division through `libtcc1.a` |
+| `armv7-hardfloat` | `armv7l` | EABI hard float; division through `libtcc1.a` |
+| `riscv64` | `riscv64` | its musl is built with the medany code model |
+| `armv7-softfloat` | none | tcc's ARM generator always emits VFP instructions |
+| `mips`, `mipsel`, `powerpc`, `powerpc64`, `powerpc64le`, `s390x` | none | no code generator |
+
+Where the column is `none`, the build skips `tcc` and its musl, and the
+archive's `COMPONENTS.tsv` and SBOM leave them out. The binutils programs
+are built for every target.
 
 ## Identifying a device
 
@@ -159,6 +180,9 @@ FTS5 index and query it from a second process, runs a qjs script, its REPL,
 and a standalone program made by `qjs -c`, has lua catch an error, starts
 htop for its version, runs a make recipe, has python3 import bytecode from
 its zip and use each library it links (compression, OpenSSL, SQLite, expat),
+assembles an object and takes it through every binutils program, where tcc
+is built has it compile, link, and run a program and has `ld` link the same
+object against tcc's musl,
 and, where Go runs, has caddy adapt a Caddyfile, yq convert YAML, and age
 encrypt to a new key and decrypt. The `testssl.sh` wrapper, a script
 that starts the bundled `openssl` and BusyBox, runs only natively. Every

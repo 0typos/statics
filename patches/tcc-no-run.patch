@@ -1,0 +1,27 @@
+tcc -run links the program in memory against the C library tcc itself
+uses, found through the dynamic loader. This tcc is static and ships only
+libc.a: loading that gives the program a second C library that was never
+initialised, so anything beyond a bare system call (printf, malloc)
+crashes. Refuse -run with a message instead. Only option parsing changes,
+identically for every target, so the cross build is unaffected.
+
+--- a/libtcc.c
++++ b/libtcc.c
+@@ -2025,14 +2025,15 @@
+             s->nostdlib = 1;
+             break;
+         case TCC_OPTION_run:
+-#ifdef TCC_IS_NATIVE
++#if 0 /* statics: see the error below */
+             /* When from script "#!/usr/bin/tcc -run <options>",
+                argv[1] is "-run <options>" and argv[2] is <script-name> */
+             run = optarg;
+             x = TCC_OUTPUT_MEMORY;
+             goto set_output_type;
+ #else
+-            return tcc_error_noabort("-run is not available in a cross compiler");
++            return tcc_error_noabort("-run is not available in this static tcc:"
++                " compile to a file and run that");
+ #endif
+ #ifdef TCC_IS_NATIVE
+         case TCC_OPTION_rstdin:

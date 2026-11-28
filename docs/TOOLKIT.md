@@ -63,9 +63,11 @@ not add separate binary payloads. `ping`, `arping`, and `traceroute` are the
 iputils and traceroute.sourceforge.net programs, not BusyBox applets;
 `busybox ping` still reaches the applet.
 
-Fourteen larger tools ship separately in `statics-extra-<arch>.tar.xz`:
+Twenty-four larger tools ship separately in `statics-extra-<arch>.tar.xz`:
 `stunnel`, `openvpn`, `lftp`, and `aria2c`, which each link their own copy
-of OpenSSL, `par2`, and `python3`, on every architecture, and eight Go tools on every
+of OpenSSL, `par2`, `python3`, and nine binutils programs, on every
+architecture; `tcc` on the six architectures it generates code for; and
+eight Go tools on every
 architecture with Go (not `powerpc` or `powerpc64`). It extracts to `<arch>-extra/` with its own
 notices, SBOM, and checksums; see
 [the extra archive](#extra-archive-rclone-croc-crictl-and-ctr).
@@ -77,6 +79,7 @@ notices, SBOM, and checksums; see
 | Parity and repair | `par2`; `par2create`, `par2verify`, `par2repair` | Recovery data that repairs damaged or missing files |
 | Container runtimes | `crictl`, `ctr` | Inspect pods, containers, images, logs, and snapshots through the CRI and containerd sockets |
 | Python | `python3`; `lib/python3XY.zip` | CPython and its standard library, for scripts on a target with no interpreter |
+| Compiler tools | `tcc`; `lib/tcc/`; `ld`, `as`, `ar`, `nm`, `objcopy`, `objdump`, `readelf`, `strings`, `strip` | Compile and statically link C on the target; assemble, link, and inspect object files |
 | Web server and reverse proxy | `caddy` | Reverse proxy, static file server, and TLS termination, from one command or a Caddyfile |
 | Data and encryption | `yq`, `age`, `age-keygen` | Query and convert YAML, JSON, XML, TOML, CSV, and properties files; encrypt files to a key, an SSH key, or a passphrase |
 
@@ -1447,6 +1450,52 @@ left out, and the two tools that link OpenSSL use the bundle's static
   reviewed change to `scripts/builders/python.sh`, `scripts/update_sources.py`,
   and these notes.
 
+### Compiler tools
+
+- The binutils programs are GNU binutils built for the bundle's own target
+  only: `objdump` and `ld` do not read or link other architectures' objects.
+  `ld` is the BFD linker; gold, gprof, gprofng, libctf, and linker plugins
+  are not built. Compressed debug sections use the bundle's zlib and
+  libzstd. `ld` was configured with `/` as its sysroot, so `--sysroot`
+  works.
+- `tcc` is the Tiny C Compiler from its `mob` development branch, pinned by
+  commit: the last release, 0.9.27, has no arm64 or riscv64 code generator.
+  It generates code for x86_64, i386, ARM (EABI hard float), arm64, and
+  riscv64, so it ships on `x86_64`, `i686`, `aarch64`, `armv6-hardfloat`,
+  `armv7-hardfloat`, and `riscv64` (the last column of `architectures.tsv`).
+  Its ARM code generator uses VFP instructions under either calling
+  convention, so it is left out of `armv7-softfloat`.
+- Two patches: `tcc` takes `lib/tcc` beside its own executable as its
+  runtime directory, read from `/proc/self/exe`
+  (`patches/tcc-relocatable.patch`), and it refuses `-run`
+  (`patches/tcc-no-run.patch`).
+  `-static` is a built-in switch, and the bounds checker (`-b`) is not
+  built: it interposes `malloc`, which a static program cannot.
+- `lib/tcc/musl/` is musl built from the pinned release for the same target,
+  with the same Zig toolchain as everything else: headers, `crt1.o`,
+  `crti.o`, `crtn.o`, and `libc.a`. It holds no Linux kernel headers, so
+  code that includes `<linux/...>` does not compile. On `riscv64` it is
+  built with the medany code model, because tcc's linker lacks the absolute
+  relocations of the default one.
+- `libtcc1.a` and the `-bt` objects are compiled by a second `tcc`, built
+  from the same source and configuration with the builder's compiler,
+  since the shipped one runs only on the target.
+- `libtcc1.a` is not all LGPL like the compiler: its integer and
+  floating-point helpers and its atomics come from libgcc (GPL with the
+  linking and GCC runtime library exceptions), the ARM EABI helpers are
+  MIT, and the arm64 and riscv64 helpers are under the FSF all-permissive
+  license. `licenses/tcc/TCC-RUNTIME-NOTICES` holds each notice. The GCC
+  exception's text is not in any pinned source, so it is kept in
+  `configs/GCC-exception-3.1.txt`, copied from the SPDX license list.
+- The binutils 2.47 tarball was released with `bfd/development.sh` still
+  in development mode; the build switches it to release mode, as 2.46.1
+  shipped, so the tools report `2.47` and run without the maintainers'
+  internal checks.
+- The updater repins binutils and musl. `tcc` is repinned by hand: its pin
+  is a commit of `mob`, a branch anyone may push to.
+- The `musl` line in `BUILDINFO` and `sources.lock` is this library. The
+  kit's own programs link the musl bundled with the pinned Zig.
+
 ### File movement tools
 
 These favor size too. The main archive's share adds about 360 KB to it on
@@ -1588,7 +1637,10 @@ uncompressed). See [TLS wrapping](#tls-wrapping-stunnel) and
 same reason, on every target; see [moving data](#moving-data) for their use
 and [the profile](#file-movement-tools) for how they are built. `python3`
 and its standard library are there on every target too; see
-[Python](#python-python3) and [its profile](#python).
+[Python](#python-python3) and [its profile](#python). So are the binutils
+programs, with `tcc` on the targets it supports; see
+[compiler tools](#compiler-tools-tcc-and-binutils) and
+[their profile](#compiler-tools).
 
 The Go tools are several times the size of anything in the main archive, so
 they are packaged apart. Each is a static Go binary built with cgo disabled,
@@ -1754,6 +1806,51 @@ tracebacks still show source lines.
   do not unpack the archive straight into a shared directory such as `/tmp`.
 - **`python3 -m http.server`** serves the directory to anything that can
   reach the address: bind to loopback or a link you control.
+
+### Compiler tools: tcc and binutils
+
+```console
+tcc -o probe probe.c && ./probe
+tcc -bt -o probe probe.c
+tcc -c probe.c && tcc -ar rcs libprobe.a probe.o
+tcc -vv
+readelf -hl /bin/busybox
+objdump -d probe | less
+nm -n probe.o
+strings -n 8 firmware.bin
+as -o stub.o stub.s && ld -r -o merged.o stub.o
+objcopy -O binary -j .text probe probe.bin
+```
+
+`tcc` compiles C to a static executable in one step, fast enough to use on
+the target itself. Keep `tcc` and `lib/` together: it finds its headers,
+`libtcc1.a`, and the bundled musl in `lib/tcc/` beside itself, and
+`tcc -vv` prints the paths it settled on.
+
+- **Six targets.** `tcc` is in the `x86_64`, `i686`, `aarch64`,
+  `armv6-hardfloat`, `armv7-hardfloat`, and `riscv64` archives. The binutils
+  programs are in all thirteen.
+- **Static only.** Output is linked against the bundled `libc.a`; there is
+  no shared C library to link to, so every executable is static, and
+  `tcc -run` is refused: compile, then run the file.
+- **What your program contains.** Every executable `tcc` links includes
+  parts of `libtcc1.a` and of musl. Both allow it without conditions on
+  your code (the GPL parts of `libtcc1.a` carry linking exceptions), but
+  musl's notices apply to what you distribute; they are in
+  `licenses/musl/` and `licenses/tcc/`.
+- **C, and no kernel headers.** `tcc` is a C99 compiler with some C11 and
+  GNU extensions and almost no optimizer. `<linux/...>` headers are not
+  bundled; add a directory of them with `-I`.
+- **`-bt`** adds a backtrace with source lines when the program faults.
+- **Linking with `ld`.** `tcc` links by itself. To link its objects with
+  binutils instead, name the start files and libraries:
+  `ld -static -z noexecstack -o probe lib/tcc/musl/lib/crt1.o lib/tcc/musl/lib/crti.o
+  probe.o lib/tcc/musl/lib/libc.a lib/tcc/libtcc1.a lib/tcc/musl/lib/libc.a
+  lib/tcc/musl/lib/crtn.o`.
+- **One architecture.** `objdump`, `nm`, `ld`, and `as` handle the
+  bundle's own architecture. `readelf` and `strings` read any ELF file.
+- **Names that shadow BusyBox.** `ar`, `strings`, and others here are the
+  GNU programs; the main archive's BusyBox is unchanged.
 
 ### caddy: reverse proxy and file server
 

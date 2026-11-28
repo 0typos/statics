@@ -42,7 +42,7 @@ user-mode emulation proves that non-native outputs can actually start.
 
 | 🧰 Carry it | 🐧 Run it | 🔐 Trust it |
 |---|---|---|
-| 140 physical executables, plus BusyBox, Dropbear, kmod, iptables and decompressor links, and fourteen larger tools (eight in Go) in an optional extra archive | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
+| 140 physical executables, plus BusyBox, Dropbear, kmod, iptables and decompressor links, and twenty-four larger tools (eight in Go) in an optional extra archive | Thirteen Linux architectures from x86 to IBM Z | Pinned sources, checksums, SPDX SBOM and complete notices |
 | Network, process, namespace, storage and hardware diagnosis | Static musl builds avoid a dependency on the target's libc | Deterministic archives, QEMU smoke tests and release attestations |
 
 ## Get a kit
@@ -66,36 +66,38 @@ Not sure which archive fits the device? Start with the
 
 Each architecture has two archives. **`statics-<arch>.tar.xz` is the kit**:
 every tool below, and it is all most sessions need.
-**`statics-extra-<arch>.tar.xz` is optional** and holds fourteen larger tools:
+**`statics-extra-<arch>.tar.xz` is optional** and holds twenty-four larger tools:
 `stunnel`, `openvpn`, `lftp` and `aria2c`, which each carry their own copy of
-OpenSSL, `par2`, `python3` with its standard library, and eight Go tools: `rclone`, `croc`, `crictl`, `ctr`, `caddy`,
-`yq`, `age` and `age-keygen`.
+OpenSSL, `par2`, `python3` with its standard library, nine binutils programs
+(`ld`, `as`, `ar`, `nm`, `objcopy`, `objdump`, `readelf`, `strings` and
+`strip`), the `tcc` C compiler with a musl C library, and eight Go tools:
+`rclone`, `croc`, `crictl`, `ctr`, `caddy`, `yq`, `age` and `age-keygen`.
 Splitting them out keeps the main kit small enough for routers and other
 cramped devices; take the extra archive when you need TLS wrapping or a VPN,
 to mirror directory trees, resume large downloads, repair files from parity
 data, sync with object storage, hand files across machines, or inspect a
 container runtime. It extracts beside the main kit as `<arch>-extra/`, with
 its own checksums, SBOM and notices. On `powerpc` and `powerpc64`, where Go
-does not run, it holds only the six C tools (see the
+does not run, it holds only the fifteen C tools (see the
 [architecture guide](docs/ARCHITECTURES.md#go-tools)).
 
 Archive sizes for the current pins:
 
 | target | main archive | extra archive |
 |---|---|---|
-| `x86_64` | 21.7 MiB | 44.8 MiB |
-| `i686` | 21.6 MiB | 42.9 MiB |
-| `aarch64` | 19.9 MiB | 40.0 MiB |
-| `armv6-hardfloat` | 18.6 MiB | 40.0 MiB |
-| `armv7-hardfloat` | 18.5 MiB | 39.9 MiB |
-| `armv7-softfloat` | 18.4 MiB | 39.9 MiB |
-| `mips` | 22.6 MiB | 40.0 MiB |
-| `mipsel` | 23.0 MiB | 40.7 MiB |
-| `powerpc` | 20.5 MiB | 14.1 MiB |
-| `powerpc64` | 21.0 MiB | 14.3 MiB |
-| `powerpc64le` | 22.4 MiB | 41.2 MiB |
-| `riscv64` | 21.4 MiB | 43.5 MiB |
-| `s390x` | 21.0 MiB | 41.7 MiB |
+| `x86_64` | 21.7 MiB | 49.5 MiB |
+| `i686` | 21.6 MiB | 46.4 MiB |
+| `aarch64` | 19.9 MiB | 44.3 MiB |
+| `armv6-hardfloat` | 18.6 MiB | 43.1 MiB |
+| `armv7-hardfloat` | 18.5 MiB | 43.0 MiB |
+| `armv7-softfloat` | 18.4 MiB | 41.6 MiB |
+| `mips` | 22.6 MiB | 42.1 MiB |
+| `mipsel` | 23.0 MiB | 42.9 MiB |
+| `powerpc` | 20.5 MiB | 15.2 MiB |
+| `powerpc64` | 21.0 MiB | 15.6 MiB |
+| `powerpc64le` | 22.4 MiB | 44.1 MiB |
+| `riscv64` | 21.4 MiB | 47.7 MiB |
+| `s390x` | 21.1 MiB | 44.9 MiB |
 
 The extra archive is compressed with `xz -9` and needs about 65 MiB of memory
 to unpack; on a smaller device, unpack it elsewhere and copy the directory.
@@ -190,6 +192,7 @@ The extra archive adds:
 | Parity and repair | `par2` | Recovery data that repairs damaged or missing files |
 | Container runtimes | `crictl`, `ctr` | Pods, containers, logs, images and snapshots through the CRI and containerd sockets |
 | Python | `python3` | CPython with its standard library, SQLite, TLS and compression modules built in, for scripts on a target with no interpreter |
+| Compiler tools | `tcc`, `ld`, `as`, `ar`, `nm`, `objcopy`, `objdump`, `readelf`, `strings`, `strip` | Compile and statically link C on the target with `tcc` and its bundled musl; assemble, link and inspect object files with GNU binutils |
 | Web server and reverse proxy | `caddy` | Reverse proxy, static file server and TLS termination from one command or a Caddyfile |
 | Data and encryption | `yq`, `age`, `age-keygen` | Query and convert YAML, JSON, XML, TOML and CSV; encrypt files to a key, an SSH key or a passphrase |
 
