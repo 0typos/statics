@@ -48,7 +48,7 @@ build_python() {
     (
         cd "$WORK_DIR/python" || exit
         # Configure insists on a build interpreter of the same X.Y to freeze
-        # modules and generate sysconfig data; the Dockerfile's build-python
+        # modules and generate sysconfig data; the Dockerfile's toolchain
         # stage compiles it natively from this same source.
         local build_python=${STATICS_BUILD_PYTHON:-/opt/build-python/python}
         [[ -x $build_python ]] || {

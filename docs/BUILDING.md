@@ -199,7 +199,8 @@ cached layer can never hold different packages than a fresh rebuild.
 `BUILDINFO` records that snapshot and a digest of the installed package
 list. Bumping the base image digest moves the snapshot with it.
 
-CI does not rebuild the toolchain stage in every job. The `Toolchain image`
+CI does not rebuild the toolchain stage, which holds Zig, Go, and the native
+CPython that cross-builds `python3`, in every job. The `Toolchain image`
 workflow builds it from scratch on `main` and publishes it as
 `ghcr.io/0typos/statics-toolchain:main`, and every CI build pulls it as a
 layer cache through `scripts/docker-build.sh`. It is never a `FROM`: the
@@ -302,7 +303,7 @@ requires the pinned Zig and Go releases, all build dependencies, every
 extracted source tree under `/src` (or `SOURCES_DIR`), the Go module
 cache that `scripts/fetch-go-modules.sh` writes there, and a CPython of the
 pinned series built natively from the same source, as the Dockerfile's
-`build-python` stage does, at `/opt/build-python/python` (or
+toolchain stage does, at `/opt/build-python/python` (or
 `STATICS_BUILD_PYTHON`). It is intentionally not the
 recommended host setup.
 
